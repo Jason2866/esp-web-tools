@@ -1,36 +1,39 @@
 {
-  "name": "esp-web-tools",
-  "version": "8.0.6",
+  "name": "tasmota-esp-web-tools",
+  "version": "8.1.0",
   "description": "Web tools for ESP devices",
   "main": "dist/install-button.js",
-  "repository": "https://github.com/esphome/esp-web-tools",
-  "author": "ESPHome maintainers",
+  "repository": "https://github.com/Jason2866/esp-web-tools",
+  "author": "ESPHome maintainers & Jason2866",
   "license": "Apache-2.0",
   "scripts": {
     "prepublishOnly": "script/build"
   },
   "devDependencies": {
-    "@rollup/plugin-json": "^4.1.0",
-    "@rollup/plugin-node-resolve": "^13.0.0",
-    "@rollup/plugin-typescript": "^8.2.1",
-    "@types/w3c-web-serial": "^1.0.1",
-    "prettier": "^2.3.0",
-    "rollup": "^2.50.2",
-    "rollup-plugin-terser": "^7.0.2",
-    "serve": "^13.0.2",
-    "typescript": "^4.3.2"
+    "@babel/plugin-proposal-class-properties": "^7.18.6",
+    "@rollup/plugin-babel": "^6.0.3",
+    "@rollup/plugin-json": "^6.0.0",
+    "@rollup/plugin-node-resolve": "^15.0.1",
+    "@rollup/plugin-typescript": "^11.0.0",
+    "@rollup/plugin-terser": "^0.4.0",
+    "@types/w3c-web-serial": "^1.0.3",
+    "prettier": "^2.8.1",
+    "rollup": "^3.9.1",
+    "serve": "^14.1.2",
+    "typescript": "^4.9.4"
   },
   "dependencies": {
-    "@material/mwc-button": "^0.26.1",
-    "@material/mwc-checkbox": "^0.26.1",
-    "@material/mwc-circular-progress": "^0.26.1",
-    "@material/mwc-dialog": "^0.26.1",
-    "@material/mwc-formfield": "^0.26.1",
-    "@material/mwc-icon-button": "^0.26.1",
-    "@material/mwc-textfield": "^0.26.1",
-    "esp-web-flasher": "^5.1.4",
-    "improv-wifi-serial-sdk": "^2.2.2",
-    "lit": "^2.0.0",
-    "tslib": "^2.3.1"
+    "@material/mwc-button": "^0.27.0",
+    "@material/mwc-checkbox": "^0.27.0",
+    "@material/mwc-circular-progress": "^0.27.0",
+    "@material/mwc-dialog": "^0.27.0",
+    "@material/mwc-formfield": "^0.27.0",
+    "@material/mwc-icon-button": "^0.27.0",
+    "@material/mwc-textfield": "^0.27.0",
+    "tasmota-webserial-esptool": "^6.0.1",
+    "improv-wifi-serial-sdk": "^2.4.0",
+    "lit": "^2.5.0",
+    "pako": "^2.1.0",
+    "tslib": "^2.4.1"
   }
 }
