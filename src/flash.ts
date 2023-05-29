@@ -1,4 +1,4 @@
-import { ESPLoader, Logger } from "esp-web-flasher";
+import { ESPLoader, Logger } from "tasmota-webserial-esptool";
 import {
   Build,
   FlashError,

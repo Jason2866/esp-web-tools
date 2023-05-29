@@ -5,7 +5,7 @@ import {
   CHIP_FAMILY_ESP8266,
   CHIP_FAMILY_ESP32C3,
   ESPLoader,
-} from "esp-web-flasher";
+} from "tasmota-webserial-esptool";
 import type { BaseFlashState } from "../const";
 
 export const getChipFamilyName = (
