@@ -11,7 +11,7 @@
   },
   "devDependencies": {
     "@rollup/plugin-json": "^6.0.0",
-    "@rollup/plugin-node-resolve": "^13.0.0",
+    "@rollup/plugin-node-resolve": "^15.0.1",
     "@rollup/plugin-typescript": "^11.0.0",
     "@types/w3c-web-serial": "^1.0.3",
     "prettier": "^2.8.1",
@@ -30,7 +30,7 @@
     "@material/mwc-textfield": "^0.27.0",
     "tasmota-webserial-esptool": "^6.0.1",
     "improv-wifi-serial-sdk": "^2.4.0",
-    "lit": "^2.0.0",
-    "tslib": "^2.3.1"
+    "lit": "^2.5.0",
+    "tslib": "^2.4.1"
   }
 }
