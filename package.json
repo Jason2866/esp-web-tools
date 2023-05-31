@@ -1,35 +1,35 @@
 {
   "name": "tasmota-esp-web-tools",
-  "version": "8.1.0",
+  "version": "8.1.1",
   "description": "Web tools for ESP devices",
   "main": "dist/install-button.js",
   "repository": "https://github.com/Jason2866/esp-web-tools",
-  "author": "ESPHome maintainers",
+  "author": "ESPHome maintainers & Jason2866",
   "license": "Apache-2.0",
   "scripts": {
     "prepublishOnly": "script/build"
   },
   "devDependencies": {
-    "@rollup/plugin-json": "^4.1.0",
+    "@rollup/plugin-json": "^6.0.0",
     "@rollup/plugin-node-resolve": "^13.0.0",
-    "@rollup/plugin-typescript": "^8.2.1",
-    "@types/w3c-web-serial": "^1.0.1",
-    "prettier": "^2.3.0",
+    "@rollup/plugin-typescript": "^11.0.0",
+    "@types/w3c-web-serial": "^1.0.3",
+    "prettier": "^2.8.1",
     "rollup": "^2.50.2",
     "rollup-plugin-terser": "^7.0.2",
-    "serve": "^13.0.2",
-    "typescript": "^4.3.2"
+    "serve": "^14.1.2",
+    "typescript": "^4.9.4"
   },
   "dependencies": {
-    "@material/mwc-button": "^0.26.1",
-    "@material/mwc-checkbox": "^0.26.1",
-    "@material/mwc-circular-progress": "^0.26.1",
-    "@material/mwc-dialog": "^0.26.1",
-    "@material/mwc-formfield": "^0.26.1",
-    "@material/mwc-icon-button": "^0.26.1",
-    "@material/mwc-textfield": "^0.26.1",
+    "@material/mwc-button": "^0.27.0",
+    "@material/mwc-checkbox": "^0.27.0",
+    "@material/mwc-circular-progress": "^0.27.0",
+    "@material/mwc-dialog": "^0.27.0",
+    "@material/mwc-formfield": "^0.27.0",
+    "@material/mwc-icon-button": "^0.27.0",
+    "@material/mwc-textfield": "^0.27.0",
     "tasmota-webserial-esptool": "^6.0.1",
-    "improv-wifi-serial-sdk": "^2.2.2",
+    "improv-wifi-serial-sdk": "^2.4.0",
     "lit": "^2.0.0",
     "tslib": "^2.3.1"
   }

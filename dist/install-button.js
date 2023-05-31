@@ -1,7 +1,4 @@
 export class InstallButton extends HTMLElement {
-    static preload() {
-        import("./connect");
-    }
     connectedCallback() {
         if (this.renderRoot) {
             return;
@@ -15,7 +12,6 @@ export class InstallButton extends HTMLElement {
             return;
         }
         this.toggleAttribute("install-supported", true);
-        this.addEventListener("mouseover", InstallButton.preload);
         const slot = document.createElement("slot");
         slot.addEventListener("click", async (ev) => {
             ev.preventDefault();

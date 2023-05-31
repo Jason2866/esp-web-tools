@@ -74,10 +74,6 @@ export class InstallButton extends HTMLElement {
 
   public overrides: EwtInstallDialog["overrides"];
 
-  public static preload() {
-    import("./connect");
-  }
-
   public connectedCallback() {
     if (this.renderRoot) {
       return;
@@ -94,8 +90,6 @@ export class InstallButton extends HTMLElement {
     }
 
     this.toggleAttribute("install-supported", true);
-
-    this.addEventListener("mouseover", InstallButton.preload);
 
     const slot = document.createElement("slot");
 

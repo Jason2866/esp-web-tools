@@ -12,6 +12,5 @@ export declare class InstallButton extends HTMLElement {
     state?: FlashState;
     renderRoot?: ShadowRoot;
     overrides: EwtInstallDialog["overrides"];
-    static preload(): void;
     connectedCallback(): void;
 }
