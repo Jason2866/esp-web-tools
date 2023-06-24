@@ -14,7 +14,8 @@ export const flash = async (
   port: SerialPort,
   logger: Logger,
   manifestPath: string,
-  eraseFirst: boolean
+  eraseFirst: boolean,
+  firmwareBuffer: Uint8Array
 ) => {
   let manifest: Manifest;
   let build: Build | undefined;
@@ -28,10 +29,17 @@ export const flash = async (
       chipFamily,
     });
 
-  const manifestURL = new URL(manifestPath, location.toString()).toString();
-  const manifestProm = fetch(manifestURL).then(
-    (resp): Promise<Manifest> => resp.json()
-  );
+  var manifestProm = null;
+  var manifestURL: string = "";
+
+  try{
+    manifestProm = JSON.parse(manifestPath);
+  } catch{
+    manifestURL = new URL(manifestPath, location.toString()).toString();
+    manifestProm = fetch(manifestURL).then(
+      (resp): Promise<Manifest> => resp.json()
+    );
+  }
 
   const esploader = new ESPLoader(port, logger);
 
@@ -110,14 +118,19 @@ export const flash = async (
   });
 
   const filePromises = build.parts.map(async (part) => {
-    const url = new URL(part.path, manifestURL).toString();
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      throw new Error(
-        `Downlading firmware ${part.path} failed: ${resp.status}`
-      );
+    if(firmwareBuffer.length == 0){
+      //No firmware buffer provided, now download ...
+      const url = new URL(part.path, manifestURL).toString();
+      const resp = await fetch(url);
+      if (!resp.ok) {
+        throw new Error(
+          `Downlading firmware ${part.path} failed: ${resp.status}`
+        );
+      }
+      return resp.arrayBuffer();
     }
-    return resp.arrayBuffer();
+    // buffer from local file upload
+    return firmwareBuffer;
   });
 
   // Run the stub while we wait for files to download

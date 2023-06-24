@@ -61,6 +61,8 @@ export class InstallButton extends HTMLElement {
 
   public manifest?: string;
 
+  public firmwareFile?: File;
+
   public eraseFirst?: boolean;
 
   public hideProgress?: boolean;

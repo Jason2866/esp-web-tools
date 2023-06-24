@@ -31,6 +31,7 @@ export const connect = async (button: InstallButton) => {
   el.port = port;
   el.manifestPath = button.manifest || button.getAttribute("manifest")!;
   el.overrides = button.overrides;
+  el.firmwareFile = button.firmwareFile;
   el.addEventListener(
     "closed",
     () => {
