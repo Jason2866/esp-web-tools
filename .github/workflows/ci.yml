@@ -4,10 +4,9 @@
 name: CI with esptool.js
 
 on:
+  workflow_dispatch:
   push:
     branches: [local_upload]
-  pull_request:
-    branches: [loacal_upload]
 
 jobs:
   build:
@@ -22,7 +21,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 16
-      - run: npm ci
+          node-version: 20
+      - run: npm
       - run: script/build
       - run: npm exec -- prettier --check src
