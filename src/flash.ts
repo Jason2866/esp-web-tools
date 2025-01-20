@@ -13,6 +13,7 @@ export const flash = async (
   manifestPath: string,
   manifest: Manifest,
   eraseFirst: boolean,
+  firmwareBuffer: Uint8Array
 ) => {
   let build: Build | undefined;
   let chipFamily: Build["chipFamily"];
@@ -85,25 +86,37 @@ export const flash = async (
     details: { done: false },
   });
 
-  const manifestURL = new URL(manifestPath, location.toString()).toString();
-  const filePromises = build.parts.map(async (part) => {
-    const url = new URL(part.path, manifestURL).toString();
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      throw new Error(
-        `Downlading firmware ${part.path} failed: ${resp.status}`,
-      );
+  var filePromises = null;
+  var manifestURL: string = "";
+
+  try {
+    filePromises = JSON.parse(manifestPath);
+  } catch {
+    if (firmwareBuffer.length == 0) {
+      //No firmware buffer provided, now download ...
+      manifestURL = new URL(manifestPath, location.toString()).toString();
+      filePromises = build.parts.map(async (part) => {
+        const url = new URL(part.path, manifestURL).toString();
+        const resp = await fetch(url);
+        if (!resp.ok) {
+          throw new Error(
+            `Downlading firmware ${part.path} failed: ${resp.status}`
+          );
+        }
+        const reader = new FileReader();
+        const blob = await resp.blob();
+
+        return new Promise<string>((resolve) => {
+          reader.addEventListener("load", () =>
+            resolve(reader.result as string)
+          );
+          reader.readAsBinaryString(blob);
+        });
+      });
     }
-
-    const reader = new FileReader();
-    const blob = await resp.blob();
-
-    return new Promise<string>((resolve) => {
-      reader.addEventListener("load", () => resolve(reader.result as string));
-      reader.readAsBinaryString(blob);
-    });
-  });
-
+    // buffer from local file upload
+    return firmwareBuffer;
+  }
   const fileArray: Array<{ data: string; address: number }> = [];
   let totalSize = 0;
 
@@ -173,7 +186,7 @@ export const flash = async (
           (written / total) * fileArray[fileIndex].data.length;
 
         const newPct = Math.floor(
-          ((totalWritten + uncompressedWritten) / totalSize) * 100,
+          ((totalWritten + uncompressedWritten) / totalSize) * 100
         );
 
         // we're done with this file
