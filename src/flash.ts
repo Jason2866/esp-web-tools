@@ -55,6 +55,7 @@ export const flash = async (
         "Failed to initialize. Try resetting your device or holding the BOOT button while clicking INSTALL.",
       details: { error: FlashError.FAILED_INITIALIZING, details: err },
     });
+  
     await hardReset(transport);
     await transport.disconnect();
     return;
