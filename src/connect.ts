@@ -8,7 +8,7 @@ export const connect = async (button: InstallButton) => {
   } catch (err: any) {
     if ((err as DOMException).name === "NotFoundError") {
       import("./no-port-picked/index").then((mod) =>
-        mod.openNoPortPickedDialog(() => connect(button)),
+        mod.openNoPortPickedDialog(() => connect(button))
       );
       return;
     }
@@ -31,12 +31,13 @@ export const connect = async (button: InstallButton) => {
   el.port = port;
   el.manifestPath = button.manifest || button.getAttribute("manifest")!;
   el.overrides = button.overrides;
+  el.firmwareFile = button.firmwareFile;
   el.addEventListener(
     "closed",
     () => {
       port!.close();
     },
-    { once: true },
+    { once: true }
   );
   document.body.appendChild(el);
 };
