@@ -2,13 +2,8 @@
 // https://github.com/microsoft/vscode-dev-containers/tree/v0.177.0/containers/typescript-node
 {
   "name": "Node.js & TypeScript",
-  "build": {
-    "dockerfile": "Dockerfile",
-    // Update 'VARIANT' to pick a Node version: 12, 14, 16, 18, 20
-    "args": {
-      "VARIANT": "20"
-    }
-  },
+  // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:0-20",
 
   // Add the IDs of extensions you want installed when the container is created.
   "extensions": [
