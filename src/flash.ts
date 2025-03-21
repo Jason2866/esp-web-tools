@@ -14,7 +14,7 @@ export const flash = async (
   manifestPath: string,
   manifest: Manifest,
   eraseFirst: boolean,
-  firmwareBuffer: Uint8Array
+  firmwareBuffer: Uint8Array,
 ) => {
   let build: Build | undefined;
   let chipFamily: Build["chipFamily"];
@@ -55,7 +55,7 @@ export const flash = async (
         "Failed to initialize. Try resetting your device or holding the BOOT button while clicking INSTALL.",
       details: { error: FlashError.FAILED_INITIALIZING, details: err },
     });
-  
+
     await hardReset(transport);
     await transport.disconnect();
     return;
@@ -102,7 +102,7 @@ export const flash = async (
         const resp = await fetch(url);
         if (!resp.ok) {
           throw new Error(
-            `Downlading firmware ${part.path} failed: ${resp.status}`
+            `Downlading firmware ${part.path} failed: ${resp.status}`,
           );
         }
         const reader = new FileReader();
@@ -110,7 +110,7 @@ export const flash = async (
 
         return new Promise<string>((resolve) => {
           reader.addEventListener("load", () =>
-            resolve(reader.result as string)
+            resolve(reader.result as string),
           );
           reader.readAsBinaryString(blob);
         });

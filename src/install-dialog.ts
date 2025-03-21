@@ -42,7 +42,7 @@ import { version } from "./version";
 import type { EwFilledSelect } from "./components/ew-filled-select";
 
 console.log(
-  `ESP Web Tools ${version} by Open Home Foundation; https://esphome.github.io/esp-web-tools/`
+  `ESP Web Tools ${version} by Open Home Foundation; https://esphome.github.io/esp-web-tools/`,
 );
 
 const ERROR_ICON = "⚠️";
@@ -60,7 +60,7 @@ export class EwtInstallDialog extends LitElement {
   public overrides?: {
     checkSameFirmware?: (
       manifest: Manifest,
-      deviceImprov: ImprovSerial["info"]
+      deviceImprov: ImprovSerial["info"],
     ) => boolean;
   };
 
@@ -356,7 +356,7 @@ export class EwtInstallDialog extends LitElement {
         this._renderProgress(
           this._ssids === undefined
             ? "Scanning for networks"
-            : "Trying to connect"
+            : "Trying to connect",
         ),
       ];
     }
@@ -458,7 +458,7 @@ export class EwtInstallDialog extends LitElement {
           error = `Unknown error (${this._client!.error})`;
       }
       const selectedSsid = this._ssids?.find(
-        (info) => info.name === this._selectedSsid
+        (info) => info.name === this._selectedSsid,
       );
       content = html`
         <ew-icon-button slot="headline" @click=${this._updateSsids}>
@@ -489,7 +489,7 @@ export class EwtInstallDialog extends LitElement {
                       >
                         ${info.name}
                       </ew-select-option>
-                    `
+                    `,
                   )}
                   <ew-divider></ew-divider>
                   <ew-select-option .selected=${!selectedSsid}>
@@ -657,7 +657,7 @@ export class EwtInstallDialog extends LitElement {
             : "2 minutes"}.<br />
           Keep this page visible to prevent slow down
         `,
-        percentage
+        percentage,
       );
     } else if (this._installState.state === FlashStateType.FINISHED) {
       heading = undefined;
@@ -725,7 +725,7 @@ export class EwtInstallDialog extends LitElement {
           @click=${() => {
             textDownload(
               this.shadowRoot!.querySelector("ewt-console")!.logs(),
-              `esp-web-tools-logs.txt`
+              `esp-web-tools-logs.txt`,
             );
 
             this.shadowRoot!.querySelector("ewt-console")!.reset();
@@ -841,10 +841,10 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private _focusFormElement(
-    selector = "ew-filled-text-field, ew-filled-select"
+    selector = "ew-filled-text-field, ew-filled-select",
   ) {
     const formEl = this.shadowRoot!.querySelector(
-      selector
+      selector,
     ) as LitElement | null;
     if (formEl) {
       formEl.updateComplete.then(() => setTimeout(() => formEl.focus(), 100));
@@ -943,7 +943,7 @@ export class EwtInstallDialog extends LitElement {
         this.manifestPath,
         this._manifest,
         this._installErase,
-        new Uint8Array(0)
+        new Uint8Array(0),
       );
     }
   }
@@ -971,7 +971,7 @@ export class EwtInstallDialog extends LitElement {
       this.manifestPath,
       this._manifest,
       this._installErase,
-      fileBuffer
+      fileBuffer,
     );
   }
 
@@ -983,14 +983,14 @@ export class EwtInstallDialog extends LitElement {
       this._selectedSsid === null
         ? (
             this.shadowRoot!.querySelector(
-              "ew-filled-text-field[name=ssid]"
+              "ew-filled-text-field[name=ssid]",
             ) as EwFilledTextField
           ).value
         : this._selectedSsid;
     const password =
       (
         this.shadowRoot!.querySelector(
-          "ew-filled-text-field[name=password]"
+          "ew-filled-text-field[name=password]",
         ) as EwFilledTextField | null
       )?.value || "";
     try {
