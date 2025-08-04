@@ -136,13 +136,13 @@ export const flash = async (
   // Run the stub while we wait for files to download
   const espStub = await esploader.runStub();
 
-  const files: ArrayBuffer[] = [];
+  const files: (ArrayBuffer | Uint8Array)[] = [];
   let totalSize = 0;
 
   for (const prom of filePromises) {
     try {
       const data = await prom;
-      files.push(data);
+      files.push(data instanceof ArrayBuffer ? new Uint8Array(data) : data);
       totalSize += data.byteLength;
     } catch (err: any) {
       fireStateEvent({
@@ -194,9 +194,10 @@ export const flash = async (
 
   for (const part of build.parts) {
     const file = files.shift()!;
+    const fileBuffer = file instanceof Uint8Array ? new Uint8Array(file).buffer : file;
     try {
       await espStub.flashData(
-        file,
+        fileBuffer as ArrayBuffer,
         (bytesWritten: number) => {
           const newPct = Math.floor(
             ((totalWritten + bytesWritten) / totalSize) * 100,

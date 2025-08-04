@@ -838,7 +838,7 @@ export class EwtInstallDialog extends LitElement {
       // If a uploaded File was provided -> create Uint8Array of content
       new Blob([this.firmwareFile])
         .arrayBuffer()
-        .then((b) => this._flashFilebuffer(b as Uint8Array));
+        .then((b) => this._flashFilebuffer(new Uint8Array(b)));
     } else {
       // Use "standard way" with URL to manifest and firmware binary
       flash(
