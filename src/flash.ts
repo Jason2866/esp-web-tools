@@ -194,7 +194,8 @@ export const flash = async (
 
   for (const part of build.parts) {
     const file = files.shift()!;
-    const fileBuffer = file instanceof Uint8Array ? new Uint8Array(file).buffer : file;
+    const fileBuffer =
+      file instanceof Uint8Array ? new Uint8Array(file).buffer : file;
     try {
       await espStub.flashData(
         fileBuffer as ArrayBuffer,

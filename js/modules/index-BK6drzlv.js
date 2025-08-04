@@ -1,4 +1,4 @@
-import{C as e,D as t,f as o,_ as l,k as i,s as a,x as n}from"./styles-C-tgIckh.js";const s=e`
+import{C as e,D as t,f as o,_ as l,k as i,s as a,x as n}from"./styles-ntwzvT31.js";const s=e`
   <svg
     version="1.1"
     id="Capa_1"
