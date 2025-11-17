@@ -28,7 +28,7 @@ Example manifest:
       "chipFamily": "ESP32-C2",
       "improv": true,
       "parts": [
-        { "path": "../firmware/tasmota32/tasmota32c2-arduino30.factory.bin", "offset": 0 }
+        { "path": "../firmware/tasmota32/tasmota32c2.factory.bin", "offset": 0 }
       ]
     },
     {
@@ -39,10 +39,24 @@ Example manifest:
       ]
     },
     {
+      "chipFamily": "ESP32-C5",
+      "improv": true,
+      "parts": [
+        { "path": "../firmware/tasmota32/tasmota32c5.factory.bin", "offset": 0 }
+      ]
+    },
+    {
       "chipFamily": "ESP32-C6",
       "improv": true,
       "parts": [
-        { "path": "../firmware/tasmota32/tasmota32c6cdc-arduino30.factory.bin", "offset": 0 }
+        { "path": "../firmware/tasmota32/tasmota32c6.factory.bin", "offset": 0 }
+      ]
+    },
+    {
+      "chipFamily": "ESP32-C61",
+      "improv": true,
+      "parts": [
+        { "path": "../firmware/tasmota32/tasmota32c61.factory.bin", "offset": 0 }
       ]
     },
     {

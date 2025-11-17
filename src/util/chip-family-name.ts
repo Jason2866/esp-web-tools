@@ -4,7 +4,9 @@ import {
   CHIP_FAMILY_ESP32S3,
   CHIP_FAMILY_ESP32C2,
   CHIP_FAMILY_ESP32C3,
+  CHIP_FAMILY_ESP32C5,
   CHIP_FAMILY_ESP32C6,
+  CHIP_FAMILY_ESP32C61,
   CHIP_FAMILY_ESP32H2,
   CHIP_FAMILY_ESP32P4,
   CHIP_FAMILY_ESP8266,
@@ -26,8 +28,12 @@ export const getChipFamilyName = (
       return "ESP32-C2";
     case CHIP_FAMILY_ESP32C3:
       return "ESP32-C3";
+    case CHIP_FAMILY_ESP32C5:
+      return "ESP32-C5";
     case CHIP_FAMILY_ESP32C6:
       return "ESP32-C6";
+    case CHIP_FAMILY_ESP32C61:
+      return "ESP32-C61";
     case CHIP_FAMILY_ESP32H2:
       return "ESP32-H2";
     case CHIP_FAMILY_ESP32P4:
