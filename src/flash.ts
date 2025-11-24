@@ -116,7 +116,9 @@ export const flash = async (
   });
 
   if (!build) {
-    const chipInfo = chipVariant ? `${chipFamily} (${chipVariant})` : chipFamily;
+    const chipInfo = chipVariant
+      ? `${chipFamily} (${chipVariant})`
+      : chipFamily;
     fireStateEvent({
       state: FlashStateType.ERROR,
       message: `Your ${chipInfo} board is not supported.`,
