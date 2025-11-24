@@ -20,6 +20,7 @@ export const flash = async (
   let manifest: Manifest;
   let build: Build | undefined;
   let chipFamily: ReturnType<typeof getChipFamilyName>;
+  let chipVariant: string | null = null;
 
   const fireStateEvent = (stateUpdate: FlashState) =>
     onEvent({
@@ -27,6 +28,7 @@ export const flash = async (
       manifest,
       build,
       chipFamily,
+      chipVariant,
     });
 
   var manifestProm = null;
@@ -69,10 +71,11 @@ export const flash = async (
   }
 
   chipFamily = getChipFamilyName(esploader);
+  chipVariant = esploader.chipVariant;
 
   fireStateEvent({
     state: FlashStateType.INITIALIZING,
-    message: `Initialized. Found ${chipFamily}`,
+    message: `Initialized. Found ${chipFamily}${chipVariant ? ` (${chipVariant})` : ""}`,
     details: { done: true },
   });
   fireStateEvent({
@@ -93,7 +96,18 @@ export const flash = async (
     return;
   }
 
-  build = manifest.builds.find((b) => b.chipFamily === chipFamily);
+  build = manifest.builds.find((b) => {
+    // Match chipFamily and optionally chipVariant
+    if (b.chipFamily !== chipFamily) {
+      return false;
+    }
+    // If build specifies a chipVariant, it must match
+    if (b.chipVariant !== undefined) {
+      return b.chipVariant === chipVariant;
+    }
+    // If build doesn't specify chipVariant, it matches any variant
+    return true;
+  });
 
   fireStateEvent({
     state: FlashStateType.MANIFEST,
@@ -102,10 +116,11 @@ export const flash = async (
   });
 
   if (!build) {
+    const chipInfo = chipVariant ? `${chipFamily} (${chipVariant})` : chipFamily;
     fireStateEvent({
       state: FlashStateType.ERROR,
-      message: `Your ${chipFamily} board is not supported.`,
-      details: { error: FlashError.NOT_SUPPORTED, details: chipFamily },
+      message: `Your ${chipInfo} board is not supported.`,
+      details: { error: FlashError.NOT_SUPPORTED, details: chipInfo },
     });
     await esploader.disconnect();
     return;

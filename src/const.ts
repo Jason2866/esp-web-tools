@@ -17,6 +17,7 @@ export interface Build {
     | "ESP32-C61"
     | "ESP32-H2"
     | "ESP32-P4";
+  chipVariant?: string;
   parts: {
     path: string;
     offset: number;
@@ -42,6 +43,7 @@ export interface BaseFlashState {
   manifest?: Manifest;
   build?: Build;
   chipFamily?: Build["chipFamily"] | "Unknown Chip";
+  chipVariant?: string | null;
 }
 
 export interface InitializingState extends BaseFlashState {

@@ -82,6 +82,32 @@ Example manifest:
 }
 ```
 
+## Chip Variant Support (ESP32-P4)
+
+For chips with multiple hardware revisions (like ESP32-P4), you can specify different firmware builds for each variant:
+
+```json
+{
+  "name": "My Firmware",
+  "builds": [
+    {
+      "chipFamily": "ESP32-P4",
+      "chipVariant": "rev0",
+      "parts": [{ "path": "firmware_p4_old.bin", "offset": 0 }]
+    },
+    {
+      "chipFamily": "ESP32-P4",
+      "chipVariant": "rev300",
+      "parts": [{ "path": "firmware_p4_new.bin", "offset": 0 }]
+    }
+  ]
+}
+```
+
+The `chipVariant` field is optional. If omitted, the build will match any variant of that chip family.
+
+See [manifest-example-p4-variants.json](manifest-example-p4-variants.json) for a complete example.
+
 ## Development
 
 Run `script/develop`. This starts a server. Open it on http://localhost:5001.

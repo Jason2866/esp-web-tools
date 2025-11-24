@@ -1,0 +1,61 @@
+{
+  "name": "ESP32-P4 Firmware Example",
+  "version": "1.0.0",
+  "home_assistant_domain": "example",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32-P4",
+      "chipVariant": "rev0",
+      "parts": [
+        {
+          "path": "bootloader_p4_rev0.bin",
+          "offset": 0
+        },
+        {
+          "path": "partition-table.bin",
+          "offset": 32768
+        },
+        {
+          "path": "firmware_p4_rev0.bin",
+          "offset": 65536
+        }
+      ]
+    },
+    {
+      "chipFamily": "ESP32-P4",
+      "chipVariant": "rev300",
+      "parts": [
+        {
+          "path": "bootloader_p4_rev300.bin",
+          "offset": 0
+        },
+        {
+          "path": "partition-table.bin",
+          "offset": 32768
+        },
+        {
+          "path": "firmware_p4_rev300.bin",
+          "offset": 65536
+        }
+      ]
+    },
+    {
+      "chipFamily": "ESP32-S3",
+      "parts": [
+        {
+          "path": "bootloader_s3.bin",
+          "offset": 0
+        },
+        {
+          "path": "partition-table.bin",
+          "offset": 32768
+        },
+        {
+          "path": "firmware_s3.bin",
+          "offset": 65536
+        }
+      ]
+    }
+  ]
+}
