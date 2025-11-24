@@ -14,8 +14,8 @@
     "@rollup/plugin-babel": "^6.0.4",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.0",
-    "@rollup/plugin-typescript": "^12.1.2",
     "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^12.1.2",
     "@types/w3c-web-serial": "^1.0.7",
     "prettier": "^3.4.2",
     "rollup": "^4.30.1",
@@ -32,7 +32,7 @@
     "@material/mwc-textfield": "^0.27.0",
     "improv-wifi-serial-sdk": "^2.5.0",
     "lit": "^2.8.0",
-    "tasmota-webserial-esptool": "^6.4.1",
+    "tasmota-webserial-esptool": "^6.5.0",
     "tslib": "^2.8.1"
   }
 }
