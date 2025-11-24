@@ -3,7 +3,10 @@
   "version": "8.2.0",
   "description": "Web tools for ESP devices",
   "main": "dist/install-button.js",
-  "repository": "https://github.com/Jason2866/esp-web-tools",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jason2866/esp-web-tools.git"
+  },
   "author": "ESPHome maintainers & Jason2866",
   "license": "Apache-2.0",
   "scripts": {
