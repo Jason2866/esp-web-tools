@@ -172,9 +172,9 @@
         <a href="https://esphome.io">ESPHome</a>. To get started, connect an ESP
         device to your computer and hit the button:
       </p>
-      <div style="margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 4px;">
-        <label for="baudRate" style="font-weight: 600; margin-right: 10px;">Flash Speed:</label>
-        <select id="baudRate" style="padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; cursor: pointer; min-width: 200px;">
+      <p>
+        <label for="baudRate" style="font-weight: 600;">Flash Speed:</label>
+        <select id="baudRate" style="padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; cursor: pointer; min-width: 200px; margin-left: 10px;">
           <option value="">115200 Baud (Default)</option>
           <option value="230400">230400 Baud</option>
           <option value="460800">460800 Baud</option>
@@ -182,10 +182,7 @@
           <option value="1500000">1500000 Baud</option>
           <option value="2000000" selected>2000000 Baud (Recommended)</option>
         </select>
-        <div id="speedInfo" style="margin-top: 10px; font-size: 14px; color: #666;">
-          Selected: <strong>2000000 Baud</strong> (~200 KB/s, ~15 seconds for 3 MB)
-        </div>
-      </div>
+      </p>
       <esp-web-install-button
         id="installButton"
         manifest="https://firmware.esphome.io/esphome-web/manifest.json"
@@ -602,21 +599,10 @@ button.overrides = {
       // Baud rate selection
       const baudRateSelect = document.getElementById('baudRate');
       const installButton = document.getElementById('installButton');
-      const speedInfo = document.getElementById('speedInfo');
 
-      const speedData = {
-        '': { speed: '~11 KB/s', time: '~4.5 minutes', label: '115200 Baud (Default)' },
-        '230400': { speed: '~22 KB/s', time: '~2.3 minutes', label: '230400 Baud' },
-        '460800': { speed: '~44 KB/s', time: '~70 seconds', label: '460800 Baud' },
-        '921600': { speed: '~88 KB/s', time: '~35 seconds', label: '921600 Baud' },
-        '1500000': { speed: '~143 KB/s', time: '~21 seconds', label: '1500000 Baud' },
-        '2000000': { speed: '~200 KB/s', time: '~15 seconds', label: '2000000 Baud' }
-      };
-
-      if (baudRateSelect && installButton && speedInfo) {
+      if (baudRateSelect && installButton) {
         baudRateSelect.addEventListener('change', function() {
           const selectedRate = this.value;
-          const data = speedData[selectedRate];
           
           // Update install button
           if (selectedRate === '') {
@@ -624,9 +610,6 @@ button.overrides = {
           } else {
             installButton.setAttribute('baud-rate', selectedRate);
           }
-          
-          // Update speed info
-          speedInfo.innerHTML = `Selected: <strong>${data.label}</strong> (${data.speed}, ${data.time} for 3 MB)`;
         });
       }
     </script>

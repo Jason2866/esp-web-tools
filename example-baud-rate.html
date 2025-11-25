@@ -72,15 +72,7 @@
       margin-top: 0;
       color: #333;
     }
-    .speed-info {
-      display: inline-block;
-      background: #e3f2fd;
-      padding: 10px 20px;
-      border-radius: 4px;
-      margin: 15px 0;
-      font-size: 14px;
-      color: #1976d2;
-    }
+
     esp-web-install-button {
       margin: 20px 0;
     }
@@ -145,9 +137,6 @@
 
     <div class="install-section">
       <h2>Install Firmware</h2>
-      <div class="speed-info" id="speedInfo">
-        Selected: <strong>2000000 Baud</strong> (~200 KB/s, ~15 seconds for 3 MB)
-      </div>
       <esp-web-install-button 
         id="installButton"
         manifest="manifest.json"
@@ -271,20 +260,9 @@
   <script>
     const baudRateSelect = document.getElementById('baudRate');
     const installButton = document.getElementById('installButton');
-    const speedInfo = document.getElementById('speedInfo');
-
-    const speedData = {
-      '': { speed: '~11 KB/s', time: '~4.5 minutes', label: '115200 Baud (Default)' },
-      '230400': { speed: '~22 KB/s', time: '~2.3 minutes', label: '230400 Baud' },
-      '460800': { speed: '~44 KB/s', time: '~70 seconds', label: '460800 Baud' },
-      '921600': { speed: '~88 KB/s', time: '~35 seconds', label: '921600 Baud' },
-      '1500000': { speed: '~143 KB/s', time: '~21 seconds', label: '1500000 Baud' },
-      '2000000': { speed: '~200 KB/s', time: '~15 seconds', label: '2000000 Baud' }
-    };
 
     baudRateSelect.addEventListener('change', function() {
       const selectedRate = this.value;
-      const data = speedData[selectedRate];
       
       // Update install button
       if (selectedRate === '') {
@@ -292,9 +270,6 @@
       } else {
         installButton.setAttribute('baud-rate', selectedRate);
       }
-      
-      // Update speed info
-      speedInfo.innerHTML = `Selected: <strong>${data.label}</strong> (${data.speed}, ${data.time} for 3 MB)`;
     });
   </script>
 </body>
