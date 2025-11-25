@@ -37,6 +37,8 @@ export class EwtInstallDialog extends LitElement {
 
   public firmwareFile?: File;
 
+  public baudRate?: number;
+
   public logger: Logger = console;
 
   public overrides?: {
@@ -856,6 +858,7 @@ export class EwtInstallDialog extends LitElement {
         this.manifestPath,
         this._installErase,
         new Uint8Array(0),
+        this.baudRate,
       );
     }
   }
@@ -876,6 +879,7 @@ export class EwtInstallDialog extends LitElement {
       this.manifestPath,
       this._installErase,
       fileBuffer,
+      this.baudRate,
     );
   }
 

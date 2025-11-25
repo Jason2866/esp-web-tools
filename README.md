@@ -108,6 +108,39 @@ The `chipVariant` field is optional. If omitted, the build will match any varian
 
 See [manifest-example-p4-variants.json](manifest-example-p4-variants.json) for a complete example.
 
+## Performance
+
+ESP Web Tools supports configurable baud rates for flashing. By default, it uses 115200 baud for maximum compatibility. You can increase the baud rate for significantly faster flashing speeds.
+
+### Custom Baud Rate
+
+You can customize the baud rate using the `baud-rate` attribute:
+
+```html
+<!-- Default: 115200 baud (maximum compatibility) -->
+<esp-web-install-button manifest="manifest.json">
+  <button slot="activate">Install</button>
+</esp-web-install-button>
+
+<!-- Fast: 2 Mbps (~17x faster, recommended for modern chips) -->
+<esp-web-install-button 
+  manifest="manifest.json"
+  baud-rate="2000000">
+  <button slot="activate">Install</button>
+</esp-web-install-button>
+
+<!-- Safe: 921600 baud (~8x faster, works with older USB-Serial chips) -->
+<esp-web-install-button 
+  manifest="manifest.json"
+  baud-rate="921600">
+  <button slot="activate">Install</button>
+</esp-web-install-button>
+```
+
+Available baud rates: `230400`, `460800`, `921600`, `1500000`, `2000000`
+
+**Note**: Higher baud rates work with all modern ESP chips except ESP8266.
+
 ## Development
 
 Run `script/develop`. This starts a server. Open it on http://localhost:5001.

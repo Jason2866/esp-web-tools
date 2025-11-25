@@ -16,6 +16,7 @@ export const flash = async (
   manifestPath: string,
   eraseFirst: boolean,
   firmwareBuffer: Uint8Array,
+  baudRate?: number,
 ) => {
   let manifest: Manifest;
   let build: Build | undefined;
@@ -152,6 +153,18 @@ export const flash = async (
 
   // Run the stub while we wait for files to download
   const espStub = await esploader.runStub();
+
+  // Increase baud rate for faster flashing if specified via baud-rate attribute
+  // Default: No change (115200 baud - stub default)
+  // Can be set via baud-rate attribute in HTML (e.g., baud-rate="2000000")
+  if (baudRate !== undefined && baudRate > 115200) {
+    try {
+      await espStub.setBaudrate(baudRate);
+    } catch (err: any) {
+      // If baud rate change fails, continue with default 115200
+      logger.log(`Could not change baud rate to ${baudRate}: ${err.message}`);
+    }
+  }
 
   const files: (ArrayBuffer | Uint8Array)[] = [];
   let totalSize = 0;

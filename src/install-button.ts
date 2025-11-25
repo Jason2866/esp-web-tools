@@ -71,6 +71,8 @@ export class InstallButton extends HTMLElement {
 
   public logConsole?: boolean;
 
+  public baudRate?: number;
+
   public state?: FlashState;
 
   public renderRoot?: ShadowRoot;

@@ -32,6 +32,18 @@ export const connect = async (button: InstallButton) => {
   el.manifestPath = button.manifest || button.getAttribute("manifest")!;
   el.overrides = button.overrides;
   el.firmwareFile = button.firmwareFile;
+
+  // Get baud rate from attribute or use default
+  const baudRateAttr = button.getAttribute("baud-rate");
+  if (baudRateAttr) {
+    const baudRate = parseInt(baudRateAttr, 10);
+    if (!isNaN(baudRate)) {
+      el.baudRate = baudRate;
+    }
+  } else if (button.baudRate !== undefined) {
+    el.baudRate = button.baudRate;
+  }
+
   el.addEventListener(
     "closed",
     () => {
