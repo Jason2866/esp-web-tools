@@ -651,7 +651,9 @@ export class EwtInstallDialog extends LitElement {
           }}
         ></ewt-button>
       `;
-    } else if (this._installState.state === FlashStateType.ESP32_S2_USB_RECONNECT) {
+    } else if (
+      this._installState.state === FlashStateType.ESP32_S2_USB_RECONNECT
+    ) {
       // ESP32-S2 Native USB has switched to CDC mode - need to select new port
       heading = "ESP32-S2 USB Port Changed";
       content = html`
@@ -873,27 +875,26 @@ export class EwtInstallDialog extends LitElement {
 
       // Request new port from user
       const newPort = await navigator.serial.requestPort();
-      
+
       // Open the new port
       await newPort.open({ baudRate: 115200 });
-      
+
       // Update the port reference
       this.port = newPort;
-      
+
       // Reset install state and restart installation
       this._installState = undefined;
       this._installConfirmed = false;
-      
+
       // Restart the install process with the same erase setting
       this._confirmInstall();
-      
     } catch (err: any) {
       if ((err as DOMException).name === "NotFoundError") {
         // User cancelled port selection - stay on reconnect screen
         this.logger.log("User cancelled port selection");
         return;
       }
-      
+
       // Show error and go back to dashboard
       this._error = `Failed to reconnect: ${err.message}`;
       this._state = "ERROR";

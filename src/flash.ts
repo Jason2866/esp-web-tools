@@ -47,7 +47,9 @@ export const flash = async (
   // ESP32-S2 Native USB event handler
   const handleESP32S2Reconnect = () => {
     esp32s2ReconnectRequired = true;
-    logger.log("ESP32-S2 Native USB disconnect detected - reconnection required");
+    logger.log(
+      "ESP32-S2 Native USB disconnect detected - reconnection required",
+    );
   };
 
   // Register event listener for ESP32-S2 Native USB reconnect
@@ -76,7 +78,10 @@ export const flash = async (
   // Cleanup function to remove event listener
   const cleanup = () => {
     if (isS2NativeUSB) {
-      window.removeEventListener("esp32s2-usb-reconnect", handleESP32S2Reconnect);
+      window.removeEventListener(
+        "esp32s2-usb-reconnect",
+        handleESP32S2Reconnect,
+      );
     }
   };
 
@@ -90,25 +95,25 @@ export const flash = async (
     await esploader.initialize();
   } catch (err: any) {
     logger.error(err);
-    
+
     // Check if this is an ESP32-S2 Native USB reconnect situation
     if (isS2NativeUSB && esp32s2ReconnectRequired) {
       cleanup();
-      
+
       // Close the old port if still accessible
       try {
         await port.close();
       } catch {
         // Port may already be closed
       }
-      
+
       // Forget the old port to allow reselection
       try {
         await port.forget();
       } catch {
         // Forget may not be supported or port already released
       }
-      
+
       // Fire reconnect event to trigger port reselection dialog
       fireStateEvent({
         state: FlashStateType.ESP32_S2_USB_RECONNECT,
@@ -117,7 +122,7 @@ export const flash = async (
       });
       return;
     }
-    
+
     cleanup();
     fireStateEvent({
       state: FlashStateType.ERROR,
