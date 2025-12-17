@@ -12,11 +12,18 @@ import { sleep } from "./util/sleep";
 /**
  * Check if a serial port is an ESP32-S2 Native USB device
  * VID 0x303a = Espressif
- * PID 0x0002 = ESP32-S2 Native USB
+ * PID 0x0002 = ESP32-S2 TinyUSB CDC (after flash)
+ * PID 0x1001 = ESP32-S2 ROM Bootloader (before flash)
+ *
+ * When user connects to ROM bootloader (0x1001), the device will
+ * switch to TinyUSB CDC (0x0002) after flashing, requiring port reselection.
  */
 const isESP32S2NativeUSB = (port: SerialPort): boolean => {
   const info = port.getInfo();
-  return info.usbVendorId === 0x303a && info.usbProductId === 0x0002;
+  return (
+    info.usbVendorId === 0x303a &&
+    (info.usbProductId === 0x0002 || info.usbProductId === 0x1001)
+  );
 };
 
 export const flash = async (
