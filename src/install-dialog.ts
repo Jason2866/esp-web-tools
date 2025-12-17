@@ -651,6 +651,28 @@ export class EwtInstallDialog extends LitElement {
           }}
         ></ewt-button>
       `;
+    } else if (this._installState.state === FlashStateType.ESP32_S2_USB_RECONNECT) {
+      // ESP32-S2 Native USB has switched to CDC mode - need to select new port
+      heading = "ESP32-S2 USB Port Changed";
+      content = html`
+        <ewt-page-message
+          .icon=${"⚠️"}
+          .label=${"The ESP32-S2 has switched from ROM bootloader to USB CDC mode. Please select the new USB port to continue."}
+        ></ewt-page-message>
+        <ewt-button
+          slot="primaryAction"
+          label="Select New Port"
+          @click=${this._handleESP32S2Reconnect}
+        ></ewt-button>
+        <ewt-button
+          slot="secondaryAction"
+          label="Cancel"
+          @click=${() => {
+            this._state = "DASHBOARD";
+            this._installState = undefined;
+          }}
+        ></ewt-button>
+      `;
     }
     return [heading, content!, hideActions, allowClosing];
   }
@@ -826,6 +848,56 @@ export class EwtInstallDialog extends LitElement {
     this._state = "INSTALL";
     this._installErase = erase;
     this._installConfirmed = false;
+  }
+
+  /**
+   * Handle ESP32-S2 Native USB reconnect.
+   * When the ESP32-S2 switches from ROM bootloader to USB CDC mode,
+   * the USB port changes and we need to let the user select the new port.
+   */
+  private async _handleESP32S2Reconnect() {
+    try {
+      // Close the old port if still accessible
+      try {
+        await this.port.close();
+      } catch {
+        // Port may already be closed
+      }
+
+      // Forget the old port to allow reselection
+      try {
+        await this.port.forget();
+      } catch {
+        // Forget may not be supported or port already released
+      }
+
+      // Request new port from user
+      const newPort = await navigator.serial.requestPort();
+      
+      // Open the new port
+      await newPort.open({ baudRate: 115200 });
+      
+      // Update the port reference
+      this.port = newPort;
+      
+      // Reset install state and restart installation
+      this._installState = undefined;
+      this._installConfirmed = false;
+      
+      // Restart the install process with the same erase setting
+      this._confirmInstall();
+      
+    } catch (err: any) {
+      if ((err as DOMException).name === "NotFoundError") {
+        // User cancelled port selection - stay on reconnect screen
+        this.logger.log("User cancelled port selection");
+        return;
+      }
+      
+      // Show error and go back to dashboard
+      this._error = `Failed to reconnect: ${err.message}`;
+      this._state = "ERROR";
+    }
   }
 
   private async _confirmInstall() {

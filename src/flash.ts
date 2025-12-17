@@ -9,6 +9,16 @@ import {
 import { getChipFamilyName } from "./util/chip-family-name";
 import { sleep } from "./util/sleep";
 
+/**
+ * Check if a serial port is an ESP32-S2 Native USB device
+ * VID 0x303a = Espressif
+ * PID 0x0002 = ESP32-S2 Native USB
+ */
+const isESP32S2NativeUSB = (port: SerialPort): boolean => {
+  const info = port.getInfo();
+  return info.usbVendorId === 0x303a && info.usbProductId === 0x0002;
+};
+
 export const flash = async (
   onEvent: (state: FlashState) => void,
   port: SerialPort,
@@ -22,6 +32,8 @@ export const flash = async (
   let build: Build | undefined;
   let chipFamily: ReturnType<typeof getChipFamilyName>;
   let chipVariant: string | null = null;
+  let esp32s2ReconnectRequired = false;
+  const isS2NativeUSB = isESP32S2NativeUSB(port);
 
   const fireStateEvent = (stateUpdate: FlashState) =>
     onEvent({
@@ -31,6 +43,18 @@ export const flash = async (
       chipFamily,
       chipVariant,
     });
+
+  // ESP32-S2 Native USB event handler
+  const handleESP32S2Reconnect = () => {
+    esp32s2ReconnectRequired = true;
+    logger.log("ESP32-S2 Native USB disconnect detected - reconnection required");
+  };
+
+  // Register event listener for ESP32-S2 Native USB reconnect
+  if (isS2NativeUSB) {
+    window.addEventListener("esp32s2-usb-reconnect", handleESP32S2Reconnect);
+    logger.log("ESP32-S2 Native USB detected - monitoring for port switch");
+  }
 
   var manifestProm = null;
   var manifestURL: string = "";
@@ -49,6 +73,13 @@ export const flash = async (
   // For debugging
   (window as any).esploader = esploader;
 
+  // Cleanup function to remove event listener
+  const cleanup = () => {
+    if (isS2NativeUSB) {
+      window.removeEventListener("esp32s2-usb-reconnect", handleESP32S2Reconnect);
+    }
+  };
+
   fireStateEvent({
     state: FlashStateType.INITIALIZING,
     message: "Initializing...",
@@ -59,6 +90,35 @@ export const flash = async (
     await esploader.initialize();
   } catch (err: any) {
     logger.error(err);
+    
+    // Check if this is an ESP32-S2 Native USB reconnect situation
+    if (isS2NativeUSB && esp32s2ReconnectRequired) {
+      cleanup();
+      
+      // Close the old port if still accessible
+      try {
+        await port.close();
+      } catch {
+        // Port may already be closed
+      }
+      
+      // Forget the old port to allow reselection
+      try {
+        await port.forget();
+      } catch {
+        // Forget may not be supported or port already released
+      }
+      
+      // Fire reconnect event to trigger port reselection dialog
+      fireStateEvent({
+        state: FlashStateType.ESP32_S2_USB_RECONNECT,
+        message: "ESP32-S2 Native USB detected - please select the new port",
+        details: { oldPort: port },
+      });
+      return;
+    }
+    
+    cleanup();
     fireStateEvent({
       state: FlashStateType.ERROR,
       message:
@@ -88,6 +148,7 @@ export const flash = async (
   try {
     manifest = await manifestProm;
   } catch (err: any) {
+    cleanup();
     fireStateEvent({
       state: FlashStateType.ERROR,
       message: `Unable to fetch manifest: ${err}`,
@@ -120,6 +181,7 @@ export const flash = async (
     const chipInfo = chipVariant
       ? `${chipFamily} (${chipVariant})`
       : chipFamily;
+    cleanup();
     fireStateEvent({
       state: FlashStateType.ERROR,
       message: `Your ${chipInfo} board is not supported.`,
@@ -175,6 +237,7 @@ export const flash = async (
       files.push(data instanceof ArrayBuffer ? new Uint8Array(data) : data);
       totalSize += data.byteLength;
     } catch (err: any) {
+      cleanup();
       fireStateEvent({
         state: FlashStateType.ERROR,
         message: err.message,
@@ -251,6 +314,7 @@ export const flash = async (
         true,
       );
     } catch (err: any) {
+      cleanup();
       fireStateEvent({
         state: FlashStateType.ERROR,
         message: err.message,
@@ -278,6 +342,7 @@ export const flash = async (
   console.log("HARD RESET");
   await esploader.hardReset();
 
+  cleanup();
   fireStateEvent({
     state: FlashStateType.FINISHED,
     message: "All done!",
