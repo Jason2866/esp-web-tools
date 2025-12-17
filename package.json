@@ -1,6 +1,6 @@
 {
   "name": "tasmota-esp-web-tools",
-  "version": "8.3.3",
+  "version": "9.0.0",
   "description": "Web tools for ESP devices",
   "main": "dist/install-button.js",
   "repository": {
@@ -35,7 +35,7 @@
     "@material/mwc-textfield": "^0.27.0",
     "improv-wifi-serial-sdk": "^2.5.0",
     "lit": "^2.8.0",
-    "tasmota-webserial-esptool": "^6.5.4",
+    "tasmota-webserial-esptool": "^7.2.0",
     "tslib": "^2.8.1"
   }
 }

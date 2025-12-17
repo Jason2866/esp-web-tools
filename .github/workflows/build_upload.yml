@@ -16,7 +16,7 @@ jobs:
       contents: write
       id-token: write  # required to use OIDC
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Remove old files and folders
         run: |
           rm -rf yarn.lock
@@ -24,11 +24,16 @@ jobs:
           rm -rf dist
           rm -rf js/modules
           mkdir js/modules
-      - name: install node v20
-        uses: actions/setup-node@v4
+      - name: install node v22
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
-      - name: Install npm
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+      - name: Update npm to latest
+        run: npm install -g npm@latest
+      - name: Check npm version
+        run: npm --version
+      - name: Install NPM
         run: npm install
       - name: Prettier
         run: npm exec -- prettier --write src
@@ -45,16 +50,15 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "Github Action: Updated dist files"
-      - name: Publish to NPM registry
+      - name: Publish to NPM registry (OIDC Trusted Publishing)
         uses: JS-DevTools/npm-publish@v4
         with:
           registry: https://registry.npmjs.org/
-          token: ${{ secrets.NPM_TOKEN }}
           strategy: all
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v5
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: "."
 
