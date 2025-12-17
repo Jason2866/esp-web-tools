@@ -44,20 +44,6 @@ export const flash = async (
       chipVariant,
     });
 
-  // ESP32-S2 Native USB event handler
-  const handleESP32S2Reconnect = () => {
-    esp32s2ReconnectRequired = true;
-    logger.log(
-      "ESP32-S2 Native USB disconnect detected - reconnection required",
-    );
-  };
-
-  // Register event listener for ESP32-S2 Native USB reconnect
-  if (isS2NativeUSB) {
-    window.addEventListener("esp32s2-usb-reconnect", handleESP32S2Reconnect);
-    logger.log("ESP32-S2 Native USB detected - monitoring for port switch");
-  }
-
   var manifestProm = null;
   var manifestURL: string = "";
 
@@ -75,13 +61,22 @@ export const flash = async (
   // For debugging
   (window as any).esploader = esploader;
 
+  // ESP32-S2 Native USB event handler - listen on ESPLoader instance
+  const handleESP32S2Reconnect = () => {
+    esp32s2ReconnectRequired = true;
+    logger.log("ESP32-S2 Native USB disconnect detected - reconnection required");
+  };
+
+  // Register event listener for ESP32-S2 Native USB reconnect on ESPLoader
+  if (isS2NativeUSB) {
+    esploader.addEventListener("esp32s2-usb-reconnect", handleESP32S2Reconnect);
+    logger.log("ESP32-S2 Native USB detected - monitoring for port switch");
+  }
+
   // Cleanup function to remove event listener
   const cleanup = () => {
     if (isS2NativeUSB) {
-      window.removeEventListener(
-        "esp32s2-usb-reconnect",
-        handleESP32S2Reconnect,
-      );
+      esploader.removeEventListener("esp32s2-usb-reconnect", handleESP32S2Reconnect);
     }
   };
 

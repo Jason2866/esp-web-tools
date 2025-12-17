@@ -74,6 +74,9 @@ export class EwtInstallDialog extends LitElement {
 
   @state() private _busy = false;
 
+  // Prevent recursive ESP32-S2 reconnect attempts
+  private _esp32s2ReconnectInProgress = false;
+
   // undefined = not loaded
   // null = not available
   @state() private _ssids?: Ssid[] | null;
@@ -850,6 +853,8 @@ export class EwtInstallDialog extends LitElement {
     this._state = "INSTALL";
     this._installErase = erase;
     this._installConfirmed = false;
+    // Reset reconnect flag when starting a fresh installation
+    this._esp32s2ReconnectInProgress = false;
   }
 
   /**
@@ -858,6 +863,16 @@ export class EwtInstallDialog extends LitElement {
    * the USB port changes and we need to let the user select the new port.
    */
   private async _handleESP32S2Reconnect() {
+    // Prevent recursive reconnect attempts
+    if (this._esp32s2ReconnectInProgress) {
+      this.logger.log("ESP32-S2 reconnect already in progress, ignoring");
+      this._error = "Reconnection failed. Please try again manually.";
+      this._state = "ERROR";
+      return;
+    }
+    
+    this._esp32s2ReconnectInProgress = true;
+    
     try {
       // Close the old port if still accessible
       try {
@@ -889,6 +904,8 @@ export class EwtInstallDialog extends LitElement {
       // Restart the install process with the same erase setting
       this._confirmInstall();
     } catch (err: any) {
+      this._esp32s2ReconnectInProgress = false;
+      
       if ((err as DOMException).name === "NotFoundError") {
         // User cancelled port selection - stay on reconnect screen
         this.logger.log("User cancelled port selection");
@@ -904,6 +921,9 @@ export class EwtInstallDialog extends LitElement {
   private async _confirmInstall() {
     this._installConfirmed = true;
     this._installState = undefined;
+    // Reset reconnect flag when starting a new installation
+    this._esp32s2ReconnectInProgress = false;
+    
     if (this._client) {
       await this._closeClientWithoutEvents(this._client);
     }
