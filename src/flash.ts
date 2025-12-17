@@ -64,7 +64,9 @@ export const flash = async (
   // ESP32-S2 Native USB event handler - listen on ESPLoader instance
   const handleESP32S2Reconnect = () => {
     esp32s2ReconnectRequired = true;
-    logger.log("ESP32-S2 Native USB disconnect detected - reconnection required");
+    logger.log(
+      "ESP32-S2 Native USB disconnect detected - reconnection required",
+    );
   };
 
   // Register event listener for ESP32-S2 Native USB reconnect on ESPLoader
@@ -76,7 +78,10 @@ export const flash = async (
   // Cleanup function to remove event listener
   const cleanup = () => {
     if (isS2NativeUSB) {
-      esploader.removeEventListener("esp32s2-usb-reconnect", handleESP32S2Reconnect);
+      esploader.removeEventListener(
+        "esp32s2-usb-reconnect",
+        handleESP32S2Reconnect,
+      );
     }
   };
 

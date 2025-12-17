@@ -870,9 +870,9 @@ export class EwtInstallDialog extends LitElement {
       this._state = "ERROR";
       return;
     }
-    
+
     this._esp32s2ReconnectInProgress = true;
-    
+
     try {
       // Close the old port if still accessible
       try {
@@ -905,7 +905,7 @@ export class EwtInstallDialog extends LitElement {
       this._confirmInstall();
     } catch (err: any) {
       this._esp32s2ReconnectInProgress = false;
-      
+
       if ((err as DOMException).name === "NotFoundError") {
         // User cancelled port selection - stay on reconnect screen
         this.logger.log("User cancelled port selection");
@@ -923,7 +923,7 @@ export class EwtInstallDialog extends LitElement {
     this._installState = undefined;
     // Reset reconnect flag when starting a new installation
     this._esp32s2ReconnectInProgress = false;
-    
+
     if (this._client) {
       await this._closeClientWithoutEvents(this._client);
     }
