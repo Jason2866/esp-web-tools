@@ -10,20 +10,13 @@ import { getChipFamilyName } from "./util/chip-family-name";
 import { sleep } from "./util/sleep";
 
 /**
- * Check if a serial port is an ESP32-S2 Native USB device
+ * Check if a serial port is an ESP32-S2 Native USB device in TinyUSB CDC mode
  * VID 0x303a = Espressif
- * PID 0x0002 = ESP32-S2 TinyUSB CDC (after flash)
- * PID 0x1001 = ESP32-S2 ROM Bootloader (before flash)
- *
- * When user connects to ROM bootloader (0x1001), the device will
- * switch to TinyUSB CDC (0x0002) after flashing, requiring port reselection.
+ * PID 0x0002 = ESP32-S2 TinyUSB CDC
  */
 const isESP32S2NativeUSB = (port: SerialPort): boolean => {
   const info = port.getInfo();
-  return (
-    info.usbVendorId === 0x303a &&
-    (info.usbProductId === 0x0002 || info.usbProductId === 0x1001)
-  );
+  return info.usbVendorId === 0x303a && info.usbProductId === 0x0002;
 };
 
 export const flash = async (
@@ -104,7 +97,13 @@ export const flash = async (
     logger.error(err);
 
     // Check if this is an ESP32-S2 Native USB reconnect situation
-    if (isS2NativeUSB && esp32s2ReconnectRequired) {
+    // This happens when:
+    // 1. ESP32-S2 in TinyUSB CDC mode was reset to bootloader
+    // 2. ESP32-S2 disconnected during initialization
+    if (
+      isS2NativeUSB &&
+      (esp32s2ReconnectRequired || String(err).includes("reconnect required"))
+    ) {
       cleanup();
 
       // Close the old port if still accessible
@@ -124,7 +123,7 @@ export const flash = async (
       // Fire reconnect event to trigger port reselection dialog
       fireStateEvent({
         state: FlashStateType.ESP32_S2_USB_RECONNECT,
-        message: "ESP32-S2 Native USB detected - please select the new port",
+        message: "ESP32-S2 USB port changed - please select the new port",
         details: { oldPort: port },
       });
       return;
