@@ -40,19 +40,20 @@ export class EwtLittleFSManager extends LitElement {
     try {
       this._busy = true;
       this.logger.log(
-        `Reading LittleFS partition "${this.partition.name}" (${this._formatSize(this.partition.size)})...`
+        `Reading LittleFS partition "${this.partition.name}" (${this._formatSize(this.partition.size)})...`,
       );
 
       // Read entire partition
       const data = await this.espStub.readFlash(
         this.partition.offset,
-        this.partition.size
+        this.partition.size,
       );
 
       this.logger.log("Mounting LittleFS filesystem...");
 
       // Load LittleFS module dynamically
-      const { createLittleFSFromImage, formatDiskVersion } = await loadLittleFS();
+      const { createLittleFSFromImage, formatDiskVersion } =
+        await loadLittleFS();
 
       // Try to mount with different block sizes
       const blockSizes = [4096, 2048, 1024, 512];
@@ -70,7 +71,9 @@ export class EwtLittleFSManager extends LitElement {
           // Try to list root to verify it works
           fs.list("/");
           blockSize = bs;
-          this.logger.log(`Successfully mounted LittleFS with block size ${bs}`);
+          this.logger.log(
+            `Successfully mounted LittleFS with block size ${bs}`,
+          );
           break;
         } catch (err) {
           // Try next block size
@@ -144,7 +147,8 @@ export class EwtLittleFSManager extends LitElement {
       if (entry.type === "dir") {
         total += block;
       } else {
-        const dataBytes = Math.max(1, Math.ceil((entry.size || 0) / block)) * block;
+        const dataBytes =
+          Math.max(1, Math.ceil((entry.size || 0) / block)) * block;
         const metadataBytes = block;
         total += dataBytes + metadataBytes;
       }
@@ -218,7 +222,9 @@ export class EwtLittleFSManager extends LitElement {
 
       // Verify by reading back
       const readBack = this._fs.readFile(targetPath);
-      this.logger.log(`✓ File written: ${readBack.length} bytes at ${targetPath}`);
+      this.logger.log(
+        `✓ File written: ${readBack.length} bytes at ${targetPath}`,
+      );
 
       // Clear input
       const uploadedFileName = this._selectedFile.name;
@@ -296,7 +302,7 @@ export class EwtLittleFSManager extends LitElement {
 
       this._refreshFiles();
       this.logger.log(
-        `${type === "dir" ? "Directory" : "File"} "${name}" deleted successfully`
+        `${type === "dir" ? "Directory" : "File"} "${name}" deleted successfully`,
       );
     } catch (e: any) {
       this.logger.error(`Failed to delete ${type}: ${e.message || e}`);
@@ -337,7 +343,7 @@ export class EwtLittleFSManager extends LitElement {
         `Partition: ${this.partition.name}\n` +
         `Offset: 0x${this.partition.offset.toString(16)}\n` +
         `Size: ${this._formatSize(this.partition.size)}\n\n` +
-        `This will overwrite the current filesystem on the device!`
+        `This will overwrite the current filesystem on the device!`,
     );
 
     if (!confirmed) return;
@@ -350,19 +356,19 @@ export class EwtLittleFSManager extends LitElement {
 
       if (image.length > this.partition.size) {
         this.logger.error(
-          `Image size (${this._formatSize(image.length)}) exceeds partition size (${this._formatSize(this.partition.size)})`
+          `Image size (${this._formatSize(image.length)}) exceeds partition size (${this._formatSize(this.partition.size)})`,
         );
         return;
       }
 
       this.logger.log(
-        `Writing ${this._formatSize(image.length)} to partition "${this.partition.name}" at 0x${this.partition.offset.toString(16)}...`
+        `Writing ${this._formatSize(image.length)} to partition "${this.partition.name}" at 0x${this.partition.offset.toString(16)}...`,
       );
 
       // Convert Uint8Array to ArrayBuffer
       const imageBuffer = image.buffer.slice(
         image.byteOffset,
-        image.byteOffset + image.byteLength
+        image.byteOffset + image.byteLength,
       );
 
       // Write the image to flash
@@ -372,7 +378,7 @@ export class EwtLittleFSManager extends LitElement {
           const percent = Math.floor((bytesWritten / totalBytes) * 100);
           this.logger.log(`Writing: ${percent}%`);
         },
-        this.partition.offset
+        this.partition.offset,
       );
 
       this.logger.log(`✓ LittleFS successfully written to flash!`);
@@ -402,7 +408,7 @@ export class EwtLittleFSManager extends LitElement {
 
   render() {
     const usedPercent = Math.round(
-      (this._usage.usedBytes / this._usage.capacityBytes) * 100
+      (this._usage.usedBytes / this._usage.capacityBytes) * 100,
     );
 
     return html`
@@ -423,7 +429,8 @@ export class EwtLittleFSManager extends LitElement {
             <div class="usage-text">
               <span
                 >Used: ${this._formatSize(this._usage.usedBytes)} /
-                ${this._formatSize(this._usage.capacityBytes)} (${usedPercent}%)</span
+                ${this._formatSize(this._usage.capacityBytes)}
+                (${usedPercent}%)</span
               >
               ${this._diskVersion
                 ? html`<span class="disk-version">${this._diskVersion}</span>`
@@ -537,7 +544,8 @@ export class EwtLittleFSManager extends LitElement {
                               ? html`
                                   <ewt-button
                                     label="Download"
-                                    @click=${() => this._downloadFile(entry.path)}
+                                    @click=${() =>
+                                      this._downloadFile(entry.path)}
                                     ?disabled=${this._busy}
                                   ></ewt-button>
                                 `
@@ -552,7 +560,7 @@ export class EwtLittleFSManager extends LitElement {
                           </div>
                         </td>
                       </tr>
-                    `
+                    `,
                   )}
             </tbody>
           </table>

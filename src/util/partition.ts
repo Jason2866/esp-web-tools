@@ -5,7 +5,7 @@ export async function detectFilesystemType(
   espStub: any,
   offset: number,
   size: number,
-  logger: any = console
+  logger: any = console,
 ): Promise<string> {
   try {
     // Read first 8KB or entire partition if smaller
@@ -40,7 +40,9 @@ export async function detectFilesystemType(
 
             if (type <= 0x7ff && length > 0 && length <= 1022) {
               if (i + length + 4 <= data.length) {
-                logger.log("✓ LittleFS detected: Found valid metadata structure");
+                logger.log(
+                  "✓ LittleFS detected: Found valid metadata structure",
+                );
                 return "littlefs";
               }
             }

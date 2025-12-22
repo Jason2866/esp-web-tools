@@ -828,12 +828,7 @@ export class EwtInstallDialog extends LitElement {
     return [heading, content, hideActions];
   }
 
-  _renderLittleFS(): [
-    string | undefined,
-    TemplateResult,
-    boolean,
-    boolean,
-  ] {
+  _renderLittleFS(): [string | undefined, TemplateResult, boolean, boolean] {
     const heading = undefined;
     const hideActions = true;
     const allowClosing = true;
@@ -864,11 +859,13 @@ export class EwtInstallDialog extends LitElement {
 
       // Import ESPLoader from the package
       const { ESPLoader } = await import("tasmota-webserial-esptool");
-      
+
       const esploader = new ESPLoader(this.port, {
         log: (msg: string, ...args: string[]) => this.logger.log(msg, ...args),
-        debug: (msg: string, ...args: string[]) => this.logger.debug?.(msg, ...args),
-        error: (msg: string, ...args: string[]) => this.logger.error(msg, ...args),
+        debug: (msg: string, ...args: string[]) =>
+          this.logger.debug?.(msg, ...args),
+        error: (msg: string, ...args: string[]) =>
+          this.logger.error(msg, ...args),
       });
 
       await esploader.initialize();
