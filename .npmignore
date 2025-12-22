@@ -1,5 +1,8 @@
 *.html
-*.md
 firmware_build
 demo
 manifest-example-p4-variants.json
+
+# Ignore all markdown files except README.md
+*.md
+!README.md
