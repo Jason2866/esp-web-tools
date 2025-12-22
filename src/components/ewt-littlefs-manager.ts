@@ -16,11 +16,13 @@ async function loadLittleFS() {
     const scriptUrl = new URL(import.meta.url);
     // The WASM files are in the same directory as the bundled JS
     // Navigate to wasm/littlefs/ relative to the script location
-    _wasmBasePath = new URL('./wasm/littlefs/', scriptUrl).href;
+    _wasmBasePath = new URL("./wasm/littlefs/", scriptUrl).href;
   }
-  
+
   // Import the index.js from the same relative location
-  const module = await import(new URL('./wasm/littlefs/index.js', new URL(import.meta.url)).href);
+  const module = await import(
+    new URL("./wasm/littlefs/index.js", new URL(import.meta.url)).href
+  );
   return module;
 }
 
@@ -68,7 +70,8 @@ export class EwtLittleFSManager extends LitElement {
       this.logger.log("Mounting LittleFS filesystem...");
 
       // Load LittleFS module dynamically
-      const { createLittleFSFromImage, formatDiskVersion } = await loadLittleFS();
+      const { createLittleFSFromImage, formatDiskVersion } =
+        await loadLittleFS();
 
       // Try to mount with different block sizes
       const blockSizes = [4096, 2048, 1024, 512];
@@ -78,17 +81,17 @@ export class EwtLittleFSManager extends LitElement {
       for (const bs of blockSizes) {
         try {
           const blockCount = Math.floor(this.partition.size / bs);
-          
+
           // Pass WASM URL if available
           const options: any = {
             blockSize: bs,
             blockCount: blockCount,
           };
-          
+
           if (_wasmBasePath) {
-            options.wasmURL = new URL('littlefs.wasm', _wasmBasePath).href;
+            options.wasmURL = new URL("littlefs.wasm", _wasmBasePath).href;
           }
-          
+
           fs = await createLittleFSFromImage(data, options);
 
           // Try to list root to verify it works
