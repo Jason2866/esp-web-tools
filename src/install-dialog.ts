@@ -29,6 +29,11 @@ import { downloadManifest } from "./util/manifest";
 import { dialogStyles } from "./styles";
 import { parsePartitionTable, type Partition } from "./partition.js";
 import { detectFilesystemType } from "./util/partition.js";
+import {
+  isESP32S2NativeUSB,
+  isESP32S2ReconnectError,
+  closeAndForgetPort,
+} from "./util/esp32s2-reconnect";
 
 const ERROR_ICON = "⚠️";
 const OK_ICON = "🎉";
@@ -928,24 +933,10 @@ export class EwtInstallDialog extends LitElement {
       // Set up ESP32-S2 reconnect handler BEFORE initialize
       const reconnectHandler = async (event: any) => {
         this.logger.log("ESP32-S2 USB reconnect event:", event.detail.message);
-
-        // Close old port
-        try {
-          await currentPort.close();
-        } catch (e) {
-          this.logger.debug("Port close error:", e);
-        }
-
-        // Forget old port
-        try {
-          await currentPort.forget();
-        } catch (e) {
-          this.logger.debug("Port forget error:", e);
-        }
-
+        await closeAndForgetPort(currentPort);
         this.logger.log("Please select the new ESP32-S2 USB CDC port");
       };
-
+      
       esploader.addEventListener("esp32s2-usb-reconnect", reconnectHandler, {
         once: true,
       });
@@ -957,28 +948,13 @@ export class EwtInstallDialog extends LitElement {
         await esploader.initialize();
         this.logger.log("ESP loader initialized successfully");
       } catch (err: any) {
-        // If initialization fails, check if it's ESP32-S2 and we need reconnect
-        const errorMsg = err.message || String(err);
-        const portInfo = currentPort.getInfo();
-        const isESP32S2 =
-          portInfo.usbVendorId === 0x303a && portInfo.usbProductId === 0x2;
-
-        if (
-          isESP32S2 &&
-          (errorMsg.includes("sync") || errorMsg.includes("disconnect"))
-        ) {
-          this.logger.log(
-            "ESP32-S2 USB port changed - user needs to select new port",
-          );
-
+        // Check if this is an ESP32-S2 reconnect scenario
+        if (isESP32S2NativeUSB(currentPort) && isESP32S2ReconnectError(err)) {
+          this.logger.log("ESP32-S2 USB port changed - user needs to select new port");
+          
           // Close and forget old port
-          try {
-            await currentPort.close();
-          } catch (e) {}
-          try {
-            await currentPort.forget();
-          } catch (e) {}
-
+          await closeAndForgetPort(currentPort);
+          
           // Show UI with button for user to click
           this._busy = false;
           this._state = "ESP32S2_RECONNECT";

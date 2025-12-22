@@ -8,16 +8,11 @@ import {
 } from "./const";
 import { getChipFamilyName } from "./util/chip-family-name";
 import { sleep } from "./util/sleep";
-
-/**
- * Check if a serial port is an ESP32-S2 Native USB device in TinyUSB CDC mode
- * VID 0x303a = Espressif
- * PID 0x0002 = ESP32-S2 TinyUSB CDC
- */
-const isESP32S2NativeUSB = (port: SerialPort): boolean => {
-  const info = port.getInfo();
-  return info.usbVendorId === 0x303a && info.usbProductId === 0x0002;
-};
+import {
+  isESP32S2NativeUSB,
+  isESP32S2ReconnectError,
+  closeAndForgetPort,
+} from "./util/esp32s2-reconnect";
 
 export const flash = async (
   onEvent: (state: FlashState) => void,
@@ -32,7 +27,6 @@ export const flash = async (
   let build: Build | undefined;
   let chipFamily: ReturnType<typeof getChipFamilyName>;
   let chipVariant: string | null = null;
-  let esp32s2ReconnectRequired = false;
   const isS2NativeUSB = isESP32S2NativeUSB(port);
 
   const fireStateEvent = (stateUpdate: FlashState) =>
@@ -63,7 +57,6 @@ export const flash = async (
 
   // ESP32-S2 Native USB event handler - listen on ESPLoader instance
   const handleESP32S2Reconnect = () => {
-    esp32s2ReconnectRequired = true;
     logger.log(
       "ESP32-S2 Native USB disconnect detected - reconnection required",
     );
@@ -97,28 +90,11 @@ export const flash = async (
     logger.error(err);
 
     // Check if this is an ESP32-S2 Native USB reconnect situation
-    // This happens when:
-    // 1. ESP32-S2 in TinyUSB CDC mode was reset to bootloader
-    // 2. ESP32-S2 disconnected during initialization
-    if (
-      isS2NativeUSB &&
-      (esp32s2ReconnectRequired || String(err).includes("reconnect required"))
-    ) {
+    if (isS2NativeUSB && isESP32S2ReconnectError(err)) {
       cleanup();
 
-      // Close the old port if still accessible
-      try {
-        await port.close();
-      } catch {
-        // Port may already be closed
-      }
-
-      // Forget the old port to allow reselection
-      try {
-        await port.forget();
-      } catch {
-        // Forget may not be supported or port already released
-      }
+      // Close and forget the old port
+      await closeAndForgetPort(port);
 
       // Fire reconnect event to trigger port reselection dialog
       fireStateEvent({

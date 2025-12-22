@@ -219,12 +219,17 @@
           <li><strong>Connect Device:</strong> Click the button above and select your ESP device</li>
           <li><strong>Install Firmware (optional):</strong> Install new firmware or skip this step</li>
           <li><strong>Open Filesystem Manager:</strong> Click <code>Manage Filesystem</code> in the dashboard</li>
+          <li><strong>ESP32-S2 Note:</strong> If using ESP32-S2 Native USB, you may need to select the new USB port when prompted</li>
           <li><strong>Read Partition Table:</strong> The partition table will be automatically read</li>
           <li><strong>Open LittleFS Partition:</strong> Click <code>Open FS</code> on a data partition</li>
           <li><strong>Manage Files:</strong> Upload, download, delete files and create folders</li>
           <li><strong>Save Changes:</strong> Click <code>Write to Flash</code> to save your changes</li>
           <li><strong>Restart Device:</strong> Restart your device to activate the changes</li>
         </ol>
+
+        <div class="info-box">
+          <strong>⚠️ ESP32-S2 Native USB:</strong> When using ESP32-S2 devices with native USB, the device may switch USB modes during initialization. If this happens, a dialog will appear asking you to select the new USB port. Simply click "Select New Port" and choose the device from the browser's port selection dialog.
+        </div>
       </div>
 
       <div class="card">
@@ -233,6 +238,7 @@
           <li><a href="https://github.com/Jason2866/esp-web-tools" target="_blank">GitHub Repository</a></li>
           <li><a href="LITTLEFS_FEATURE.md" target="_blank">LittleFS Feature Documentation</a></li>
           <li><a href="FS_DETECTION.md" target="_blank">Filesystem Detection Algorithm</a></li>
+          <li><a href="ESP32_S2_USB_RECONNECT.md" target="_blank">ESP32-S2 USB Reconnect Guide</a></li>
           <li><a href="https://github.com/littlefs-project/littlefs" target="_blank">LittleFS Project</a></li>
         </ul>
       </div>
