@@ -936,7 +936,7 @@ export class EwtInstallDialog extends LitElement {
         await closeAndForgetPort(currentPort);
         this.logger.log("Please select the new ESP32-S2 USB CDC port");
       };
-      
+
       esploader.addEventListener("esp32s2-usb-reconnect", reconnectHandler, {
         once: true,
       });
@@ -950,11 +950,13 @@ export class EwtInstallDialog extends LitElement {
       } catch (err: any) {
         // Check if this is an ESP32-S2 reconnect scenario
         if (isESP32S2NativeUSB(currentPort) && isESP32S2ReconnectError(err)) {
-          this.logger.log("ESP32-S2 USB port changed - user needs to select new port");
-          
+          this.logger.log(
+            "ESP32-S2 USB port changed - user needs to select new port",
+          );
+
           // Close and forget old port
           await closeAndForgetPort(currentPort);
-          
+
           // Show UI with button for user to click
           this._busy = false;
           this._state = "ESP32S2_RECONNECT";

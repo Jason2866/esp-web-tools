@@ -1,6 +1,6 @@
 /**
  * ESP32-S2 Native USB Reconnect Utilities
- * 
+ *
  * The ESP32-S2 can switch between ROM bootloader mode and USB CDC mode,
  * causing the serial port to change. These utilities help detect and handle
  * this scenario consistently across the application.
