@@ -10,7 +10,7 @@ function copyWasmFiles() {
   return {
     name: "copy-wasm-files",
     writeBundle() {
-      // Copy WASM files from src to dist/web
+      // Copy WASM files from src to dist/web AND js/modules
       const files = [
         {
           src: "src/wasm/littlefs/littlefs.wasm",
@@ -27,6 +27,23 @@ function copyWasmFiles() {
         {
           src: "src/wasm/littlefs/index.d.ts",
           dest: "dist/web/wasm/littlefs/index.d.ts",
+        },
+        // Also copy to js/modules for GitHub Pages compatibility
+        {
+          src: "src/wasm/littlefs/littlefs.wasm",
+          dest: "js/modules/wasm/littlefs/littlefs.wasm",
+        },
+        {
+          src: "src/wasm/littlefs/littlefs.js",
+          dest: "js/modules/wasm/littlefs/littlefs.js",
+        },
+        {
+          src: "src/wasm/littlefs/index.js",
+          dest: "js/modules/wasm/littlefs/index.js",
+        },
+        {
+          src: "src/wasm/littlefs/index.d.ts",
+          dest: "js/modules/wasm/littlefs/index.d.ts",
         },
       ];
 
