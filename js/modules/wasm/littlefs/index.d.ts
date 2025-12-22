@@ -68,13 +68,31 @@ export interface LittleFS {
   readFile(path: string): Uint8Array;
   /**
    * Get the disk version of the mounted filesystem.
-   * @returns Version as 32-bit number (e.g., 0x00020000 for v2.0)
+   * @returns Version as 32-bit number (e.g., 0x00020000 for v2.0, 0x00020001 for v2.1)
    */
   getDiskVersion(): number;
+  /**
+   * Set the disk version for new filesystems.
+   * Must be called before formatting.
+   * @param version - Version as 32-bit number (use DISK_VERSION_2_0 or DISK_VERSION_2_1)
+   */
+  setDiskVersion(version: number): void;
   /**
    * Get filesystem usage statistics.
    */
   getUsage(): { capacityBytes: number; usedBytes: number; freeBytes: number };
+  /**
+   * Check if a file of given size can fit in the filesystem.
+   * @param path - File path (currently unused, reserved for future use)
+   * @param size - Size in bytes
+   * @returns true if the file can fit, false otherwise
+   */
+  canFit(path: string, size: number): boolean;
+  /**
+   * Cleanup and unmount the filesystem.
+   * Should be called when done using the filesystem to free resources.
+   */
+  cleanup(): void;
 }
 
 export declare class LittleFSError extends Error {

@@ -599,13 +599,3 @@ function createClient(Module, blockSize, blockCount) {
 
   return client;
 }
-
-// Default export for CommonJS compatibility
-export default {
-  createLittleFS,
-  createLittleFSFromImage,
-  DISK_VERSION_2_0,
-  DISK_VERSION_2_1,
-  LFS_NAME_MAX,
-  formatDiskVersion,
-};

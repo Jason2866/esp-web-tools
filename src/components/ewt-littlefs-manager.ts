@@ -63,11 +63,13 @@ export class EwtLittleFSManager extends LitElement {
   @state() private _diskVersion = "";
   @state() private _busy = false;
   @state() private _selectedFile: File | null = null;
-  @state() private _flashProgress = 0; // 0-100 for flash progress, -1 when not flashing
+  @state() private _flashProgress = 0; // 0-100 for flash progress
   @state() private _isFlashing = false;
+  @state() private _flashOperation: "reading" | "writing" | null = null; // Track operation type
 
   async connectedCallback() {
     super.connectedCallback();
+    this.logger.log("LittleFS Manager: connectedCallback called");
     await this._openFilesystem();
   }
 
@@ -79,15 +81,31 @@ export class EwtLittleFSManager extends LitElement {
   private async _openFilesystem() {
     try {
       this._busy = true;
+      this._isFlashing = true;
+      this._flashProgress = 0;
+      this._flashOperation = "reading";
+
       this.logger.log(
         `Reading LittleFS partition "${this.partition.name}" (${this._formatSize(this.partition.size)})...`,
       );
 
-      // Read entire partition
+      if (!this.espStub.IS_STUB) {
+        throw new Error("ESP stub loader is not running. Cannot read flash.");
+      }
+
+      // Read entire partition with progress callback
       const data = await this.espStub.readFlash(
         this.partition.offset,
         this.partition.size,
+        (_packet: Uint8Array, progress: number, totalSize: number) => {
+          const progressPercent = Math.floor((progress / totalSize) * 100);
+          this._flashProgress = progressPercent;
+        },
       );
+
+      if (data.length === 0) {
+        throw new Error("Read 0 bytes from partition");
+      }
 
       this.logger.log("Mounting LittleFS filesystem...");
 
@@ -139,9 +157,13 @@ export class EwtLittleFSManager extends LitElement {
       // Get disk version
       try {
         const diskVer = fs.getDiskVersion();
-        this._diskVersion = formatDiskVersion(diskVer);
-      } catch (e) {
-        this._diskVersion = "";
+        if (diskVer && diskVer !== 0) {
+          this._diskVersion = formatDiskVersion(diskVer);
+        } else {
+          this._diskVersion = "Unknown";
+        }
+      } catch (e: any) {
+        this._diskVersion = "Unknown";
       }
 
       this._refreshFiles();
@@ -153,11 +175,16 @@ export class EwtLittleFSManager extends LitElement {
       }
     } finally {
       this._busy = false;
+      this._isFlashing = false;
+      this._flashProgress = 0;
+      this._flashOperation = null;
     }
   }
 
   private _refreshFiles() {
-    if (!this._fs) return;
+    if (!this._fs) {
+      return;
+    }
 
     try {
       // Calculate usage
@@ -184,6 +211,7 @@ export class EwtLittleFSManager extends LitElement {
       this._files = entries;
     } catch (e: any) {
       this.logger.error(`Failed to refresh file list: ${e.message || e}`);
+      this._files = [];
     }
   }
 
@@ -400,6 +428,7 @@ export class EwtLittleFSManager extends LitElement {
       this._busy = true;
       this._isFlashing = true;
       this._flashProgress = 0;
+      this._flashOperation = "writing"; // Set operation type
 
       this.logger.log("Creating LittleFS image...");
       const image = this._fs.toImage();
@@ -428,7 +457,6 @@ export class EwtLittleFSManager extends LitElement {
         (bytesWritten: number, totalBytes: number) => {
           const percent = Math.floor((bytesWritten / totalBytes) * 100);
           this._flashProgress = percent;
-          this.logger.log(`Writing: ${percent}%`);
         },
         this.partition.offset,
       );
@@ -441,6 +469,7 @@ export class EwtLittleFSManager extends LitElement {
       this._busy = false;
       this._isFlashing = false;
       this._flashProgress = 0;
+      this._flashOperation = null;
     }
   }
 
@@ -488,7 +517,11 @@ export class EwtLittleFSManager extends LitElement {
             <div class="usage-text">
               ${this._isFlashing
                 ? html`<span class="flash-status">
-                    ⚡ Writing to flash: ${this._flashProgress}%
+                    ⚡
+                    ${this._flashOperation === "reading"
+                      ? "Reading from"
+                      : "Writing to"}
+                    flash: ${this._flashProgress}%
                   </span>`
                 : html`<span
                       >Used: ${this._formatSize(this._usage.usedBytes)} /
