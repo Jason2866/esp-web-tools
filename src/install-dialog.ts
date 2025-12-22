@@ -972,12 +972,16 @@ export class EwtInstallDialog extends LitElement {
 
       // Set baudrate for reading flash (use user-selected baudrate if available)
       if (this.baudRate) {
-        this.logger.log(`Setting baudrate to ${this.baudRate} for flash reading...`);
+        this.logger.log(
+          `Setting baudrate to ${this.baudRate} for flash reading...`,
+        );
         try {
           await espStub.setBaudrate(this.baudRate);
           this.logger.log(`Baudrate set to ${this.baudRate}`);
         } catch (baudErr: any) {
-          this.logger.log(`Failed to set baudrate: ${baudErr.message}, continuing with default`);
+          this.logger.log(
+            `Failed to set baudrate: ${baudErr.message}, continuing with default`,
+          );
         }
       }
 
