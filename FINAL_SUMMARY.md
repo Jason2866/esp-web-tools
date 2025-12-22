@@ -1,26 +1,26 @@
-# Finale Zusammenfassung: Baud-Rate Konfiguration
+# Final Summary: Baud Rate Configuration
 
-## ✅ Implementierung abgeschlossen
+## ✅ Implementation Complete
 
-Die Baud-Rate ist jetzt vollständig konfigurierbar über das HTML-Attribut `baud-rate`.
+The baud rate is now fully configurable via the HTML attribute `baud-rate`.
 
-## Standard-Verhalten
+## Default Behavior
 
-**Ohne `baud-rate` Attribut**: 115.200 Baud (keine Änderung)
-- ✅ Maximale Kompatibilität
-- ✅ Funktioniert mit allen Chips und USB-Serial-Adaptern
-- ✅ Keine Überraschungen für bestehende Benutzer
+**Without `baud-rate` attribute**: 115,200 Baud (no change)
+- ✅ Maximum compatibility
+- ✅ Works with all chips and USB-Serial adapters
+- ✅ No surprises for existing users
 
-## Verwendung
+## Usage
 
-### Standard (115200 - maximale Kompatibilität):
+### Default (115200 - maximum compatibility):
 ```html
 <esp-web-install-button manifest="manifest.json">
   <button slot="activate">Install</button>
 </esp-web-install-button>
 ```
 
-### Schnell (2 Mbps - empfohlen für Geschwindigkeit):
+### Fast (2 Mbps - recommended for speed):
 ```html
 <esp-web-install-button 
   manifest="manifest.json"
@@ -29,7 +29,7 @@ Die Baud-Rate ist jetzt vollständig konfigurierbar über das HTML-Attribut `bau
 </esp-web-install-button>
 ```
 
-### Sicher für ältere Chips (921600):
+### Safe for older chips (921600):
 ```html
 <esp-web-install-button 
   manifest="manifest.json"
@@ -38,11 +38,11 @@ Die Baud-Rate ist jetzt vollständig konfigurierbar über das HTML-Attribut `bau
 </esp-web-install-button>
 ```
 
-## Implementierungs-Details
+## Implementation Details
 
 ### Code in `flash.ts`:
 ```typescript
-// Baud-Rate wird nur geändert, wenn explizit angegeben
+// Baud rate is only changed if explicitly specified
 if (baudRate !== undefined && baudRate > 115200) {
   try {
     await espStub.setBaudrate(baudRate);
@@ -52,7 +52,7 @@ if (baudRate !== undefined && baudRate > 115200) {
 }
 ```
 
-### Attribut-Parsing in `connect.ts`:
+### Attribute Parsing in `connect.ts`:
 ```typescript
 const baudRateAttr = button.getAttribute("baud-rate");
 if (baudRateAttr) {
@@ -63,38 +63,38 @@ if (baudRateAttr) {
 }
 ```
 
-## Geänderte Dateien
+## Modified Files
 
-1. ✅ `src/flash.ts` - Baud-Rate nur ändern wenn angegeben
-2. ✅ `src/install-button.ts` - `baudRate` Property
-3. ✅ `src/install-dialog.ts` - `baudRate` Property und Übergabe
-4. ✅ `src/connect.ts` - Attribut-Parsing
-5. ✅ `README.md` - Dokumentation aktualisiert
-6. ✅ `BAUD_RATE_IMPROVEMENT.md` - Aktualisiert
-7. ✅ `BAUD_RATE_CONFIGURATION.md` - Aktualisiert
-8. ✅ `example-baud-rate.html` - Beispiele aktualisiert
+1. ✅ `src/flash.ts` - Only change baud rate when specified
+2. ✅ `src/install-button.ts` - `baudRate` property
+3. ✅ `src/install-dialog.ts` - `baudRate` property and passing
+4. ✅ `src/connect.ts` - Attribute parsing
+5. ✅ `README.md` - Documentation updated
+6. ✅ `BAUD_RATE_IMPROVEMENT.md` - Updated
+7. ✅ `BAUD_RATE_CONFIGURATION.md` - Updated
+8. ✅ `example-baud-rate.html` - Examples updated
 
-## Performance-Vergleich
+## Performance Comparison
 
-| Baud Rate | Geschwindigkeit | 3 MB Firmware | Verwendung |
-|-----------|----------------|---------------|------------|
-| 115200 (Standard) | ~11 KB/s | ~4,5 Minuten | Maximale Kompatibilität |
-| 921600 | ~88 KB/s | ~35 Sekunden | Ältere Chips |
-| 2000000 | ~200 KB/s | ~15 Sekunden | Moderne Chips (empfohlen) |
+| Baud Rate | Speed | 3 MB Firmware | Usage |
+|-----------|-------|---------------|-------|
+| 115200 (Default) | ~11 KB/s | ~4.5 minutes | Maximum compatibility |
+| 921600 | ~88 KB/s | ~35 seconds | Older chips |
+| 2000000 | ~200 KB/s | ~15 seconds | Modern chips (recommended) |
 
-## Vorteile
+## Benefits
 
-1. ✅ **Abwärtskompatibel**: Standard bleibt 115200 (keine Änderung)
-2. ✅ **Flexibel**: Jede Website kann die optimale Baud-Rate wählen
-3. ✅ **Opt-in**: Schnelleres Flashen nur wenn gewünscht
-4. ✅ **Sicher**: Automatischer Fallback bei Problemen
-5. ✅ **Dokumentiert**: Vollständige Beispiele und Anleitungen
+1. ✅ **Backward Compatible**: Default remains 115200 (no change)
+2. ✅ **Flexible**: Each website can choose optimal baud rate
+3. ✅ **Opt-in**: Faster flashing only when desired
+4. ✅ **Safe**: Automatic fallback on problems
+5. ✅ **Documented**: Complete examples and guides
 
-## Empfehlungen für verschiedene Anwendungsfälle
+## Recommendations for Different Use Cases
 
-### Für Tasmota-Style Websites (viele Benutzer):
+### For Tasmota-Style Websites (many users):
 ```html
-<!-- Biete beide Optionen an -->
+<!-- Offer both options -->
 <h3>Fast Installation (Recommended)</h3>
 <esp-web-install-button 
   manifest="firmware/tasmota32.json"
@@ -108,9 +108,9 @@ if (baudRateAttr) {
 </esp-web-install-button>
 ```
 
-### Für Entwickler-Tools:
+### For Developer Tools:
 ```html
-<!-- Standard: Schnell -->
+<!-- Default: Fast -->
 <esp-web-install-button 
   manifest="firmware.json"
   baud-rate="2000000">
@@ -118,9 +118,9 @@ if (baudRateAttr) {
 </esp-web-install-button>
 ```
 
-### Für Support-Seiten:
+### For Support Pages:
 ```html
-<!-- Standard: Kompatibel -->
+<!-- Default: Compatible -->
 <esp-web-install-button manifest="firmware.json">
   <button slot="activate">Install</button>
 </esp-web-install-button>
@@ -128,26 +128,26 @@ if (baudRateAttr) {
 
 ## Testing
 
-Alle Änderungen wurden getestet:
-- ✅ TypeScript kompiliert ohne Fehler
-- ✅ Build erfolgreich
-- ✅ Keine Diagnostics-Fehler
-- ✅ Abwärtskompatibilität gewährleistet
+All changes have been tested:
+- ✅ TypeScript compiles without errors
+- ✅ Build successful
+- ✅ No diagnostic errors
+- ✅ Backward compatibility ensured
 
-## Nächste Schritte
+## Next Steps
 
-1. **Testing mit Hardware**: Verschiedene ESP-Chips und USB-Serial-Adapter testen
-2. **Dokumentation**: In offizielle Dokumentation aufnehmen
-3. **Deployment**: Neue Version veröffentlichen
+1. **Hardware Testing**: Test with various ESP chips and USB-Serial adapters
+2. **Documentation**: Include in official documentation
+3. **Deployment**: Publish new version
 
-## Zusammenfassung
+## Summary
 
-Die Baud-Rate-Konfiguration ist jetzt vollständig implementiert und dokumentiert:
+Baud rate configuration is now fully implemented and documented:
 
-- **Standard**: 115200 (keine Änderung) - maximale Kompatibilität
-- **Opt-in**: Höhere Baud-Raten via `baud-rate` Attribut
-- **Flexibel**: Jede Website kann die optimale Einstellung wählen
-- **Sicher**: Automatischer Fallback bei Problemen
-- **Dokumentiert**: Vollständige Beispiele und Anleitungen
+- **Default**: 115200 (no change) - maximum compatibility
+- **Opt-in**: Higher baud rates via `baud-rate` attribute
+- **Flexible**: Each website can choose optimal setting
+- **Safe**: Automatic fallback on problems
+- **Documented**: Complete examples and guides
 
-Perfekt für Real-World-Anwendungen wie Tasmota! 🎉
+Perfect for real-world applications like Tasmota! 🎉

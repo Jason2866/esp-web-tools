@@ -10,6 +10,7 @@ import "./components/ewt-textfield";
 import type { EwtTextfield } from "./components/ewt-textfield";
 import "./components/ewt-select";
 import "./components/ewt-list-item";
+import "./components/ewt-littlefs-manager";
 import "./pages/ewt-page-progress";
 import "./pages/ewt-page-message";
 import { chipIcon, closeIcon, firmwareIcon } from "./components/svg";
@@ -26,6 +27,8 @@ import { fireEvent } from "./util/fire-event";
 import { sleep } from "./util/sleep";
 import { downloadManifest } from "./util/manifest";
 import { dialogStyles } from "./styles";
+import { parsePartitionTable, type Partition } from "./partition.js";
+import { detectFilesystemType } from "./util/partition.js";
 
 const ERROR_ICON = "⚠️";
 const OK_ICON = "🎉";
@@ -61,7 +64,9 @@ export class EwtInstallDialog extends LitElement {
     | "PROVISION"
     | "INSTALL"
     | "ASK_ERASE"
-    | "LOGS" = "DASHBOARD";
+    | "LOGS"
+    | "PARTITIONS"
+    | "LITTLEFS" = "DASHBOARD";
 
   @state() private _installErase = false;
   @state() private _installConfirmed = false;
@@ -83,6 +88,11 @@ export class EwtInstallDialog extends LitElement {
 
   // -1 = custom
   @state() private _selectedSsid = -1;
+
+  // Partition table support
+  @state() private _partitions?: Partition[];
+  @state() private _selectedPartition?: Partition;
+  @state() private _espStub?: any;
 
   protected render() {
     if (!this.port) {
@@ -119,6 +129,10 @@ export class EwtInstallDialog extends LitElement {
       [heading, content, hideActions] = this._renderProvision();
     } else if (this._state === "LOGS") {
       [heading, content, hideActions] = this._renderLogs();
+    } else if (this._state === "PARTITIONS") {
+      [heading, content, hideActions] = this._renderPartitions();
+    } else if (this._state === "LITTLEFS") {
+      [heading, content, hideActions, allowClosing] = this._renderLittleFS();
     }
 
     return html`
@@ -258,6 +272,15 @@ export class EwtInstallDialog extends LitElement {
             }}
           ></ewt-button>
         </div>
+        <div>
+          <ewt-button
+            label="Manage Filesystem"
+            @click=${() => {
+              this._state = "PARTITIONS";
+              this._readPartitionTable();
+            }}
+          ></ewt-button>
+        </div>
         ${this._isSameFirmware && this._manifest.funding_url
           ? html`
               <div>
@@ -317,6 +340,16 @@ export class EwtInstallDialog extends LitElement {
               // Also set `null` back to undefined.
               this._client = undefined;
               this._state = "LOGS";
+            }}
+          ></ewt-button>
+        </div>
+
+        <div>
+          <ewt-button
+            label="Manage Filesystem"
+            @click=${() => {
+              this._state = "PARTITIONS";
+              this._readPartitionTable();
             }}
           ></ewt-button>
         </div>
@@ -722,6 +755,197 @@ export class EwtInstallDialog extends LitElement {
     return [heading, content!, hideActions];
   }
 
+  _renderPartitions(): [string | undefined, TemplateResult, boolean] {
+    const heading = "Partition Table";
+    let content: TemplateResult;
+    const hideActions = false;
+
+    if (this._busy) {
+      content = this._renderProgress("Reading partition table...");
+    } else if (!this._partitions || this._partitions.length === 0) {
+      content = html`
+        <ewt-page-message
+          .icon=${ERROR_ICON}
+          label="No partitions found"
+        ></ewt-page-message>
+        <ewt-button
+          slot="primaryAction"
+          label="Back"
+          @click=${() => {
+            this._state = "DASHBOARD";
+          }}
+        ></ewt-button>
+      `;
+    } else {
+      content = html`
+        <div class="partition-list">
+          <table class="partition-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>SubType</th>
+                <th>Offset</th>
+                <th>Size</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${this._partitions.map(
+                (partition) => html`
+                  <tr>
+                    <td>${partition.name}</td>
+                    <td>${partition.typeName}</td>
+                    <td>${partition.subtypeName}</td>
+                    <td>0x${partition.offset.toString(16)}</td>
+                    <td>${this._formatSize(partition.size)}</td>
+                    <td>
+                      ${partition.type === 0x01 && partition.subtype === 0x82
+                        ? html`
+                            <ewt-button
+                              label="Open FS"
+                              @click=${() => this._openFilesystem(partition)}
+                            ></ewt-button>
+                          `
+                        : ""}
+                    </td>
+                  </tr>
+                `,
+              )}
+            </tbody>
+          </table>
+        </div>
+        <ewt-button
+          slot="primaryAction"
+          label="Back"
+          @click=${() => {
+            this._state = "DASHBOARD";
+          }}
+        ></ewt-button>
+      `;
+    }
+
+    return [heading, content, hideActions];
+  }
+
+  _renderLittleFS(): [
+    string | undefined,
+    TemplateResult,
+    boolean,
+    boolean,
+  ] {
+    const heading = undefined;
+    const hideActions = true;
+    const allowClosing = true;
+
+    const content = html`
+      <ewt-littlefs-manager
+        .partition=${this._selectedPartition}
+        .espStub=${this._espStub}
+        .logger=${this.logger}
+        .onClose=${() => {
+          this._state = "PARTITIONS";
+        }}
+      ></ewt-littlefs-manager>
+    `;
+
+    return [heading, content, hideActions, allowClosing];
+  }
+
+  private async _readPartitionTable() {
+    const PARTITION_TABLE_OFFSET = 0x8000;
+    const PARTITION_TABLE_SIZE = 0x1000;
+
+    this._busy = true;
+    this._partitions = undefined;
+
+    try {
+      this.logger.log("Reading partition table from 0x8000...");
+
+      // Import ESPLoader from the package
+      const { ESPLoader } = await import("tasmota-webserial-esptool");
+      
+      const esploader = new ESPLoader(this.port, {
+        log: (msg: string, ...args: string[]) => this.logger.log(msg, ...args),
+        debug: (msg: string, ...args: string[]) => this.logger.debug?.(msg, ...args),
+        error: (msg: string, ...args: string[]) => this.logger.error(msg, ...args),
+      });
+
+      await esploader.initialize();
+      const espStub = await esploader.runStub();
+      this._espStub = espStub;
+
+      const data = await espStub.readFlash(
+        PARTITION_TABLE_OFFSET,
+        PARTITION_TABLE_SIZE,
+      );
+
+      const partitions = parsePartitionTable(data);
+
+      if (partitions.length === 0) {
+        this.logger.error("No valid partition table found");
+        this._partitions = [];
+      } else {
+        this.logger.log(`Found ${partitions.length} partition(s)`);
+        this._partitions = partitions;
+      }
+    } catch (e: any) {
+      this.logger.error(`Failed to read partition table: ${e.message || e}`);
+      this._error = `Failed to read partition table: ${e.message || e}`;
+      this._state = "ERROR";
+    } finally {
+      this._busy = false;
+    }
+  }
+
+  private async _openFilesystem(partition: Partition) {
+    try {
+      this._busy = true;
+      this.logger.log(
+        `Detecting filesystem type for partition "${partition.name}"...`,
+      );
+
+      const fsType = await detectFilesystemType(
+        this._espStub,
+        partition.offset,
+        partition.size,
+        this.logger,
+      );
+      this.logger.log(`Detected filesystem: ${fsType}`);
+
+      if (fsType === "littlefs") {
+        this._selectedPartition = partition;
+        this._state = "LITTLEFS";
+      } else if (fsType === "spiffs") {
+        this.logger.error(
+          "SPIFFS support not yet implemented. Use LittleFS partitions.",
+        );
+        this._error = "SPIFFS support not yet implemented";
+        this._state = "ERROR";
+      } else {
+        this.logger.error("Unknown filesystem type. Cannot open partition.");
+        this._error = "Unknown filesystem type";
+        this._state = "ERROR";
+      }
+    } catch (e: any) {
+      this.logger.error(`Failed to open filesystem: ${e.message || e}`);
+      this._error = `Failed to open filesystem: ${e.message || e}`;
+      this._state = "ERROR";
+    } finally {
+      this._busy = false;
+    }
+  }
+
+  private _formatSize(bytes: number): string {
+    if (bytes < 1024) {
+      return `${bytes} B`;
+    } else if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(2)} KB`;
+    } else {
+      return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    }
+  }
+
   public override willUpdate(changedProps: PropertyValues) {
     if (!changedProps.has("_state")) {
       return;
@@ -1100,6 +1324,36 @@ export class EwtInstallDialog extends LitElement {
       ewt-console {
         width: calc(80vw - 48px);
         height: 80vh;
+      }
+      :host([state="PARTITIONS"]) ewt-dialog {
+        --mdc-dialog-max-width: 800px;
+      }
+      :host([state="LITTLEFS"]) ewt-dialog {
+        --mdc-dialog-max-width: 95vw;
+      }
+      .partition-list {
+        max-height: 60vh;
+        overflow-y: auto;
+      }
+      .partition-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0;
+      }
+      .partition-table th,
+      .partition-table td {
+        padding: 8px 12px;
+        text-align: left;
+        border: 1px solid #ccc;
+      }
+      .partition-table th {
+        font-weight: 600;
+        background-color: #f0f0f0;
+        position: sticky;
+        top: 0;
+      }
+      .partition-table tbody tr:hover {
+        background-color: rgba(3, 169, 244, 0.1);
       }
     `,
   ];

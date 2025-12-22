@@ -1,19 +1,19 @@
-# Baud Rate Configuration für schnelleres Flashen
+# Baud Rate Configuration for Faster Flashing
 
-## Änderung
+## Change
 
-esp-web-tools unterstützt jetzt die Konfiguration der Baud-Rate über das HTML-Attribut `baud-rate`.
+esp-web-tools now supports baud rate configuration via the HTML attribute `baud-rate`.
 
-**Standard**: 115.200 Baud (keine Änderung - maximale Kompatibilität)
-**Empfohlen für schnelles Flashen**: 2.000.000 Baud (2 Mbps) via `baud-rate="2000000"`
+**Default**: 115,200 Baud (no change - maximum compatibility)
+**Recommended for fast flashing**: 2,000,000 Baud (2 Mbps) via `baud-rate="2000000"`
 
-## Implementierung
+## Implementation
 
 ### Code:
 ```typescript
 const espStub = await esploader.runStub();
 
-// Baud-Rate wird nur geändert, wenn explizit angegeben
+// Baud rate is only changed if explicitly specified
 if (baudRate !== undefined && baudRate > 115200) {
   try {
     await espStub.setBaudrate(baudRate);
@@ -23,27 +23,27 @@ if (baudRate !== undefined && baudRate > 115200) {
 }
 ```
 
-### Standard-Verhalten (ohne baud-rate Attribut):
-**Flash-Geschwindigkeit**: ~11-12 KB/s (115.200 Baud)
+### Default Behavior (without baud-rate attribute):
+**Flash Speed**: ~11-12 KB/s (115,200 Baud)
 
-### Mit baud-rate="2000000":
-**Flash-Geschwindigkeit**: ~200 KB/s (ca. **17x schneller!**)
+### With baud-rate="2000000":
+**Flash Speed**: ~200 KB/s (approx. **17x faster!**)
 
-## Performance-Verbesserung
+## Performance Improvement
 
-### Beispiel: 3 MB Firmware
+### Example: 3 MB Firmware
 
-| Baud Rate | Geschwindigkeit | Flash-Zeit |
-|-----------|----------------|------------|
-| 115.200   | ~11 KB/s       | ~4,5 Minuten |
-| 2.000.000 | ~200 KB/s      | ~15 Sekunden |
+| Baud Rate | Speed | Flash Time |
+|-----------|-------|------------|
+| 115,200   | ~11 KB/s | ~4.5 minutes |
+| 2,000,000 | ~200 KB/s | ~15 seconds |
 
-**Zeitersparnis: ~4 Minuten pro Flash-Vorgang!**
+**Time Saved: ~4 minutes per flash operation!**
 
-## Kompatibilität
+## Compatibility
 
-### Unterstützte Chips:
-- ✅ ESP32 (alle Varianten)
+### Supported Chips:
+- ✅ ESP32 (all variants)
 - ✅ ESP32-S2
 - ✅ ESP32-S3
 - ✅ ESP32-C2
@@ -53,28 +53,28 @@ if (baudRate !== undefined && baudRate > 115200) {
 - ✅ ESP32-C61
 - ✅ ESP32-H2
 - ✅ ESP32-P4
-- ❌ ESP8266 (unterstützt keine Baud-Rate-Änderung)
+- ❌ ESP8266 (does not support baud rate change)
 
-### USB-Serial-Chips:
-Die meisten modernen USB-Serial-Chips unterstützen 2 Mbps:
+### USB-Serial Chips:
+Most modern USB-Serial chips support 2 Mbps:
 - ✅ CP2102N
 - ✅ CP2104
 - ✅ CH340C/G/E
 - ✅ FT232H
 - ✅ Native USB (ESP32-C3, ESP32-S3)
-- ⚠️ Ältere CP2102 (nicht CP2102N) - max. 921.600 Baud
+- ⚠️ Older CP2102 (not CP2102N) - max. 921,600 Baud
 
-## Fehlerbehandlung
+## Error Handling
 
-Wenn die Baud-Rate-Änderung fehlschlägt:
-- ✅ Fehler wird abgefangen
-- ✅ Warnung wird geloggt
-- ✅ Flashen läuft mit 115.200 Baud weiter
-- ✅ Keine Unterbrechung des Flash-Vorgangs
+If baud rate change fails:
+- ✅ Error is caught
+- ✅ Warning is logged
+- ✅ Flashing continues at 115,200 Baud
+- ✅ No interruption of flash operation
 
-## Erwartetes Log
+## Expected Log
 
-### Erfolgreiche Baud-Rate-Änderung:
+### Successful Baud Rate Change:
 ```
 Uploading stub...
 Running stub...
@@ -85,49 +85,49 @@ Detecting Flash Size
 Writing data with filesize: 3045696
 ```
 
-### Fallback bei Fehler:
+### Fallback on Error:
 ```
 Uploading stub...
 Running stub...
 Stub is now running...
-Could not change baud rate: [Fehlergrund]
+Could not change baud rate: [error reason]
 Detecting Flash Size
 Writing data with filesize: 3045696
 ```
 
-## Technische Details
+## Technical Details
 
-### Warum 2 Mbps?
+### Why 2 Mbps?
 
-1. **Maximale Kompatibilität**: Die meisten USB-Serial-Chips unterstützen 2 Mbps
-2. **Stabile Übertragung**: Höhere Raten (z.B. 3 Mbps) sind weniger zuverlässig
-3. **Optimales Verhältnis**: Beste Balance zwischen Geschwindigkeit und Stabilität
+1. **Maximum Compatibility**: Most USB-Serial chips support 2 Mbps
+2. **Stable Transfer**: Higher rates (e.g., 3 Mbps) are less reliable
+3. **Optimal Ratio**: Best balance between speed and stability
 
-### Verfügbare Baud-Raten:
+### Available Baud Rates:
 ```typescript
 export const baudRates = [
-  115200,   // Standard (Stub-Default)
+  115200,   // Default (Stub default)
   128000,
   153600,
   230400,
   460800,
   921600,
   1500000,
-  2000000,  // Empfohlen für Flashen
+  2000000,  // Recommended for flashing
 ];
 ```
 
-## HTML-Verwendung
+## HTML Usage
 
-### Standard (115200 - maximale Kompatibilität):
+### Default (115200 - maximum compatibility):
 ```html
 <esp-web-install-button manifest="manifest.json">
   <button slot="activate">Install</button>
 </esp-web-install-button>
 ```
-Keine Baud-Rate-Änderung, funktioniert mit allen Chips.
+No baud rate change, works with all chips.
 
-### Schnelles Flashen (2 Mbps - empfohlen):
+### Fast Flashing (2 Mbps - recommended):
 ```html
 <esp-web-install-button 
   manifest="manifest.json"
@@ -135,9 +135,9 @@ Keine Baud-Rate-Änderung, funktioniert mit allen Chips.
   <button slot="activate">Install</button>
 </esp-web-install-button>
 ```
-~17x schneller, funktioniert mit modernen USB-Serial-Chips.
+~17x faster, works with modern USB-Serial chips.
 
-### Für ältere USB-Serial-Chips:
+### For Older USB-Serial Chips:
 ```html
 <esp-web-install-button 
   manifest="manifest.json"
@@ -145,17 +145,17 @@ Keine Baud-Rate-Änderung, funktioniert mit allen Chips.
   <button slot="activate">Install</button>
 </esp-web-install-button>
 ```
-~8x schneller, kompatibel mit älteren Chips wie CP2102.
+~8x faster, compatible with older chips like CP2102.
 
-### Verfügbare Baud-Raten:
-- Kein Attribut - Standard (115200, keine Änderung)
-- `230400` - 2x schneller
-- `460800` - 4x schneller
-- `921600` - 8x schneller (sicher für ältere Chips)
-- `1500000` - 13x schneller
-- `2000000` - 17x schneller (empfohlen für Geschwindigkeit)
+### Available Baud Rates:
+- No attribute - Default (115200, no change)
+- `230400` - 2x faster
+- `460800` - 4x faster
+- `921600` - 8x faster (safe for older chips)
+- `1500000` - 13x faster
+- `2000000` - 17x faster (recommended for speed)
 
-### Programmatische Verwendung:
+### Programmatic Usage:
 ```javascript
 const button = document.querySelector('esp-web-install-button');
 button.baudRate = 921600;
@@ -163,7 +163,7 @@ button.baudRate = 921600;
 
 ## Testing
 
-### Getestet mit:
+### Tested with:
 - [ ] ESP32
 - [ ] ESP32-S2
 - [ ] ESP32-S3
@@ -175,21 +175,21 @@ button.baudRate = 921600;
 - [ ] ESP32-H2
 - [ ] ESP32-P4
 
-### Erwartetes Ergebnis:
-- Flash-Zeit sollte deutlich reduziert sein
-- Keine Fehler während des Flashens
-- Erfolgreiche Firmware-Installation
+### Expected Result:
+- Flash time should be significantly reduced
+- No errors during flashing
+- Successful firmware installation
 
-## Vorteile
+## Benefits
 
-1. **Schnelleres Flashen**: ~17x schneller als vorher
-2. **Bessere User Experience**: Kürzere Wartezeiten
-3. **Produktivität**: Mehr Flash-Zyklen in kürzerer Zeit
-4. **Robust**: Automatischer Fallback bei Problemen
-5. **Transparent**: Keine Änderungen am Manifest nötig
+1. **Faster Flashing**: ~17x faster than before
+2. **Better User Experience**: Shorter wait times
+3. **Productivity**: More flash cycles in less time
+4. **Robust**: Automatic fallback on problems
+5. **Transparent**: No manifest changes needed
 
-## Zusammenfassung
+## Summary
 
-Diese Änderung verbessert die Flash-Geschwindigkeit erheblich, ohne die Kompatibilität oder Zuverlässigkeit zu beeinträchtigen. Die automatische Fehlerbehandlung stellt sicher, dass das Flashen auch bei älteren USB-Serial-Chips funktioniert.
+This change significantly improves flash speed without compromising compatibility or reliability. Automatic error handling ensures flashing works even with older USB-Serial chips.
 
-**Empfehlung**: Diese Änderung sollte in die nächste Version von esp-web-tools aufgenommen werden.
+**Recommendation**: This change should be included in the next version of esp-web-tools.

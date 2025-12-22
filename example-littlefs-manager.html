@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>ESP Web Tools - LittleFS Manager Demo</title>
+    <meta name="description" content="Demo of ESP Web Tools with LittleFS Filesystem Manager" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="color-scheme" content="dark light" />
+    <style>
+      body {
+        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, sans-serif;
+        padding: 0;
+        margin: 0;
+        line-height: 1.4;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 40px 20px;
+      }
+      .header {
+        text-align: center;
+        color: white;
+        margin-bottom: 40px;
+      }
+      .header h1 {
+        font-size: 2.5em;
+        margin: 0 0 10px 0;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+      }
+      .header p {
+        font-size: 1.2em;
+        opacity: 0.9;
+        margin: 0;
+      }
+      .card {
+        background: white;
+        border-radius: 12px;
+        padding: 30px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        margin-bottom: 30px;
+      }
+      .card h2 {
+        margin-top: 0;
+        color: #667eea;
+        font-size: 1.8em;
+      }
+      .feature-list {
+        list-style: none;
+        padding: 0;
+      }
+      .feature-list li {
+        padding: 10px 0;
+        border-bottom: 1px solid #eee;
+      }
+      .feature-list li:last-child {
+        border-bottom: none;
+      }
+      .feature-list li:before {
+        content: "✓ ";
+        color: #667eea;
+        font-weight: bold;
+        margin-right: 8px;
+      }
+      .install-section {
+        text-align: center;
+        padding: 20px 0;
+      }
+      .baud-rate-selector {
+        margin: 20px 0;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+      }
+      .baud-rate-selector label {
+        font-weight: 600;
+        color: #333;
+        display: block;
+        margin-bottom: 10px;
+      }
+      .baud-rate-selector select {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid #667eea;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+        background: white;
+      }
+      .info-box {
+        background: #e3f2fd;
+        border-left: 4px solid #2196f3;
+        padding: 15px;
+        margin: 20px 0;
+        border-radius: 4px;
+      }
+      code {
+        background: #f5f5f5;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: "Courier New", monospace;
+        color: #d63384;
+      }
+      .footer {
+        text-align: center;
+        color: white;
+        margin-top: 40px;
+        opacity: 0.8;
+      }
+      .footer a {
+        color: white;
+        text-decoration: underline;
+      }
+      @media (prefers-color-scheme: dark) {
+        .card {
+          background: #2d2d2d;
+          color: #e0e0e0;
+        }
+        .card h2 {
+          color: #8b9dff;
+        }
+        .feature-list li {
+          border-bottom-color: #444;
+        }
+        .baud-rate-selector {
+          background: #1a1a1a;
+        }
+        .baud-rate-selector label {
+          color: #e0e0e0;
+        }
+        .baud-rate-selector select {
+          background: #2d2d2d;
+          color: #e0e0e0;
+          border-color: #8b9dff;
+        }
+        code {
+          background: #1a1a1a;
+          color: #ff6b9d;
+        }
+      }
+    </style>
+    <script type="module">
+      // Import ESP Web Tools
+      import(
+        window.location.hostname === "localhost"
+          ? "/dist/web/install-button.js"
+          : "./dist/web/install-button.js"
+      ).catch(err => {
+        console.error("Failed to load ESP Web Tools:", err);
+        document.querySelector('.install-section').innerHTML = 
+          '<p style="color: red;">Failed to load ESP Web Tools. Check browser console for details.</p>';
+      });
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🚀 ESP Web Tools</h1>
+        <p>LittleFS Filesystem Manager Demo</p>
+      </div>
+
+      <div class="card">
+        <h2>📦 What's New?</h2>
+        <p>ESP Web Tools now supports complete management of LittleFS filesystems directly in your browser!</p>
+
+        <h3>✨ Features</h3>
+        <ul class="feature-list">
+          <li>Automatic detection of LittleFS partitions</li>
+          <li>Hierarchical file browser with navigation</li>
+          <li>Upload and download files</li>
+          <li>Create and delete folders</li>
+          <li>Real-time storage usage display</li>
+          <li>Save complete filesystem as backup</li>
+          <li>Write modified filesystem back to device</li>
+          <li>Support for various block sizes (512-4096 bytes)</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>🎯 Installation & Filesystem Management</h2>
+
+        <div class="baud-rate-selector">
+          <label for="baudRate">Flash Speed:</label>
+          <select id="baudRate">
+            <option value="">115200 Baud (Default)</option>
+            <option value="230400">230400 Baud</option>
+            <option value="460800">460800 Baud</option>
+            <option value="921600">921600 Baud</option>
+            <option value="1500000">1500000 Baud</option>
+            <option value="2000000" selected>2000000 Baud (Recommended)</option>
+          </select>
+        </div>
+
+        <div class="install-section">
+          <esp-web-install-button
+            id="installButton"
+            manifest="https://firmware.esphome.io/esphome-web/manifest.json"
+            baud-rate="2000000"
+          >
+            <button slot="activate" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 15px 40px; font-size: 18px; font-weight: 600; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">
+              🔌 Connect & Install Device
+            </button>
+            <span slot="unsupported" style="color: #d32f2f; font-weight: 600;">
+              ⚠️ Web Serial is not supported. Please use Chrome or Edge (not on iOS).
+            </span>
+          </esp-web-install-button>
+        </div>
+
+        <div class="info-box">
+          <strong>💡 Tip:</strong> After installation, a "Manage Filesystem" button will appear in the dashboard. Use it to manage the LittleFS partitions on your device.
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📖 How to Use</h2>
+        <ol>
+          <li><strong>Connect Device:</strong> Click the button above and select your ESP device</li>
+          <li><strong>Install Firmware (optional):</strong> Install new firmware or skip this step</li>
+          <li><strong>Open Filesystem Manager:</strong> Click <code>Manage Filesystem</code> in the dashboard</li>
+          <li><strong>Read Partition Table:</strong> The partition table will be automatically read</li>
+          <li><strong>Open LittleFS Partition:</strong> Click <code>Open FS</code> on a data partition</li>
+          <li><strong>Manage Files:</strong> Upload, download, delete files and create folders</li>
+          <li><strong>Save Changes:</strong> Click <code>Write to Flash</code> to save your changes</li>
+          <li><strong>Restart Device:</strong> Restart your device to activate the changes</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h2>📚 Additional Resources</h2>
+        <ul>
+          <li><a href="https://github.com/Jason2866/esp-web-tools" target="_blank">GitHub Repository</a></li>
+          <li><a href="LITTLEFS_FEATURE.md" target="_blank">LittleFS Feature Documentation</a></li>
+          <li><a href="FS_DETECTION.md" target="_blank">Filesystem Detection Algorithm</a></li>
+          <li><a href="https://github.com/littlefs-project/littlefs" target="_blank">LittleFS Project</a></li>
+        </ul>
+      </div>
+
+      <div class="footer">
+        <p>
+          ESP Web Tools with LittleFS Support<br />
+          <a href="https://github.com/Jason2866/esp-web-tools" target="_blank">Open Source on GitHub</a>
+        </p>
+      </div>
+    </div>
+
+    <script>
+      const baudRateSelect = document.getElementById("baudRate");
+      const installButton = document.getElementById("installButton");
+
+      if (baudRateSelect && installButton) {
+        baudRateSelect.addEventListener("change", function () {
+          const selectedRate = this.value;
+          if (selectedRate === "") {
+            installButton.removeAttribute("baud-rate");
+          } else {
+            installButton.setAttribute("baud-rate", selectedRate);
+          }
+        });
+      }
+    </script>
+  </body>
+</html>
