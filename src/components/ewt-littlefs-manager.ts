@@ -18,24 +18,31 @@ async function loadLittleFS() {
   if (!_wasmBasePath) {
     const scriptUrl = new URL(import.meta.url);
     // Remove the filename to get the directory
-    const scriptDir = scriptUrl.href.substring(0, scriptUrl.href.lastIndexOf('/') + 1);
-    _wasmBasePath = scriptDir + 'wasm/littlefs/';
+    const scriptDir = scriptUrl.href.substring(
+      0,
+      scriptUrl.href.lastIndexOf("/") + 1,
+    );
+    _wasmBasePath = scriptDir + "wasm/littlefs/";
   }
-  
+
   try {
     // Try to import from the calculated path
-    const indexUrl = _wasmBasePath + 'index.js';
-    console.log('[LittleFS] Loading module from:', indexUrl);
+    const indexUrl = _wasmBasePath + "index.js";
+    console.log("[LittleFS] Loading module from:", indexUrl);
     _littleFSModule = await import(/* @vite-ignore */ indexUrl);
     return _littleFSModule;
   } catch (err) {
-    console.error('[LittleFS] Failed to load from calculated path:', _wasmBasePath, err);
+    console.error(
+      "[LittleFS] Failed to load from calculated path:",
+      _wasmBasePath,
+      err,
+    );
     // Fallback to relative import (for local development)
     try {
       _littleFSModule = await import("../wasm/littlefs/index.js");
       return _littleFSModule;
     } catch (fallbackErr) {
-      console.error('[LittleFS] Fallback import also failed:', fallbackErr);
+      console.error("[LittleFS] Fallback import also failed:", fallbackErr);
       throw new Error(`Failed to load LittleFS module: ${err}`);
     }
   }
