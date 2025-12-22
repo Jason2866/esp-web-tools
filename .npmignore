@@ -6,3 +6,25 @@ manifest-example-p4-variants.json
 # Ignore all markdown files except README.md
 *.md
 !README.md
+
+# Development and build files
+.devcontainer/
+.github/
+script/
+src/
+static/
+esp-web-tools/
+rollup.config.mjs
+tsconfig.json
+.prettierignore
+.DS_Store
+
+# Example files
+example-*.html
+index.html
+
+# Git files
+.git/
+.gitignore
+
+# Only include dist/ folder for npm
