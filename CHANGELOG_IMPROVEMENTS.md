@@ -2,23 +2,23 @@
 
 ## Version: TBD
 
-### 🚀 Performance: Schnelleres Flashen (2 Mbps)
+### 🚀 Performance: Faster Flashing (2 Mbps)
 
-**Änderung**: Automatische Erhöhung der Baud-Rate auf 2.000.000 Baud nach Stub-Upload
+**Change**: Automatic increase of baud rate to 2,000,000 Baud after stub upload
 
-**Datei**: `src/flash.ts`
+**File**: `src/flash.ts`
 
-**Vorteile**:
-- ⚡ ~17x schnellere Flash-Geschwindigkeit
-- 📉 3 MB Firmware: von ~4,5 Minuten auf ~15 Sekunden
-- ✅ Automatischer Fallback auf 115200 bei Problemen
-- 🔧 Keine Manifest-Änderungen nötig
+**Benefits**:
+- ⚡ ~17x faster flash speed
+- 📉 3 MB firmware: from ~4.5 minutes to ~15 seconds
+- ✅ Automatic fallback to 115200 on problems
+- 🔧 No manifest changes needed
 
 **Code**:
 ```typescript
 const espStub = await esploader.runStub();
 
-// NEU: Erhöhe Baud-Rate für schnelleres Flashen
+// NEW: Increase baud rate for faster flashing
 try {
   await espStub.setBaudrate(2000000);
 } catch (err: any) {
@@ -26,33 +26,33 @@ try {
 }
 ```
 
-**Kompatibilität**:
+**Compatibility**:
 - ✅ ESP32, ESP32-S2, ESP32-S3
 - ✅ ESP32-C2, ESP32-C3, ESP32-C5, ESP32-C6, ESP32-C61
 - ✅ ESP32-H2, ESP32-P4
-- ❌ ESP8266 (keine Baud-Rate-Änderung unterstützt)
+- ❌ ESP8266 (baud rate change not supported)
 
 ---
 
 ### 🔧 Feature: Chip Variant Support (ESP32-P4)
 
-**Änderung**: Unterstützung für verschiedene Chip-Varianten im Manifest
+**Change**: Support for different chip variants in manifest
 
-**Dateien**: 
-- `src/const.ts` - Interface-Erweiterungen
-- `src/flash.ts` - Build-Matching-Logik
-- `README.md` - Dokumentation
+**Files**: 
+- `src/const.ts` - Interface extensions
+- `src/flash.ts` - Build matching logic
+- `README.md` - Documentation
 
-**Neue Manifest-Felder**:
+**New Manifest Fields**:
 ```typescript
 interface Build {
   chipFamily: "ESP32-P4" | ...;
-  chipVariant?: string;  // NEU - optional
+  chipVariant?: string;  // NEW - optional
   parts: { path: string; offset: number; }[];
 }
 ```
 
-**Verwendung**:
+**Usage**:
 ```json
 {
   "builds": [
@@ -70,74 +70,74 @@ interface Build {
 }
 ```
 
-**Vorteile**:
-- 🎯 Separate Firmware für ESP32-P4 Rev. 0 und Rev. 300
-- 🔄 Intelligente Build-Auswahl mit Fallback
-- ⬆️ Vollständig abwärtskompatibel
-- 📦 Erweiterbar für zukünftige Chip-Varianten
+**Benefits**:
+- 🎯 Separate firmware for ESP32-P4 Rev. 0 and Rev. 300
+- 🔄 Intelligent build selection with fallback
+- ⬆️ Fully backward compatible
+- 📦 Extensible for future chip variants
 
-**Matching-Logik**:
-1. Wenn `chipVariant` im Build angegeben → muss exakt matchen
-2. Wenn `chipVariant` nicht angegeben → matched alle Varianten (Fallback)
+**Matching Logic**:
+1. If `chipVariant` specified in build → must match exactly
+2. If `chipVariant` not specified → matches all variants (fallback)
 
 ---
 
-## WebSerial_ESPTool Verbesserungen
+## WebSerial_ESPTool Improvements
 
-### 🐛 Bugfix: GET_SECURITY_INFO für ESP32-C3
+### 🐛 Bugfix: GET_SECURITY_INFO for ESP32-C3
 
-**Problem**: ESP32-C3 v0.4 wurde nicht via IMAGE_CHIP_ID erkannt
+**Problem**: ESP32-C3 v0.4 was not detected via IMAGE_CHIP_ID
 
-**Ursache**: `chipFamily` war noch nicht gesetzt, als `GET_SECURITY_INFO` aufgerufen wurde
+**Cause**: `chipFamily` was not yet set when `GET_SECURITY_INFO` was called
 
-**Lösung**: Spezielle Behandlung für `GET_SECURITY_INFO` in `checkCommand()`
+**Solution**: Special handling for `GET_SECURITY_INFO` in `checkCommand()`
 
-**Datei**: `src/esp_loader.ts`
+**File**: `src/esp_loader.ts`
 
 **Code**:
 ```typescript
 if (opcode === ESP_GET_SECURITY_INFO) {
-  statusLen = 4;  // Moderne Chips verwenden 4-Byte Status
+  statusLen = 4;  // Modern chips use 4-byte status
 }
 ```
 
-**Ergebnis**:
-- ✅ ESP32-C3 v0.4 wird jetzt via IMAGE_CHIP_ID erkannt
-- ✅ Schnellere Chip-Erkennung
-- ✅ Fallback auf Magic Value bleibt erhalten
+**Result**:
+- ✅ ESP32-C3 v0.4 is now detected via IMAGE_CHIP_ID
+- ✅ Faster chip detection
+- ✅ Fallback to magic value remains
 
-**Vorher**:
+**Before**:
 ```
 GET_SECURITY_INFO failed, using magic value detection
 Detected chip via magic value: 0x1B31506F (ESP32-C3)
 ```
 
-**Nachher**:
+**After**:
 ```
 Detected chip via IMAGE_CHIP_ID: 5 (ESP32-C3)
 ```
 
 ---
 
-### 🆕 Feature: chipVariant Feld
+### 🆕 Feature: chipVariant Field
 
-**Änderung**: Neues `chipVariant` Feld in `ESPLoader`
+**Change**: New `chipVariant` field in `ESPLoader`
 
-**Datei**: `src/esp_loader.ts`
+**File**: `src/esp_loader.ts`
 
 **Code**:
 ```typescript
 export class ESPLoader extends EventTarget {
-  chipVariant: string | null = null;  // NEU
+  chipVariant: string | null = null;  // NEW
   // ...
 }
 ```
 
-**ESP32-P4 Varianten**:
+**ESP32-P4 Variants**:
 - `"rev0"` - Revision < 300
 - `"rev300"` - Revision >= 300
 
-**Erkennung**:
+**Detection**:
 ```typescript
 if (this.chipFamily === CHIP_FAMILY_ESP32P4) {
   this.chipRevision = await this.getChipRevision();
@@ -150,57 +150,57 @@ if (this.chipFamily === CHIP_FAMILY_ESP32P4) {
 }
 ```
 
-**Stub-Auswahl**:
+**Stub Selection**:
 - Rev. < 300 → `esp32p4.json`
 - Rev. >= 300 → `esp32p4r3.json`
 
 ---
 
-## Zusammenfassung
+## Summary
 
 ### Performance
-- ⚡ **17x schnelleres Flashen** durch 2 Mbps Baud-Rate
-- 📉 **4+ Minuten Zeitersparnis** pro Flash-Vorgang
+- ⚡ **17x faster flashing** through 2 Mbps baud rate
+- 📉 **4+ minutes time saved** per flash operation
 
 ### Features
-- 🎯 **Chip Variant Support** für ESP32-P4 und zukünftige Chips
-- 🔍 **Verbesserte Chip-Erkennung** via IMAGE_CHIP_ID
+- 🎯 **Chip Variant Support** for ESP32-P4 and future chips
+- 🔍 **Improved Chip Detection** via IMAGE_CHIP_ID
 
-### Qualität
-- 🐛 **Bugfixes** für ESP32-C3 Erkennung
-- ✅ **Robustheit** durch Fehlerbehandlung und Fallbacks
-- ⬆️ **Abwärtskompatibilität** vollständig gewährleistet
+### Quality
+- 🐛 **Bugfixes** for ESP32-C3 detection
+- ✅ **Robustness** through error handling and fallbacks
+- ⬆️ **Backward Compatibility** fully ensured
 
-### Dokumentation
-- 📚 Vollständige technische Dokumentation
-- 📝 Beispiel-Manifeste
-- 🔧 Implementierungs-Guides
+### Documentation
+- 📚 Complete technical documentation
+- 📝 Example manifests
+- 🔧 Implementation guides
 
 ---
 
 ## Testing
 
-### Empfohlene Tests:
+### Recommended Tests:
 
 **Performance**:
-- [ ] Flash-Zeit mit 115200 Baud messen
-- [ ] Flash-Zeit mit 2000000 Baud messen
-- [ ] Vergleich dokumentieren
+- [ ] Measure flash time with 115200 Baud
+- [ ] Measure flash time with 2000000 Baud
+- [ ] Document comparison
 
 **Chip Variant**:
-- [ ] ESP32-P4 Rev. 0 mit spezifischem Build
-- [ ] ESP32-P4 Rev. 300 mit spezifischem Build
-- [ ] ESP32-P4 mit Fallback-Build
+- [ ] ESP32-P4 Rev. 0 with specific build
+- [ ] ESP32-P4 Rev. 300 with specific build
+- [ ] ESP32-P4 with fallback build
 
-**Chip-Erkennung**:
+**Chip Detection**:
 - [ ] ESP32-C3 v0.4 via IMAGE_CHIP_ID
 - [ ] ESP32-S3 via IMAGE_CHIP_ID
-- [ ] ESP8266 via Magic Value (Fallback)
+- [ ] ESP8266 via Magic Value (fallback)
 
-**Kompatibilität**:
-- [ ] Bestehende Manifeste ohne chipVariant
-- [ ] Verschiedene USB-Serial-Chips
-- [ ] Ältere Browser-Versionen
+**Compatibility**:
+- [ ] Existing manifests without chipVariant
+- [ ] Various USB-Serial chips
+- [ ] Older browser versions
 
 ---
 
@@ -209,7 +209,7 @@ if (this.chipFamily === CHIP_FAMILY_ESP32P4) {
 ### WebSerial_ESPTool
 ```bash
 cd WebSerial_ESPTool
-# Version erhöhen (z.B. 6.5.0)
+# Increment version (e.g., 6.5.0)
 npm run prepublishOnly
 npm publish
 ```
@@ -219,16 +219,16 @@ npm publish
 cd esp-web-tools
 # package.json: "tasmota-webserial-esptool": "^6.5.0"
 npm install
-# Version erhöhen (z.B. 8.2.0)
+# Increment version (e.g., 8.2.0)
 npm run prepublishOnly
 npm publish
 ```
 
 ---
 
-## Dateien
+## Files
 
-### Neu erstellt:
+### Newly Created:
 - `WebSerial_ESPTool/CHIP_VARIANT_SUPPORT.md`
 - `WebSerial_ESPTool/CHANGELOG_CHIP_VARIANT.md`
 - `WebSerial_ESPTool/IMPLEMENTATION_SUMMARY.md`
@@ -238,9 +238,9 @@ npm publish
 - `esp-web-tools/CHANGELOG_IMPROVEMENTS.md`
 - `esp-web-tools/manifest-example-p4-variants.json`
 
-### Geändert:
+### Modified:
 - `WebSerial_ESPTool/src/esp_loader.ts`
-- `WebSerial_ESPTool/src/stubs/index.ts` (bereits vorhanden)
+- `WebSerial_ESPTool/src/stubs/index.ts` (already present)
 - `esp-web-tools/src/const.ts`
 - `esp-web-tools/src/flash.ts`
 - `esp-web-tools/README.md`

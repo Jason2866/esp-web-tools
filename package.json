@@ -1,6 +1,6 @@
 {
   "name": "tasmota-esp-web-tools",
-  "version": "9.0.2",
+  "version": "10.0.0",
   "description": "Web tools for ESP devices",
   "main": "dist/install-button.js",
   "repository": {
@@ -10,7 +10,8 @@
   "author": "ESPHome maintainers & Jason2866",
   "license": "Apache-2.0",
   "scripts": {
-    "prepublishOnly": "script/build"
+    "prepublishOnly": "script/build",
+    "develop": "script/develop"
   },
   "devDependencies": {
     "@babel/plugin-proposal-class-properties": "^7.18.6",
