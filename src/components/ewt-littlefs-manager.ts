@@ -6,24 +6,39 @@ import "./ewt-textfield";
 
 // Dynamic import for LittleFS WASM module
 let _wasmBasePath: string | null = null;
+let _littleFSModule: any = null;
 
 async function loadLittleFS() {
-  // Determine WASM base path
-  // When deployed on GitHub Pages or other CDNs, the WASM files need to be
-  // loaded from the correct relative path
-  if (!_wasmBasePath) {
-    // Get the base URL of the current script
-    const scriptUrl = new URL(import.meta.url);
-    // The WASM files are in the same directory as the bundled JS
-    // Navigate to wasm/littlefs/ relative to the script location
-    _wasmBasePath = new URL("./wasm/littlefs/", scriptUrl).href;
+  // Cache the module to avoid reloading
+  if (_littleFSModule) {
+    return _littleFSModule;
   }
 
-  // Import the index.js from the same relative location
-  const module = await import(
-    new URL("./wasm/littlefs/index.js", new URL(import.meta.url)).href
-  );
-  return module;
+  // Determine WASM base path from the current script location
+  if (!_wasmBasePath) {
+    const scriptUrl = new URL(import.meta.url);
+    // Remove the filename to get the directory
+    const scriptDir = scriptUrl.href.substring(0, scriptUrl.href.lastIndexOf('/') + 1);
+    _wasmBasePath = scriptDir + 'wasm/littlefs/';
+  }
+  
+  try {
+    // Try to import from the calculated path
+    const indexUrl = _wasmBasePath + 'index.js';
+    console.log('[LittleFS] Loading module from:', indexUrl);
+    _littleFSModule = await import(/* @vite-ignore */ indexUrl);
+    return _littleFSModule;
+  } catch (err) {
+    console.error('[LittleFS] Failed to load from calculated path:', _wasmBasePath, err);
+    // Fallback to relative import (for local development)
+    try {
+      _littleFSModule = await import("../wasm/littlefs/index.js");
+      return _littleFSModule;
+    } catch (fallbackErr) {
+      console.error('[LittleFS] Fallback import also failed:', fallbackErr);
+      throw new Error(`Failed to load LittleFS module: ${err}`);
+    }
+  }
 }
 
 @customElement("ewt-littlefs-manager")
