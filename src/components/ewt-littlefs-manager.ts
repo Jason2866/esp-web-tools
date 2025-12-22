@@ -25,6 +25,8 @@ export class EwtLittleFSManager extends LitElement {
   @state() private _diskVersion = "";
   @state() private _busy = false;
   @state() private _selectedFile: File | null = null;
+  @state() private _flashProgress = 0; // 0-100 for flash progress, -1 when not flashing
+  @state() private _isFlashing = false;
 
   async connectedCallback() {
     super.connectedCallback();
@@ -350,6 +352,9 @@ export class EwtLittleFSManager extends LitElement {
 
     try {
       this._busy = true;
+      this._isFlashing = true;
+      this._flashProgress = 0;
+      
       this.logger.log("Creating LittleFS image...");
       const image = this._fs.toImage();
       this.logger.log(`Image created: ${this._formatSize(image.length)}`);
@@ -371,11 +376,12 @@ export class EwtLittleFSManager extends LitElement {
         image.byteOffset + image.byteLength,
       );
 
-      // Write the image to flash
+      // Write the image to flash with progress callback
       await this.espStub.flashData(
         imageBuffer,
         (bytesWritten: number, totalBytes: number) => {
           const percent = Math.floor((bytesWritten / totalBytes) * 100);
+          this._flashProgress = percent;
           this.logger.log(`Writing: ${percent}%`);
         },
         this.partition.offset,
@@ -387,6 +393,8 @@ export class EwtLittleFSManager extends LitElement {
       this.logger.error(`Failed to write LittleFS to flash: ${e.message || e}`);
     } finally {
       this._busy = false;
+      this._isFlashing = false;
+      this._flashProgress = 0;
     }
   }
 
@@ -424,17 +432,24 @@ export class EwtLittleFSManager extends LitElement {
           </div>
           <div class="littlefs-usage">
             <div class="usage-bar">
-              <div class="usage-fill" style="width: ${usedPercent}%"></div>
+              <div 
+                class="usage-fill ${this._isFlashing ? 'flashing' : ''}" 
+                style="width: ${this._isFlashing ? this._flashProgress : usedPercent}%"
+              ></div>
             </div>
             <div class="usage-text">
-              <span
-                >Used: ${this._formatSize(this._usage.usedBytes)} /
-                ${this._formatSize(this._usage.capacityBytes)}
-                (${usedPercent}%)</span
-              >
-              ${this._diskVersion
-                ? html`<span class="disk-version">${this._diskVersion}</span>`
-                : ""}
+              ${this._isFlashing
+                ? html`<span class="flash-status">
+                    ⚡ Writing to flash: ${this._flashProgress}%
+                  </span>`
+                : html`<span
+                    >Used: ${this._formatSize(this._usage.usedBytes)} /
+                    ${this._formatSize(this._usage.capacityBytes)} (${usedPercent}%)</span
+                  >
+                  ${this._diskVersion
+                    ? html`<span class="disk-version">${this._diskVersion}</span>`
+                    : ""}`
+              }
             </div>
           </div>
         </div>
@@ -576,31 +591,32 @@ export class EwtLittleFSManager extends LitElement {
 
     .littlefs-manager {
       width: 100%;
-      max-width: 900px;
+      max-width: 100%;
       margin: 0 auto;
-      padding: 25px;
+      padding: 15px;
       border: 2px solid var(--mdc-theme-primary, #03a9f4);
       border-radius: 10px;
       background-color: rgba(3, 169, 244, 0.05);
+      box-sizing: border-box;
     }
 
     h3 {
-      margin: 0 0 20px 0;
+      margin: 0 0 15px 0;
       color: var(--mdc-theme-primary, #03a9f4);
-      font-size: 20px;
+      font-size: 18px;
       font-weight: 600;
     }
 
     .littlefs-info {
-      margin-bottom: 20px;
-      padding: 15px;
+      margin-bottom: 15px;
+      padding: 12px;
       background-color: rgba(255, 255, 255, 0.5);
       border-radius: 8px;
     }
 
     .littlefs-partition-info {
-      margin-bottom: 12px;
-      font-size: 14px;
+      margin-bottom: 10px;
+      font-size: 13px;
     }
 
     .littlefs-size {
@@ -609,16 +625,16 @@ export class EwtLittleFSManager extends LitElement {
     }
 
     .littlefs-usage {
-      margin-top: 10px;
+      margin-top: 8px;
     }
 
     .usage-bar {
       width: 100%;
-      height: 20px;
+      height: 18px;
       background-color: #e0e0e0;
       border-radius: 10px;
       overflow: hidden;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .usage-fill {
@@ -631,17 +647,42 @@ export class EwtLittleFSManager extends LitElement {
       transition: width 0.3s ease;
     }
 
+    .usage-fill.flashing {
+      background: linear-gradient(
+        90deg,
+        #ff9800 0%,
+        #ff5722 100%
+      );
+      animation: pulse 1s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.7;
+      }
+    }
+
+    .flash-status {
+      font-weight: 600;
+      color: #ff5722;
+    }
+
     .usage-text {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 13px;
+      font-size: 12px;
       color: #555;
+      flex-wrap: wrap;
+      gap: 5px;
     }
 
     .disk-version {
-      font-size: 12px;
-      padding: 2px 8px;
+      font-size: 11px;
+      padding: 2px 6px;
       background-color: var(--mdc-theme-primary, #03a9f4);
       color: white;
       border-radius: 4px;
@@ -649,50 +690,58 @@ export class EwtLittleFSManager extends LitElement {
 
     .littlefs-controls {
       display: flex;
-      gap: 10px;
-      margin-bottom: 20px;
+      gap: 8px;
+      margin-bottom: 15px;
       flex-wrap: wrap;
     }
 
     .littlefs-breadcrumb {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 15px;
-      padding: 10px;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding: 8px;
       background-color: rgba(255, 255, 255, 0.5);
       border-radius: 8px;
     }
 
     .littlefs-breadcrumb span {
       font-family: monospace;
-      font-size: 14px;
+      font-size: 13px;
       color: #333;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .littlefs-file-upload {
       display: flex;
-      gap: 10px;
-      margin-bottom: 15px;
+      gap: 8px;
+      margin-bottom: 12px;
       align-items: center;
+      flex-wrap: wrap;
     }
 
     .littlefs-file-upload input[type="file"] {
       flex: 1;
-      padding: 5px;
+      min-width: 150px;
+      padding: 4px;
       border: 2px solid #ccc;
       border-radius: 8px;
+      font-size: 13px;
     }
 
     .littlefs-files {
-      max-height: 400px;
+      max-height: 350px;
       overflow-y: auto;
+      overflow-x: auto;
       border: 1px solid #ccc;
       border-radius: 8px;
     }
 
     .file-table {
       width: 100%;
+      min-width: 500px;
       border-collapse: collapse;
     }
 
@@ -704,7 +753,7 @@ export class EwtLittleFSManager extends LitElement {
     }
 
     .file-table th {
-      padding: 10px;
+      padding: 8px;
       text-align: left;
       font-weight: 600;
       border-bottom: 2px solid #ccc;

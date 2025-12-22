@@ -1327,6 +1327,14 @@ export class EwtInstallDialog extends LitElement {
       }
       :host([state="LITTLEFS"]) ewt-dialog {
         --mdc-dialog-max-width: 95vw;
+        --mdc-dialog-max-height: 90vh;
+      }
+      :host([state="LITTLEFS"]) .mdc-dialog__content {
+        padding: 10px 20px;
+      }
+      :host([state="LITTLEFS"]) ewt-littlefs-manager {
+        display: block;
+        max-width: 100%;
       }
       .partition-list {
         max-height: 60vh;
