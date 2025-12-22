@@ -878,15 +878,15 @@ export class EwtInstallDialog extends LitElement {
   private async _handleESP32S2ReconnectClick() {
     try {
       this._busy = true;
-      
+
       // Request new port (this is triggered by user click, so it works)
       this.logger.log("Requesting new port selection...");
       const newPort = await navigator.serial.requestPort();
       await newPort.open({ baudRate: 115200 });
-      
+
       this.logger.log("New port selected, updating...");
       this.port = newPort;
-      
+
       // Restart partition table reading with new port
       this._state = "PARTITIONS";
       await this._readPartitionTable();
@@ -928,29 +928,31 @@ export class EwtInstallDialog extends LitElement {
       // Set up ESP32-S2 reconnect handler BEFORE initialize
       const reconnectHandler = async (event: any) => {
         this.logger.log("ESP32-S2 USB reconnect event:", event.detail.message);
-        
+
         // Close old port
         try {
           await currentPort.close();
         } catch (e) {
           this.logger.debug("Port close error:", e);
         }
-        
+
         // Forget old port
         try {
           await currentPort.forget();
         } catch (e) {
           this.logger.debug("Port forget error:", e);
         }
-        
+
         this.logger.log("Please select the new ESP32-S2 USB CDC port");
       };
-      
-      esploader.addEventListener("esp32s2-usb-reconnect", reconnectHandler, { once: true });
+
+      esploader.addEventListener("esp32s2-usb-reconnect", reconnectHandler, {
+        once: true,
+      });
 
       // Initialize ESP loader
       this.logger.log("Initializing ESP loader...");
-      
+
       try {
         await esploader.initialize();
         this.logger.log("ESP loader initialized successfully");
@@ -958,11 +960,17 @@ export class EwtInstallDialog extends LitElement {
         // If initialization fails, check if it's ESP32-S2 and we need reconnect
         const errorMsg = err.message || String(err);
         const portInfo = currentPort.getInfo();
-        const isESP32S2 = portInfo.usbVendorId === 0x303a && portInfo.usbProductId === 0x2;
-        
-        if (isESP32S2 && (errorMsg.includes("sync") || errorMsg.includes("disconnect"))) {
-          this.logger.log("ESP32-S2 USB port changed - user needs to select new port");
-          
+        const isESP32S2 =
+          portInfo.usbVendorId === 0x303a && portInfo.usbProductId === 0x2;
+
+        if (
+          isESP32S2 &&
+          (errorMsg.includes("sync") || errorMsg.includes("disconnect"))
+        ) {
+          this.logger.log(
+            "ESP32-S2 USB port changed - user needs to select new port",
+          );
+
           // Close and forget old port
           try {
             await currentPort.close();
@@ -970,7 +978,7 @@ export class EwtInstallDialog extends LitElement {
           try {
             await currentPort.forget();
           } catch (e) {}
-          
+
           // Show UI with button for user to click
           this._busy = false;
           this._state = "ESP32S2_RECONNECT";
@@ -1004,13 +1012,13 @@ export class EwtInstallDialog extends LitElement {
       }
     } catch (e: any) {
       this.logger.error(`Failed to read partition table: ${e.message || e}`);
-      
+
       if (e.message === "Port selection cancelled") {
         this._error = "Port selection cancelled";
       } else {
         this._error = `Failed to read partition table: ${e.message || e}. Try resetting your device.`;
       }
-      
+
       this._state = "ERROR";
     } finally {
       this._busy = false;
