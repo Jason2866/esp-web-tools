@@ -354,7 +354,7 @@ export class EwtLittleFSManager extends LitElement {
       this._busy = true;
       this._isFlashing = true;
       this._flashProgress = 0;
-      
+
       this.logger.log("Creating LittleFS image...");
       const image = this._fs.toImage();
       this.logger.log(`Image created: ${this._formatSize(image.length)}`);
@@ -432,9 +432,11 @@ export class EwtLittleFSManager extends LitElement {
           </div>
           <div class="littlefs-usage">
             <div class="usage-bar">
-              <div 
-                class="usage-fill ${this._isFlashing ? 'flashing' : ''}" 
-                style="width: ${this._isFlashing ? this._flashProgress : usedPercent}%"
+              <div
+                class="usage-fill ${this._isFlashing ? "flashing" : ""}"
+                style="width: ${this._isFlashing
+                  ? this._flashProgress
+                  : usedPercent}%"
               ></div>
             </div>
             <div class="usage-text">
@@ -443,13 +445,15 @@ export class EwtLittleFSManager extends LitElement {
                     ⚡ Writing to flash: ${this._flashProgress}%
                   </span>`
                 : html`<span
-                    >Used: ${this._formatSize(this._usage.usedBytes)} /
-                    ${this._formatSize(this._usage.capacityBytes)} (${usedPercent}%)</span
-                  >
-                  ${this._diskVersion
-                    ? html`<span class="disk-version">${this._diskVersion}</span>`
-                    : ""}`
-              }
+                      >Used: ${this._formatSize(this._usage.usedBytes)} /
+                      ${this._formatSize(this._usage.capacityBytes)}
+                      (${usedPercent}%)</span
+                    >
+                    ${this._diskVersion
+                      ? html`<span class="disk-version"
+                          >${this._diskVersion}</span
+                        >`
+                      : ""}`}
             </div>
           </div>
         </div>
@@ -648,16 +652,13 @@ export class EwtLittleFSManager extends LitElement {
     }
 
     .usage-fill.flashing {
-      background: linear-gradient(
-        90deg,
-        #ff9800 0%,
-        #ff5722 100%
-      );
+      background: linear-gradient(90deg, #ff9800 0%, #ff5722 100%);
       animation: pulse 1s ease-in-out infinite;
     }
 
     @keyframes pulse {
-      0%, 100% {
+      0%,
+      100% {
         opacity: 1;
       }
       50% {
