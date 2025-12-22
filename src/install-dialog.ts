@@ -970,6 +970,17 @@ export class EwtInstallDialog extends LitElement {
       const espStub = await esploader.runStub();
       this._espStub = espStub;
 
+      // Set baudrate for reading flash (use user-selected baudrate if available)
+      if (this.baudRate) {
+        this.logger.log(`Setting baudrate to ${this.baudRate} for flash reading...`);
+        try {
+          await espStub.setBaudrate(this.baudRate);
+          this.logger.log(`Baudrate set to ${this.baudRate}`);
+        } catch (baudErr: any) {
+          this.logger.log(`Failed to set baudrate: ${baudErr.message}, continuing with default`);
+        }
+      }
+
       // Add a small delay after stub is running
       await sleep(500);
 

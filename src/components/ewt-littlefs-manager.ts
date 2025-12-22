@@ -68,6 +68,7 @@ export class EwtLittleFSManager extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
+    this.logger.log("LittleFS Manager: connectedCallback called");
     await this._openFilesystem();
   }
 
@@ -83,11 +84,68 @@ export class EwtLittleFSManager extends LitElement {
         `Reading LittleFS partition "${this.partition.name}" (${this._formatSize(this.partition.size)})...`,
       );
 
+      // Verify stub mode
+      this.logger.log(`espStub.IS_STUB = ${this.espStub.IS_STUB}`);
+      if (!this.espStub.IS_STUB) {
+        throw new Error("ESP stub loader is not running. Cannot read flash.");
+      }
+
       // Read entire partition
-      const data = await this.espStub.readFlash(
-        this.partition.offset,
-        this.partition.size,
-      );
+      const startTime = Date.now();
+      this.logger.log(`Starting readFlash from offset 0x${this.partition.offset.toString(16)}, size ${this.partition.size} bytes`);
+      this.logger.log(`This may take several minutes for large partitions...`);
+      this.logger.log(`Progress callback will be called after each 64KB chunk`);
+      
+      let data: Uint8Array;
+      let lastProgress = 0;
+      let lastLogTime = Date.now();
+      
+      try {
+        this.logger.log("Calling espStub.readFlash()...");
+        data = await this.espStub.readFlash(
+          this.partition.offset,
+          this.partition.size,
+          (packet: Uint8Array, progress: number, totalSize: number) => {
+            // Log progress every 10% or every 5 seconds
+            const progressPercent = Math.floor((progress / totalSize) * 100);
+            const now = Date.now();
+            
+            this.logger.log(
+              `Progress callback invoked: ${progressPercent}% (${this._formatSize(progress)} / ${this._formatSize(totalSize)})`
+            );
+            
+            if (progressPercent >= lastProgress + 10 || now - lastLogTime > 5000) {
+              const elapsed = Math.floor((now - startTime) / 1000);
+              const speed = progress / elapsed;
+              const remaining = Math.floor((totalSize - progress) / speed);
+              
+              this.logger.log(
+                `Reading flash: ${progressPercent}% (${this._formatSize(progress)} / ${this._formatSize(totalSize)}) - ` +
+                `${elapsed}s elapsed, ~${remaining}s remaining`
+              );
+              lastProgress = progressPercent;
+              lastLogTime = now;
+            }
+          }
+        );
+        this.logger.log("readFlash() call completed, checking result...");
+      } catch (readErr: any) {
+        this.logger.error(`readFlash failed: ${readErr.message || readErr}`);
+        this.logger.error(`Error stack: ${readErr.stack || 'No stack trace'}`);
+        throw new Error(`Failed to read partition: ${readErr.message || readErr}`);
+      }
+      
+      const readTime = Date.now() - startTime;
+      
+      this.logger.log(`Read completed: ${data.length} bytes in ${readTime}ms (${this._formatSize(data.length)})`);
+      
+      if (data.length !== this.partition.size) {
+        this.logger.error(`WARNING: Read ${data.length} bytes but expected ${this.partition.size} bytes!`);
+      }
+      
+      if (data.length === 0) {
+        throw new Error("Read 0 bytes from partition - readFlash returned empty data");
+      }
 
       this.logger.log("Mounting LittleFS filesystem...");
 
@@ -138,10 +196,20 @@ export class EwtLittleFSManager extends LitElement {
 
       // Get disk version
       try {
+        this.logger.log("Attempting to read disk version...");
         const diskVer = fs.getDiskVersion();
-        this._diskVersion = formatDiskVersion(diskVer);
-      } catch (e) {
-        this._diskVersion = "";
+        this.logger.log(`Raw disk version value: ${diskVer} (0x${diskVer.toString(16)})`);
+        
+        if (diskVer && diskVer !== 0) {
+          this._diskVersion = formatDiskVersion(diskVer);
+          this.logger.log(`LittleFS disk version: ${this._diskVersion}`);
+        } else {
+          this._diskVersion = "Unknown";
+          this.logger.log("LittleFS disk version returned 0 or null");
+        }
+      } catch (e: any) {
+        this._diskVersion = "Unknown";
+        this.logger.log(`LittleFS disk version error: ${e.message || e}`);
       }
 
       this._refreshFiles();
@@ -157,11 +225,18 @@ export class EwtLittleFSManager extends LitElement {
   }
 
   private _refreshFiles() {
-    if (!this._fs) return;
+    if (!this._fs) {
+      this.logger.log("_refreshFiles: No filesystem mounted");
+      return;
+    }
 
     try {
+      this.logger.log(`_refreshFiles: Listing files in ${this._currentPath}`);
+      
       // Calculate usage
       const allFiles = this._fs.list("/");
+      this.logger.log(`_refreshFiles: Found ${allFiles.length} total files/folders`);
+      
       const usedBytes = this._estimateUsage(allFiles);
       const totalBytes = this.partition.size;
 
@@ -171,8 +246,11 @@ export class EwtLittleFSManager extends LitElement {
         freeBytes: totalBytes - usedBytes,
       };
 
+      this.logger.log(`_refreshFiles: Usage - ${usedBytes} / ${totalBytes} bytes`);
+
       // List files in current directory
       const entries = this._fs.list(this._currentPath);
+      this.logger.log(`_refreshFiles: Found ${entries.length} entries in ${this._currentPath}`);
 
       // Sort: directories first, then files
       entries.sort((a: any, b: any) => {
@@ -182,8 +260,10 @@ export class EwtLittleFSManager extends LitElement {
       });
 
       this._files = entries;
+      this.logger.log(`_refreshFiles: Set ${this._files.length} files to display`);
     } catch (e: any) {
       this.logger.error(`Failed to refresh file list: ${e.message || e}`);
+      this._files = [];
     }
   }
 
