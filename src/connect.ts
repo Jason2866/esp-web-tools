@@ -20,6 +20,7 @@ const loadWebUSBSerial = async (): Promise<void> => {
   // Dynamically load the WebUSB serial script from the npm package
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
+    script.type = "module"; // CRITICAL: Load as ES6 module to support export statements
     // Load from the installed npm package (tasmota-webserial-esptool)
     script.src =
       "https://unpkg.com/tasmota-webserial-esptool/js/webusb-serial.js";
