@@ -3,7 +3,7 @@ import type { EwtInstallDialog } from "./install-dialog";
 import { connect } from "./connect";
 
 export class InstallButton extends HTMLElement {
-  public static isSupported = "serial" in navigator;
+  public static isSupported = "serial" in navigator || "usb" in navigator;
 
   public static isAllowed = window.isSecureContext;
 
@@ -90,7 +90,7 @@ export class InstallButton extends HTMLElement {
       this.toggleAttribute("install-unsupported", true);
       this.renderRoot.innerHTML = !InstallButton.isAllowed
         ? "<slot name='not-allowed'>You can only install ESP devices on HTTPS websites or on the localhost.</slot>"
-        : "<slot name='unsupported'>Your browser does not support installing things on ESP devices. Use Google Chrome or Microsoft Edge.</slot>";
+        : "<slot name='unsupported'>Your browser does not support installing things on ESP devices. Use Google Chrome or Microsoft Edge (Desktop) or Chrome on Android with USB OTG.</slot>";
       return;
     }
 
