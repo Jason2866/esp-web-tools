@@ -1,4 +1,5 @@
 import type { InstallButton } from "./install-button.js";
+import { connect as esptoolConnect } from "tasmota-webserial-esptool";
 
 /**
  * Detect if running on Android
@@ -42,34 +43,28 @@ const loadWebUSBSerial = async (): Promise<void> => {
   });
 };
 
-/**
- * Request a serial port with automatic platform detection
- */
-const requestPort = async (): Promise<SerialPort> => {
-  // Android: Use WebUSB
-  if (isAndroid() && "usb" in navigator) {
-    // Load WebUSB serial wrapper if needed
-    await loadWebUSBSerial();
-
-    const customRequestPort = (globalThis as any).requestSerialPort;
-    if (typeof customRequestPort === "function") {
-      return await customRequestPort();
-    }
-    throw new Error("WebUSB support could not be loaded");
-  }
-
-  // Desktop: Use Web Serial API
-  if (!navigator.serial) {
-    throw new Error("Web Serial API not supported");
-  }
-  return await navigator.serial.requestPort();
-};
-
 export const connect = async (button: InstallButton) => {
   import("./install-dialog.js");
-  let port: SerialPort | undefined;
+
+  // Android: Load WebUSB support first
+  if (isAndroid() && "usb" in navigator) {
+    try {
+      await loadWebUSBSerial();
+    } catch (err: any) {
+      alert(`Failed to load WebUSB support: ${err.message}`);
+      return;
+    }
+  }
+
+  // Use tasmota-webserial-esptool's connect() function
+  // This handles ALL port logic (request, open, platform detection)
+  let esploader;
   try {
-    port = await requestPort();
+    esploader = await esptoolConnect({
+      log: () => {}, // Silent logger for connection
+      debug: () => {},
+      error: (msg: string) => console.error(msg),
+    });
   } catch (err: any) {
     if ((err as DOMException).name === "NotFoundError") {
       import("./no-port-picked/index").then((mod) =>
@@ -77,22 +72,22 @@ export const connect = async (button: InstallButton) => {
       );
       return;
     }
-    alert(`Error: ${err.message}`);
+    alert(`Connection failed: ${err.message}`);
     return;
   }
 
-  if (!port) {
+  if (!esploader || !esploader.port) {
+    alert("Failed to connect to device");
     return;
   }
 
+  const port = esploader.port;
+
+  // Disconnect the esploader since we only needed it for port setup
   try {
-    // Only open if not already open (WebUSB may return an opened port)
-    if (!port.readable || !port.writable) {
-      await port.open({ baudRate: 115200 });
-    }
-  } catch (err: any) {
-    alert(err.message);
-    return;
+    await esploader.disconnect();
+  } catch (err) {
+    // Ignore disconnect errors
   }
 
   const el = document.createElement("ewt-install-dialog");
