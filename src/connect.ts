@@ -86,7 +86,10 @@ export const connect = async (button: InstallButton) => {
   }
 
   try {
-    await port.open({ baudRate: 115200 });
+    // Only open if not already open (WebUSB may return an opened port)
+    if (!port.readable || !port.writable) {
+      await port.open({ baudRate: 115200 });
+    }
   } catch (err: any) {
     alert(err.message);
     return;
