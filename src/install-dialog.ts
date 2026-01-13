@@ -1032,6 +1032,26 @@ export class EwtInstallDialog extends LitElement {
 
   protected override firstUpdated(changedProps: PropertyValues) {
     super.firstUpdated(changedProps);
+    
+    // Wrap logger to also log to debug component
+    const originalLogger = this.logger;
+    this.logger = {
+      log: (...args: any[]) => {
+        originalLogger.log(...args);
+        this._debugLog?.addLog("log", args.join(" "));
+      },
+      error: (...args: any[]) => {
+        originalLogger.error(...args);
+        this._debugLog?.addLog("error", args.join(" "));
+      },
+      debug: (...args: any[]) => {
+        if (originalLogger.debug) {
+          originalLogger.debug(...args);
+        }
+        this._debugLog?.addLog("log", `[DEBUG] ${args.join(" ")}`);
+      },
+    };
+    
     this._initialize();
   }
 
