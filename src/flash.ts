@@ -274,17 +274,11 @@ export const flash = async (
   // Release the reader AND writer so Improv can use the port
   // Both are in the parent ESPLoader, not in the stub
   try {
-    // Try to access reader and writer from parent (esploader) first
-    let reader = (esploader as any)._reader;
-    let writer = (esploader as any)._writer;
-
-    // If not found, try from stub's parent
-    if ((!reader || !writer) && (espStub as any)._parent) {
-      const parent = (espStub as any)._parent;
-      if (!reader) reader = (parent as any)._reader;
-      if (!writer) writer = (parent as any)._writer;
-    }
-
+    // Access reader and writer from parent (esploader)
+    // These are now public properties in tasmota-webserial-esptool 9.1.4+
+    const reader = esploader._reader;
+    const writer = esploader._writer;
+    
     if (reader) {
       await reader.cancel();
       reader.releaseLock();
@@ -292,7 +286,7 @@ export const flash = async (
     } else {
       logger.log("No reader found to release");
     }
-
+    
     if (writer) {
       await writer.close();
       logger.log("Writer released successfully");
