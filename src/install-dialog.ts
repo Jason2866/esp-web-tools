@@ -164,16 +164,6 @@ export class EwtInstallDialog extends LitElement {
     return this.shadowRoot?.querySelector("ewt-debug-log") || null;
   }
 
-  private _log(message: string) {
-    console.log(message);
-    this._debugLog?.addLog("log", message);
-  }
-
-  private _logError(message: string) {
-    console.error(message);
-    this._debugLog?.addLog("error", message);
-  }
-
   _renderProgress(label: string | TemplateResult, progress?: number) {
     return html`
       <ewt-page-progress
@@ -185,6 +175,8 @@ export class EwtInstallDialog extends LitElement {
 
   _renderError(label: string): [string, TemplateResult, boolean] {
     const heading = "Error";
+    // Log error to debug log for Android debugging
+    this._debugLog?.addLog("error", `Error: ${label}`);
     const content = html`
       <ewt-page-message .icon=${ERROR_ICON} .label=${label}></ewt-page-message>
       <ewt-button
