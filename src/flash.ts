@@ -136,31 +136,13 @@ export const flash = async (
     details: { done: false },
   });
 
-  // Run the stub FIRST - needed for all flash operations
-  // Check if the esploader itself is already a stub (e.g., after _ensureStub())
-  let espStub;
-  if (esploader.IS_STUB) {
-    logger.log("ESPLoader is already a stub, using it directly");
-    espStub = esploader;
-    // DON'T set baudrate - it was already set in _ensureStub()
-    logger.log("Baudrate already configured, skipping");
-  } else {
-    logger.log("Running stub...");
-    espStub = await esploader.runStub();
+  // The esploader passed in is always a stub (from _ensureStub())
+  // Baudrate was already set in _ensureStub()
+  const espStub = esploader;
 
-    // Change baud rate if specified (must be done AFTER runStub, BEFORE flashing)
-    if (baudRate !== undefined && baudRate > 115200) {
-      try {
-        await espStub.setBaudrate(baudRate);
-        logger.log(`Baud rate changed to ${baudRate}`);
-      } catch (err: any) {
-        logger.log(`Could not change baud rate to ${baudRate}: ${err.message}`);
-      }
-    }
-  }
-
-  // Erase flash if requested (only works with stub loader)
-  if (eraseFirst) {
+  // Verify stub has chipFamily (should be copied in _ensureStub)
+  if (!espStub.chipFamily) {
+    logger.error("Stub missing chipFamily - this should not happen!");
     fireStateEvent({
       state: FlashStateType.ERASING,
       message: "Erasing flash...",
@@ -188,6 +170,10 @@ export const flash = async (
       return;
     }
   }
+
+  logger.log(
+    `Using stub: IS_STUB=${espStub.IS_STUB}, chipFamily=${espStub.chipFamily}`,
+  );
 
   // Fetch firmware files
   const filePromises = build.parts.map(async (part) => {
@@ -233,6 +219,36 @@ export const flash = async (
     message: "Installation prepared",
     details: { done: true },
   });
+
+  // CRITICAL: Erase MUST be done BEFORE writing, if requested
+  if (eraseFirst) {
+    fireStateEvent({
+      state: FlashStateType.ERASING,
+      message: "Erasing flash...",
+      details: { done: false },
+    });
+
+    try {
+      logger.log("Erasing flash memory. Please wait...");
+      await espStub.eraseFlash();
+      logger.log("Flash erased successfully");
+
+      fireStateEvent({
+        state: FlashStateType.ERASING,
+        message: "Flash erased",
+        details: { done: true },
+      });
+    } catch (err: any) {
+      logger.error(`Flash erase failed: ${err.message}`);
+      fireStateEvent({
+        state: FlashStateType.ERROR,
+        message: `Failed to erase flash: ${err.message}`,
+        details: { error: FlashError.WRITE_FAILED, details: err },
+      });
+      await esploader.disconnect();
+      return;
+    }
+  }
 
   fireStateEvent({
     state: FlashStateType.WRITING,
