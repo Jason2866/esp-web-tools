@@ -276,12 +276,12 @@ export const flash = async (
   try {
     // Try to access reader from parent (esploader) first
     let reader = (esploader as any)._reader;
-    
+
     // If not found, try from stub's parent
     if (!reader && (espStub as any)._parent) {
       reader = ((espStub as any)._parent as any)._reader;
     }
-    
+
     if (reader) {
       await reader.cancel();
       reader.releaseLock();
