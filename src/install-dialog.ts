@@ -1032,7 +1032,7 @@ export class EwtInstallDialog extends LitElement {
 
   protected override firstUpdated(changedProps: PropertyValues) {
     super.firstUpdated(changedProps);
-    
+
     // Wrap logger to also log to debug component
     const originalLogger = this.logger;
     this.logger = {
@@ -1051,7 +1051,7 @@ export class EwtInstallDialog extends LitElement {
         this._debugLog?.addLog("log", `[DEBUG] ${[msg, ...args].join(" ")}`);
       },
     };
-    
+
     this._initialize();
   }
 
