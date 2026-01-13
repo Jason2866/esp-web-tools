@@ -1237,8 +1237,34 @@ export class EwtInstallDialog extends LitElement {
     }
     this._client = undefined;
 
-    // Use stub if available (e.g., after reading partitions), otherwise use parent loader
-    const loaderToUse = this._espStub || this.esploader!;
+    // CRITICAL: Reset stub and locks before flash
+    // The stub from partition read is not suitable for flashing
+    // Release locks so flash() can create a fresh stub
+    try {
+      const reader = this.esploader._reader;
+      const writer = this.esploader._writer;
+
+      if (reader) {
+        await reader.cancel();
+        reader.releaseLock();
+        this.esploader._reader = undefined;
+        this.logger.log("Reader released before flash");
+      }
+
+      if (writer) {
+        writer.releaseLock();
+        this.esploader._writer = undefined;
+        this.logger.log("Writer released before flash");
+      }
+
+      this._espStub = undefined;
+      this.logger.log("Stub invalidated before flash");
+    } catch (err) {
+      this.logger.log("Could not release locks before flash:", err);
+    }
+
+    // Always use parent loader for flash (not the partition stub)
+    const loaderToUse = this.esploader!;
 
     if (this.firmwareFile != undefined) {
       // If a uploaded File was provided -> create Uint8Array of content
@@ -1268,8 +1294,8 @@ export class EwtInstallDialog extends LitElement {
   }
 
   async _flashFilebuffer(fileBuffer: Uint8Array) {
-    // Use stub if available (e.g., after reading partitions), otherwise use parent loader
-    const loaderToUse = this._espStub || this.esploader!;
+    // Always use parent loader for flash (stub was already invalidated in _confirmInstall)
+    const loaderToUse = this.esploader!;
 
     flash(
       (state) => {
