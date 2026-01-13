@@ -945,6 +945,12 @@ export class EwtInstallDialog extends LitElement {
           this.esploader._writer = undefined;
           this.logger.log("Writer lock released after partition read");
         }
+        
+        // CRITICAL: Invalidate stub after releasing locks
+        // The stub is no longer usable after reader/writer are released
+        // This forces a fresh stub on next operation
+        this._espStub = undefined;
+        this.logger.log("Stub invalidated after partition read");
       } catch (err) {
         this.logger.log("Could not release reader/writer:", err);
       }
