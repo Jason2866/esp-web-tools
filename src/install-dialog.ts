@@ -11,6 +11,8 @@ import type { EwtTextfield } from "./components/ewt-textfield";
 import "./components/ewt-select";
 import "./components/ewt-list-item";
 import "./components/ewt-littlefs-manager";
+import "./components/ewt-debug-log";
+import type { EwtDebugLog } from "./components/ewt-debug-log";
 import "./pages/ewt-page-progress";
 import "./pages/ewt-page-message";
 import { chipIcon, closeIcon, firmwareIcon } from "./components/svg";
@@ -154,7 +156,27 @@ export class EwtInstallDialog extends LitElement {
           : ""}
         ${content!}
       </ewt-dialog>
+      <ewt-debug-log></ewt-debug-log>
     `;
+  }
+
+  private get _debugLog(): EwtDebugLog | null {
+    return this.shadowRoot?.querySelector("ewt-debug-log") || null;
+  }
+
+  private _log(message: string) {
+    console.log(message);
+    this._debugLog?.addLog("log", message);
+  }
+
+  private _logError(message: string) {
+    console.error(message);
+    this._debugLog?.addLog("error", message);
+  }
+
+  private _logWarn(message: string) {
+    console.warn(message);
+    this._debugLog?.addLog("warn", message);
   }
 
   _renderProgress(label: string | TemplateResult, progress?: number) {
