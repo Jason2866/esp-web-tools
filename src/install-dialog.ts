@@ -840,21 +840,13 @@ export class EwtInstallDialog extends LitElement {
         throw new Error("ESPLoader not initialized");
       }
 
-      // Check if stub is already running, if not run it
-      let espStub;
-      if (this.esploader.chip && this.esploader.chip.IS_STUB) {
-        // Stub already running, use it
-        this.logger.log("Using existing stub...");
-        espStub = this.esploader;
-      } else {
-        // Need to run stub
-        this.logger.log("Running stub...");
-        espStub = await this.esploader.runStub();
-      }
+      // Always run stub for flash operations
+      this.logger.log("Running stub...");
+      const espStub = await this.esploader.runStub();
       this._espStub = espStub;
 
       // Set baudrate for reading flash (use user-selected baudrate if available)
-      if (this.baudRate) {
+      if (this.baudRate && this.baudRate > 115200) {
         this.logger.log(
           `Setting baudrate to ${this.baudRate} for flash reading...`,
         );
@@ -869,7 +861,7 @@ export class EwtInstallDialog extends LitElement {
       }
 
       // Add a small delay after stub is running
-      await sleep(500);
+      await sleep(100);
 
       this.logger.log("Reading flash data...");
       const data = await espStub.readFlash(
