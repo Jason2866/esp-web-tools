@@ -1,222 +1,99 @@
 import { LitElement, html, css } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
-interface LogEntry {
-  timestamp: Date;
-  level: "log" | "error" | "warn";
-  message: string;
-}
-
 @customElement("ewt-debug-log")
 export class EwtDebugLog extends LitElement {
-  @state() private _logs: LogEntry[] = [];
-  @state() private _expanded = false;
-  private _maxLogs = 100;
+  @state() private _logs: string[] = [];
+  private _maxLogs = 200;
 
   static styles = css`
     :host {
       display: block;
       position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: rgba(0, 0, 0, 0.95);
-      color: #fff;
-      font-family: monospace;
-      font-size: 12px;
-      z-index: 999999;
-      max-height: 40vh;
+      top: 10px;
+      right: 10px;
+      width: 400px;
+      max-height: 80vh;
+      background: white;
+      border: 2px solid #333;
+      border-radius: 4px;
       overflow: hidden;
-      border-top: 2px solid #333;
-      pointer-events: auto;
+      z-index: 999999;
+      font-family: monospace;
+      font-size: 11px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
 
     .header {
-      padding: 8px 12px;
-      background: #222;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      cursor: pointer;
-      user-select: none;
-    }
-
-    .header:hover {
+      padding: 8px;
       background: #333;
-    }
-
-    .title {
+      color: white;
       font-weight: bold;
-      color: #4caf50;
-    }
-
-    .count {
-      color: #999;
-      font-size: 11px;
+      text-align: center;
     }
 
     .logs {
-      max-height: calc(40vh - 40px);
+      max-height: calc(80vh - 40px);
       overflow-y: auto;
       padding: 8px;
+      background: #f5f5f5;
     }
 
     .log-entry {
-      padding: 4px 8px;
+      padding: 4px;
       margin: 2px 0;
-      border-left: 3px solid #666;
       word-wrap: break-word;
+      white-space: pre-wrap;
+      border-bottom: 1px solid #ddd;
     }
 
     .log-entry.error {
-      border-left-color: #f44336;
-      background: rgba(244, 67, 54, 0.1);
+      color: #d32f2f;
+      font-weight: bold;
     }
 
     .log-entry.warn {
-      border-left-color: #ff9800;
-      background: rgba(255, 152, 0, 0.1);
+      color: #f57c00;
     }
 
     .log-entry.log {
-      border-left-color: #2196f3;
-      background: rgba(33, 150, 243, 0.05);
-    }
-
-    .timestamp {
-      color: #666;
-      font-size: 10px;
-      margin-right: 8px;
-    }
-
-    .message {
-      color: #fff;
-    }
-
-    .error .message {
-      color: #ff6b6b;
-    }
-
-    .warn .message {
-      color: #ffa726;
-    }
-
-    .buttons {
-      display: flex;
-      gap: 8px;
-    }
-
-    button {
-      background: #444;
-      color: #fff;
-      border: none;
-      padding: 4px 12px;
-      border-radius: 3px;
-      cursor: pointer;
-      font-size: 11px;
-      pointer-events: auto;
-    }
-
-    button:hover {
-      background: #555;
-    }
-
-    button:active {
-      background: #666;
-    }
-
-    .collapsed .logs {
-      display: none;
+      color: #333;
     }
   `;
 
   addLog(level: "log" | "error" | "warn", message: string) {
-    this._logs = [
-      ...this._logs.slice(-this._maxLogs + 1),
-      {
-        timestamp: new Date(),
-        level,
-        message,
-      },
-    ];
-    this.requestUpdate();
-  }
-
-  clear() {
-    this._logs = [];
-    this.requestUpdate();
-  }
-
-  private _formatTime(date: Date): string {
-    return date.toLocaleTimeString("en-US", {
+    const timestamp = new Date().toLocaleTimeString("en-US", {
       hour12: false,
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
     });
-  }
-
-  private _toggleExpanded() {
-    this._expanded = !this._expanded;
-  }
-
-  private _copyLogs(e: Event) {
-    e.stopPropagation();
-    const text = this._logs
-      .map(
-        (log) =>
-          `[${this._formatTime(log.timestamp)}] ${log.level.toUpperCase()}: ${log.message}`,
-      )
-      .join("\n");
-    navigator.clipboard.writeText(text).then(() => {
-      alert("Logs copied to clipboard!");
-    });
-  }
-
-  private _clearLogs(e: Event) {
-    e.stopPropagation();
-    this._logs = [];
+    
+    this._logs = [
+      ...this._logs.slice(-this._maxLogs + 1),
+      `[${timestamp}] ${level.toUpperCase()}: ${message}`,
+    ];
     this.requestUpdate();
+    
+    // Auto-scroll to bottom
+    setTimeout(() => {
+      const logsDiv = this.shadowRoot?.querySelector(".logs");
+      if (logsDiv) {
+        logsDiv.scrollTop = logsDiv.scrollHeight;
+      }
+    }, 10);
   }
 
   render() {
-    const errorCount = this._logs.filter((l) => l.level === "error").length;
-    const warnCount = this._logs.filter((l) => l.level === "warn").length;
-
     return html`
-      <div class=${this._expanded ? "expanded" : "collapsed"}>
-        <div class="header" @click=${this._toggleExpanded}>
-          <div class="title">
-            🐛 Debug Log
-            ${errorCount > 0
-              ? html`<span style="color: #f44336">
-                  (${errorCount} errors)</span
-                >`
-              : ""}
-            ${warnCount > 0
-              ? html`<span style="color: #ff9800">
-                  (${warnCount} warnings)</span
-                >`
-              : ""}
-          </div>
-          <div class="buttons">
-            <button @click=${this._copyLogs}>Copy</button>
-            <button @click=${this._clearLogs}>Clear</button>
-            <span class="count">${this._logs.length} entries</span>
-          </div>
-        </div>
-        <div class="logs">
-          ${this._logs.map(
-            (log) => html`
-              <div class="log-entry ${log.level}">
-                <span class="timestamp"
-                  >${this._formatTime(log.timestamp)}</span
-                >
-                <span class="message">${log.message}</span>
-              </div>
-            `,
-          )}
-        </div>
+      <div class="header">🐛 Debug Log (${this._logs.length})</div>
+      <div class="logs">
+        ${this._logs.map(
+          (log) => {
+            const level = log.includes("ERROR:") ? "error" : log.includes("WARN:") ? "warn" : "log";
+            return html`<div class="log-entry ${level}">${log}</div>`;
+          }
+        )}
       </div>
     `;
   }
