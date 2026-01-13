@@ -277,7 +277,12 @@ export class EwtInstallDialog extends LitElement {
         <div>
           <ewt-button
             label="Manage Filesystem"
-            @click=${() => {
+            @click=${async () => {
+              // Close Improv client if active (it locks the reader)
+              if (this._client) {
+                await this._closeClientWithoutEvents(this._client);
+                this._client = undefined;
+              }
               this._state = "PARTITIONS";
               this._readPartitionTable();
             }}
@@ -349,7 +354,12 @@ export class EwtInstallDialog extends LitElement {
         <div>
           <ewt-button
             label="Manage Filesystem"
-            @click=${() => {
+            @click=${async () => {
+              // Close Improv client if active (it locks the reader)
+              if (this._client) {
+                await this._closeClientWithoutEvents(this._client);
+                this._client = undefined;
+              }
               this._state = "PARTITIONS";
               this._readPartitionTable();
             }}
