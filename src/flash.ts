@@ -279,7 +279,7 @@ export const flash = async (
     // Access reader from parent (esploader)
     // This is now a public property in tasmota-webserial-esptool 9.1.4+
     const reader = esploader._reader;
-    
+
     if (reader) {
       await reader.cancel();
       reader.releaseLock();
