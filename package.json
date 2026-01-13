@@ -10,7 +10,10 @@
   "author": "ESPHome maintainers & Jason2866",
   "license": "Apache-2.0",
   "scripts": {
-    "prepublishOnly": "script/build",
+    "format": "npm exec -- prettier --write src",
+    "build": "script/build",
+    "lint": "eslint src/",
+    "lintAndFix": "eslint src/ --fix",
     "develop": "script/develop"
   },
   "devDependencies": {
@@ -21,10 +24,15 @@
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^12.1.2",
     "@types/w3c-web-serial": "^1.0.7",
-    "prettier": "^3.4.2",
-    "rollup": "^4.30.1",
-    "serve": "^14.2.1",
-    "typescript": "^5.7.3"
+    "eslint": "^9.39.2",
+    "@eslint/js": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "prettier": "^3.7.3",
+    "rollup": "^4.53.5",
+    "serve": "^14.2.4",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.52.0"
   },
   "dependencies": {
     "@material/mwc-button": "^0.27.0",
