@@ -1204,10 +1204,32 @@ export class EwtInstallDialog extends LitElement {
           this._installState = state;
 
           if (state.state === FlashStateType.FINISHED) {
-            // Don't call _initialize() - it would try to start Improv again
-            // The stub is still running and reader is locked
-            // Just update the UI
-            sleep(100).then(() => this.requestUpdate());
+            // Release locks so we can test Improv with new firmware
+            const reader = this.esploader._reader;
+            const writer = this.esploader._writer;
+
+            if (reader) {
+              reader.cancel().then(() => {
+                reader.releaseLock();
+                this.esploader._reader = undefined;
+                this.logger.log("Reader released after flash for Improv test");
+              });
+            }
+
+            if (writer) {
+              writer.releaseLock();
+              this.esploader._writer = undefined;
+              this.logger.log("Writer released after flash for Improv test");
+            }
+
+            // Invalidate stub - will be recreated if needed
+            this._espStub = undefined;
+            this._improvChecked = false; // Allow Improv test with new firmware
+            
+            // Test Improv with new firmware
+            sleep(100)
+              .then(() => this._initialize(true))
+              .then(() => this.requestUpdate());
           }
         },
         loaderToUse,
@@ -1229,10 +1251,32 @@ export class EwtInstallDialog extends LitElement {
         this._installState = state;
 
         if (state.state === FlashStateType.FINISHED) {
-          // Don't call _initialize() - it would try to start Improv again
-          // The stub is still running and reader is locked
-          // Just update the UI
-          sleep(100).then(() => this.requestUpdate());
+          // Release locks so we can test Improv with new firmware
+          const reader = this.esploader._reader;
+          const writer = this.esploader._writer;
+
+          if (reader) {
+            reader.cancel().then(() => {
+              reader.releaseLock();
+              this.esploader._reader = undefined;
+              this.logger.log("Reader released after flash for Improv test");
+            });
+          }
+
+          if (writer) {
+            writer.releaseLock();
+            this.esploader._writer = undefined;
+            this.logger.log("Writer released after flash for Improv test");
+          }
+
+          // Invalidate stub - will be recreated if needed
+          this._espStub = undefined;
+          this._improvChecked = false; // Allow Improv test with new firmware
+          
+          // Test Improv with new firmware
+          sleep(100)
+            .then(() => this._initialize(true))
+            .then(() => this.requestUpdate());
         }
       },
       loaderToUse,
