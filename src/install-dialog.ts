@@ -1036,19 +1036,19 @@ export class EwtInstallDialog extends LitElement {
     // Wrap logger to also log to debug component
     const originalLogger = this.logger;
     this.logger = {
-      log: (...args: any[]) => {
-        originalLogger.log(...args);
-        this._debugLog?.addLog("log", args.join(" "));
+      log: (msg: string, ...args: any[]) => {
+        originalLogger.log(msg, ...args);
+        this._debugLog?.addLog("log", [msg, ...args].join(" "));
       },
-      error: (...args: any[]) => {
-        originalLogger.error(...args);
-        this._debugLog?.addLog("error", args.join(" "));
+      error: (msg: string, ...args: any[]) => {
+        originalLogger.error(msg, ...args);
+        this._debugLog?.addLog("error", [msg, ...args].join(" "));
       },
-      debug: (...args: any[]) => {
+      debug: (msg: string, ...args: any[]) => {
         if (originalLogger.debug) {
-          originalLogger.debug(...args);
+          originalLogger.debug(msg, ...args);
         }
-        this._debugLog?.addLog("log", `[DEBUG] ${args.join(" ")}`);
+        this._debugLog?.addLog("log", `[DEBUG] ${[msg, ...args].join(" ")}`);
       },
     };
     
