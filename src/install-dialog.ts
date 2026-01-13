@@ -1091,36 +1091,8 @@ export class EwtInstallDialog extends LitElement {
       return;
     }
 
-    // CRITICAL: Always release locks FIRST before trying to initialize
-    // This ensures we can retry after errors
-    try {
-      const reader = this.esploader._reader;
-      const writer = this.esploader._writer;
-
-      if (reader) {
-        await reader.cancel();
-        reader.releaseLock();
-        this.esploader._reader = undefined;
-        this.logger.log("Reader released before initialize");
-      }
-
-      if (writer) {
-        writer.releaseLock();
-        this.esploader._writer = undefined;
-        this.logger.log("Writer released before initialize");
-      }
-
-      // Invalidate stub when locks are released
-      if (reader || writer) {
-        this._espStub = undefined;
-        this.logger.log("Stub invalidated before initialize");
-      }
-    } catch (releaseErr) {
-      this.logger.log(
-        "Could not release reader/writer before initialize:",
-        releaseErr,
-      );
-    }
+    // DON'T release locks here!
+    // The stub will be created on first use and kept for all operations
 
     try {
       // If local file upload via browser is used, we already provide a manifest as a JSON string and not a URL to it
@@ -1191,34 +1163,8 @@ export class EwtInstallDialog extends LitElement {
         this.logger.error("Improv initialization failed.", err);
       }
 
-      // CRITICAL: Invalidate the stub because Improv may have changed baudrate
-      // This forces a fresh stub with correct baudrate on next operation
-      this._espStub = undefined;
-      this.logger.log("Stub invalidated after Improv error");
-
-      // Release locks again after error (in case anything else created them)
-      try {
-        const reader = this.esploader._reader;
-        const writer = this.esploader._writer;
-
-        if (reader) {
-          await reader.cancel();
-          reader.releaseLock();
-          this.esploader._reader = undefined;
-          this.logger.log("Reader released after Improv error");
-        }
-
-        if (writer) {
-          writer.releaseLock();
-          this.esploader._writer = undefined;
-          this.logger.log("Writer released after Improv error");
-        }
-      } catch (releaseErr) {
-        this.logger.log(
-          "Could not release reader/writer after error:",
-          releaseErr,
-        );
-      }
+      // Close Improv client to release its reader, but DON'T touch esploader locks
+      // The stub will be created on first use (partition read or flash) and kept forever
     }
   }
 
