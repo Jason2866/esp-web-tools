@@ -46,7 +46,7 @@ export class EwtDebugLog extends LitElement {
 
     .title {
       font-weight: bold;
-      color: #4CAF50;
+      color: #4caf50;
     }
 
     .count {
@@ -78,7 +78,7 @@ export class EwtDebugLog extends LitElement {
     }
 
     .log-entry.log {
-      border-left-color: #2196F3;
+      border-left-color: #2196f3;
       background: rgba(33, 150, 243, 0.05);
     }
 
@@ -175,8 +175,16 @@ export class EwtDebugLog extends LitElement {
         <div class="header" @click=${this._toggleExpanded}>
           <div class="title">
             🐛 Debug Log
-            ${errorCount > 0 ? html`<span style="color: #f44336"> (${errorCount} errors)</span>` : ""}
-            ${warnCount > 0 ? html`<span style="color: #ff9800"> (${warnCount} warnings)</span>` : ""}
+            ${errorCount > 0
+              ? html`<span style="color: #f44336">
+                  (${errorCount} errors)</span
+                >`
+              : ""}
+            ${warnCount > 0
+              ? html`<span style="color: #ff9800">
+                  (${warnCount} warnings)</span
+                >`
+              : ""}
           </div>
           <div class="buttons" @click=${(e: Event) => e.stopPropagation()}>
             <button @click=${this._copyLogs}>Copy</button>
@@ -188,7 +196,9 @@ export class EwtDebugLog extends LitElement {
           ${this._logs.map(
             (log) => html`
               <div class="log-entry ${log.level}">
-                <span class="timestamp">${this._formatTime(log.timestamp)}</span>
+                <span class="timestamp"
+                  >${this._formatTime(log.timestamp)}</span
+                >
                 <span class="message">${log.message}</span>
               </div>
             `,
