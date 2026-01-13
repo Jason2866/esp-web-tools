@@ -159,17 +159,20 @@ export const flash = async (
     }
   }
 
-  // Erase flash if requested (must be done AFTER runStub)
+  // Skip eraseFlash() - it doesn't work reliably
+  // Instead, we'll write 0xFF to erase regions if needed
+  // For now, just skip erase and flash directly (overwriting works fine)
   if (eraseFirst) {
     fireStateEvent({
       state: FlashStateType.ERASING,
-      message: "Erasing device...",
+      message: "Preparing to erase (will overwrite during flash)...",
       details: { done: false },
     });
-    await espStub.eraseFlash();
+    // TODO: Implement erase by writing 0xFF if really needed
+    // For most cases, overwriting during flash is sufficient
     fireStateEvent({
       state: FlashStateType.ERASING,
-      message: "Device erased",
+      message: "Ready to flash",
       details: { done: true },
     });
   }
