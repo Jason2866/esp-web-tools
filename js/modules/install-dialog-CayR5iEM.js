@@ -856,7 +856,7 @@ import{l as e,o as t,_ as i,n as o,B as n,i as r,a as d,t as a,e as l,b as c,R a
         <div>
           <ewt-button
             label="Manage Filesystem"
-            @click=${()=>{this._state="PARTITIONS",this._readPartitionTable()}}
+            @click=${async()=>{this._client&&(await this._closeClientWithoutEvents(this._client),this._client=void 0),this._state="PARTITIONS",this._readPartitionTable()}}
           ></ewt-button>
         </div>
         ${this._isSameFirmware&&this._manifest.funding_url?m`
@@ -900,7 +900,7 @@ import{l as e,o as t,_ as i,n as o,B as n,i as r,a as d,t as a,e as l,b as c,R a
         <div>
           <ewt-button
             label="Manage Filesystem"
-            @click=${()=>{this._state="PARTITIONS",this._readPartitionTable()}}
+            @click=${async()=>{this._client&&(await this._closeClientWithoutEvents(this._client),this._client=void 0),this._state="PARTITIONS",this._readPartitionTable()}}
           ></ewt-button>
         </div>
       </div>
