@@ -137,7 +137,15 @@ export const flash = async (
   });
 
   // Run the stub FIRST - needed for all flash operations
-  const espStub = await esploader.runStub();
+  // Check if stub is already running (e.g., after reading partitions)
+  let espStub;
+  if (esploader.IS_STUB) {
+    logger.log("Stub already running, reusing it");
+    espStub = esploader;
+  } else {
+    logger.log("Running stub...");
+    espStub = await esploader.runStub();
+  }
 
   // Change baud rate if specified (must be done AFTER runStub, BEFORE flashing)
   if (baudRate !== undefined && baudRate > 115200) {
