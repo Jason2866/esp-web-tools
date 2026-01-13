@@ -1128,7 +1128,7 @@ export class EwtInstallDialog extends LitElement {
         this.esploader._writer = undefined;
         this.logger.log("Writer released before initialize");
       }
-      
+
       // Invalidate stub when locks are released
       if (reader || writer) {
         this._espStub = undefined;
