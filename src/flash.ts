@@ -159,22 +159,34 @@ export const flash = async (
     }
   }
 
-  // Skip eraseFlash() - it doesn't work reliably
-  // Instead, we'll write 0xFF to erase regions if needed
-  // For now, just skip erase and flash directly (overwriting works fine)
+  // Erase flash if requested (only works with stub loader)
   if (eraseFirst) {
     fireStateEvent({
       state: FlashStateType.ERASING,
-      message: "Preparing to erase (will overwrite during flash)...",
+      message: "Erasing flash...",
       details: { done: false },
     });
-    // TODO: Implement erase by writing 0xFF if really needed
-    // For most cases, overwriting during flash is sufficient
-    fireStateEvent({
-      state: FlashStateType.ERASING,
-      message: "Ready to flash",
-      details: { done: true },
-    });
+    
+    try {
+      logger.log("Erasing flash memory...");
+      await espStub.eraseFlash();
+      logger.log("Flash erased successfully");
+      
+      fireStateEvent({
+        state: FlashStateType.ERASING,
+        message: "Flash erased",
+        details: { done: true },
+      });
+    } catch (err: any) {
+      logger.error(`Flash erase failed: ${err.message}`);
+      fireStateEvent({
+        state: FlashStateType.ERROR,
+        message: `Failed to erase flash: ${err.message}`,
+        details: { error: FlashError.WRITE_FAILED, details: err },
+      });
+      await esploader.disconnect();
+      return;
+    }
   }
 
   // Fetch firmware files

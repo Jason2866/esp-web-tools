@@ -1334,8 +1334,15 @@ export class EwtInstallDialog extends LitElement {
               this.esploader._writer = undefined;
               this.logger.log("ESP state reset for Improv test");
 
+              // Hard reset the ESP to boot into new firmware
+              try {
+                await this.esploader.hardReset();
+                this.logger.log("ESP hard reset complete");
+              } catch (resetErr: any) {
+                this.logger.log(`Hard reset failed: ${resetErr.message}`);
+              }
+
               // Test Improv with new firmware
-              // If Improv fails, _initialize will automatically close/reopen port
               await this._initialize(true);
               this.requestUpdate();
             });
@@ -1387,8 +1394,15 @@ export class EwtInstallDialog extends LitElement {
             this.esploader._writer = undefined;
             this.logger.log("ESP state reset for Improv test");
 
+            // Hard reset the ESP to boot into new firmware
+            try {
+              await this.esploader.hardReset();
+              this.logger.log("ESP hard reset complete");
+            } catch (resetErr: any) {
+              this.logger.log(`Hard reset failed: ${resetErr.message}`);
+            }
+
             // Test Improv with new firmware
-            // If Improv fails, _initialize will automatically close/reopen port
             await this._initialize(true);
             this.requestUpdate();
           });
