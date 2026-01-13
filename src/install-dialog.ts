@@ -1284,9 +1284,6 @@ export class EwtInstallDialog extends LitElement {
             this.requestUpdate();
           });
         }
-            .then(() => this._initialize(true))
-            .then(() => this.requestUpdate());
-        }
       },
       loaderToUse,
       this.logger,
