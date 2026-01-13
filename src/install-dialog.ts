@@ -11,8 +11,6 @@ import type { EwtTextfield } from "./components/ewt-textfield";
 import "./components/ewt-select";
 import "./components/ewt-list-item";
 import "./components/ewt-littlefs-manager";
-import "./components/ewt-debug-log";
-import type { EwtDebugLog } from "./components/ewt-debug-log";
 import "./pages/ewt-page-progress";
 import "./pages/ewt-page-message";
 import { chipIcon, closeIcon, firmwareIcon } from "./components/svg";
@@ -212,10 +210,6 @@ export class EwtInstallDialog extends LitElement {
     `;
   }
 
-  private get _debugLog(): EwtDebugLog | null {
-    return document.querySelector("ewt-debug-log");
-  }
-
   _renderProgress(label: string | TemplateResult, progress?: number) {
     return html`
       <ewt-page-progress
@@ -227,8 +221,6 @@ export class EwtInstallDialog extends LitElement {
 
   _renderError(label: string): [string, TemplateResult, boolean] {
     const heading = "Error";
-    // Log error to debug log for Android debugging
-    this._debugLog?.addLog("error", `Error: ${label}`);
     const content = html`
       <ewt-page-message .icon=${ERROR_ICON} .label=${label}></ewt-page-message>
       <ewt-button
@@ -1143,17 +1135,14 @@ export class EwtInstallDialog extends LitElement {
     this.logger = {
       log: (msg: string, ...args: any[]) => {
         originalLogger.log(msg, ...args);
-        this._debugLog?.addLog("log", [msg, ...args].join(" "));
       },
       error: (msg: string, ...args: any[]) => {
         originalLogger.error(msg, ...args);
-        this._debugLog?.addLog("error", [msg, ...args].join(" "));
       },
       debug: (msg: string, ...args: any[]) => {
         if (originalLogger.debug) {
           originalLogger.debug(msg, ...args);
         }
-        this._debugLog?.addLog("log", `[DEBUG] ${[msg, ...args].join(" ")}`);
       },
     };
 
