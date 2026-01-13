@@ -323,7 +323,7 @@ export class EwtInstallDialog extends LitElement {
               }
               // Also set `null` back to undefined.
               this._client = undefined;
-              
+
               // Release esploader reader/writer if locked
               if (this.esploader._reader) {
                 try {
@@ -344,7 +344,7 @@ export class EwtInstallDialog extends LitElement {
                   this.logger.log("Could not release writer:", err);
                 }
               }
-              
+
               this._state = "LOGS";
             }}
           ></ewt-button>
@@ -358,7 +358,7 @@ export class EwtInstallDialog extends LitElement {
                 await this._closeClientWithoutEvents(this._client);
                 this._client = undefined;
               }
-              
+
               // If we just checked Improv (whether it worked or not), we need to reset
               // ESP state to put it back into bootloader mode
               if (this._improvChecked) {
@@ -366,9 +366,11 @@ export class EwtInstallDialog extends LitElement {
                 this.esploader.IS_STUB = false;
                 this.esploader.chipFamily = null;
                 this._improvChecked = false; // Clear flag so we don't reset again
-                this.logger.log("ESP state reset - will re-initialize for filesystem access");
+                this.logger.log(
+                  "ESP state reset - will re-initialize for filesystem access",
+                );
               }
-              
+
               this._state = "PARTITIONS";
               this._readPartitionTable();
             }}
@@ -432,7 +434,7 @@ export class EwtInstallDialog extends LitElement {
             @click=${async () => {
               // Also set `null` back to undefined.
               this._client = undefined;
-              
+
               // Release esploader reader/writer if locked
               if (this.esploader._reader) {
                 try {
@@ -453,7 +455,7 @@ export class EwtInstallDialog extends LitElement {
                   this.logger.log("Could not release writer:", err);
                 }
               }
-              
+
               this._state = "LOGS";
             }}
           ></ewt-button>
@@ -468,7 +470,7 @@ export class EwtInstallDialog extends LitElement {
                 await this._closeClientWithoutEvents(this._client);
                 this._client = undefined;
               }
-              
+
               // If we just checked Improv (whether it worked or not), we need to reset
               // ESP state to put it back into bootloader mode
               if (this._improvChecked) {
@@ -476,9 +478,11 @@ export class EwtInstallDialog extends LitElement {
                 this.esploader.IS_STUB = false;
                 this.esploader.chipFamily = null;
                 this._improvChecked = false; // Clear flag so we don't reset again
-                this.logger.log("ESP state reset - will re-initialize for filesystem access");
+                this.logger.log(
+                  "ESP state reset - will re-initialize for filesystem access",
+                );
               }
-              
+
               this._state = "PARTITIONS";
               this._readPartitionTable();
             }}
@@ -834,32 +838,31 @@ export class EwtInstallDialog extends LitElement {
         label="Back"
         @click=${async () => {
           await this.shadowRoot!.querySelector("ewt-console")!.disconnect();
-          
+
           // Complete re-init like new connection (but without Improv)
           this.logger.log("Closing port for reconnect after console...");
           try {
             await this._port.close();
             this.logger.log("Port closed");
-            
+
             await sleep(250);
-            
+
             await this._port.open({ baudRate: 115200 });
             this.logger.log("Port reopened");
-            
+
             await sleep(250);
             this.logger.log("Device ready as new connection");
-            
+
             // Reset ESP state completely
             this._espStub = undefined;
             this.esploader.IS_STUB = false;
             this.esploader.chipFamily = null;
             this.esploader._reader = undefined;
             this.esploader._writer = undefined;
-            
           } catch (reconnectErr: any) {
             this.logger.error(`Reconnect failed: ${reconnectErr.message}`);
           }
-          
+
           this._state = "DASHBOARD";
           this._initialize(false, true); // skipImprov = true (from console)
         }}
