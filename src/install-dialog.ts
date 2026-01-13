@@ -927,34 +927,15 @@ export class EwtInstallDialog extends LitElement {
 
       this._state = "ERROR";
     } finally {
-      // Release reader and writer locks so the port can be used again
-      // (e.g., for Install Firmware after viewing partitions)
-      try {
-        const reader = this.esploader._reader;
-        const writer = this.esploader._writer;
-
-        if (reader) {
-          await reader.cancel();
-          reader.releaseLock();
-          this.esploader._reader = undefined;
-          this.logger.log("Reader released after partition read");
-        }
-
-        if (writer) {
-          writer.releaseLock();
-          this.esploader._writer = undefined;
-          this.logger.log("Writer lock released after partition read");
-        }
-
-        // CRITICAL: Invalidate stub after releasing locks
-        // The stub is no longer usable after reader/writer are released
-        // This forces a fresh stub on next operation
-        this._espStub = undefined;
-        this.logger.log("Stub invalidated after partition read");
-      } catch (err) {
-        this.logger.log("Could not release reader/writer:", err);
-      }
-
+      // DON'T release reader/writer locks here!
+      // Keep them so the stub remains usable for:
+      // - Multiple partition reads
+      // - Opening filesystem
+      // The locks will be released when:
+      // - User clicks "Back" to dashboard (calls _initialize)
+      // - User clicks "Install Firmware" (flash.ts releases them)
+      // - Dialog is closed (calls _handleClose)
+      
       this._busy = false;
     }
   }
