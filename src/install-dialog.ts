@@ -1225,7 +1225,7 @@ export class EwtInstallDialog extends LitElement {
             // Invalidate stub - will be recreated if needed
             this._espStub = undefined;
             this._improvChecked = false; // Allow Improv test with new firmware
-            
+
             // Test Improv with new firmware
             sleep(100)
               .then(() => this._initialize(true))
@@ -1272,7 +1272,7 @@ export class EwtInstallDialog extends LitElement {
           // Invalidate stub - will be recreated if needed
           this._espStub = undefined;
           this._improvChecked = false; // Allow Improv test with new firmware
-          
+
           // Test Improv with new firmware
           sleep(100)
             .then(() => this._initialize(true))
