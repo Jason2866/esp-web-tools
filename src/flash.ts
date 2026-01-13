@@ -277,7 +277,7 @@ export const flash = async (
     // Try to access reader and writer from parent (esploader) first
     let reader = (esploader as any)._reader;
     let writer = (esploader as any)._writer;
-    
+
     // If not found, try from stub's parent
     if ((!reader || !writer) && (espStub as any)._parent) {
       const parent = (espStub as any)._parent;
@@ -292,7 +292,7 @@ export const flash = async (
     } else {
       logger.log("No reader found to release");
     }
-    
+
     if (writer) {
       await writer.close();
       logger.log("Writer released successfully");
