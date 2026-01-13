@@ -146,7 +146,10 @@ export const flash = async (
     fireStateEvent({
       state: FlashStateType.ERROR,
       message: "Internal error: Stub not properly initialized",
-      details: { error: FlashError.FAILED_INITIALIZING, details: "Missing chipFamily" },
+      details: {
+        error: FlashError.FAILED_INITIALIZING,
+        details: "Missing chipFamily",
+      },
     });
     return;
   }

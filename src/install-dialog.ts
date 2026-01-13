@@ -1368,7 +1368,7 @@ export class EwtInstallDialog extends LitElement {
                 this._client = null;
                 this._improvChecked = true;
               }
-              
+
               this.requestUpdate();
             });
           }
@@ -1437,7 +1437,7 @@ export class EwtInstallDialog extends LitElement {
               this._client = null;
               this._improvChecked = true;
             }
-            
+
             this.requestUpdate();
           });
         }
