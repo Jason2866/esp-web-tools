@@ -142,18 +142,29 @@ export const flash = async (
   if (esploader.IS_STUB) {
     logger.log("ESPLoader is already a stub, using it directly");
     espStub = esploader;
+    
+    // Re-set baudrate even if stub already exists
+    // The partition read may have set a different baudrate
+    if (baudRate !== undefined && baudRate > 115200) {
+      try {
+        await espStub.setBaudrate(baudRate);
+        logger.log(`Baud rate re-set to ${baudRate} for existing stub`);
+      } catch (err: any) {
+        logger.log(`Could not re-set baud rate to ${baudRate}: ${err.message}`);
+      }
+    }
   } else {
     logger.log("Running stub...");
     espStub = await esploader.runStub();
-  }
-
-  // Change baud rate if specified (must be done AFTER runStub, BEFORE flashing)
-  if (baudRate !== undefined && baudRate > 115200) {
-    try {
-      await espStub.setBaudrate(baudRate);
-      logger.log(`Baud rate changed to ${baudRate}`);
-    } catch (err: any) {
-      logger.log(`Could not change baud rate to ${baudRate}: ${err.message}`);
+    
+    // Change baud rate if specified (must be done AFTER runStub, BEFORE flashing)
+    if (baudRate !== undefined && baudRate > 115200) {
+      try {
+        await espStub.setBaudrate(baudRate);
+        logger.log(`Baud rate changed to ${baudRate}`);
+      } catch (err: any) {
+        logger.log(`Could not change baud rate to ${baudRate}: ${err.message}`);
+      }
     }
   }
 

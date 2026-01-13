@@ -1237,38 +1237,11 @@ export class EwtInstallDialog extends LitElement {
     }
     this._client = undefined;
 
-    // CRITICAL: Reset stub and locks before flash
-    // The stub from partition read is not suitable for flashing
-    // Release locks so flash() can create a fresh stub
-    try {
-      const reader = this.esploader._reader;
-      const writer = this.esploader._writer;
+    // Don't reset anything - let flash() handle the existing state
+    // If we came from partition read, the stub is already running
+    // flash() will check IS_STUB and use it directly
 
-      if (reader) {
-        await reader.cancel();
-        reader.releaseLock();
-        this.esploader._reader = undefined;
-        this.logger.log("Reader released before flash");
-      }
-
-      if (writer) {
-        writer.releaseLock();
-        this.esploader._writer = undefined;
-        this.logger.log("Writer released before flash");
-      }
-
-      this._espStub = undefined;
-      this.logger.log("Stub invalidated before flash");
-
-      // CRITICAL: Reset chipFamily to force re-initialization
-      // This will reset the ESP and sync properly before flashing
-      this.esploader.chipFamily = null;
-      this.logger.log("ESPLoader reset - will re-initialize for flash");
-    } catch (err) {
-      this.logger.log("Could not release locks before flash:", err);
-    }
-
-    // Always use parent loader for flash (not the partition stub)
+    // Always use parent loader for flash
     const loaderToUse = this.esploader!;
 
     if (this.firmwareFile != undefined) {
