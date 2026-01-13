@@ -1185,10 +1185,8 @@ export class EwtInstallDialog extends LitElement {
 
     // Don't reset anything - let flash() handle the existing state
     // If we came from partition read, the stub is already running
-    // flash() will check IS_STUB and use it directly
-
-    // Always use parent loader for flash
-    const loaderToUse = this.esploader!;
+    // Use the stub if available, otherwise use parent loader
+    const loaderToUse = this._espStub || this.esploader!;
 
     if (this.firmwareFile != undefined) {
       // If a uploaded File was provided -> create Uint8Array of content
@@ -1218,8 +1216,8 @@ export class EwtInstallDialog extends LitElement {
   }
 
   async _flashFilebuffer(fileBuffer: Uint8Array) {
-    // Always use parent loader for flash (stub was already invalidated in _confirmInstall)
-    const loaderToUse = this.esploader!;
+    // Use the stub if available, otherwise use parent loader
+    const loaderToUse = this._espStub || this.esploader!;
 
     flash(
       (state) => {
