@@ -1204,32 +1204,35 @@ export class EwtInstallDialog extends LitElement {
           this._installState = state;
 
           if (state.state === FlashStateType.FINISHED) {
-            // Release locks so we can test Improv with new firmware
-            const reader = this.esploader._reader;
-            const writer = this.esploader._writer;
+            // Release locks and reset ESP state for Improv test
+            sleep(100).then(async () => {
+              const reader = this.esploader._reader;
+              const writer = this.esploader._writer;
 
-            if (reader) {
-              reader.cancel().then(() => {
+              if (reader) {
+                await reader.cancel();
                 reader.releaseLock();
                 this.esploader._reader = undefined;
-                this.logger.log("Reader released after flash for Improv test");
-              });
-            }
+                this.logger.log("Reader released after flash");
+              }
 
-            if (writer) {
-              writer.releaseLock();
-              this.esploader._writer = undefined;
-              this.logger.log("Writer released after flash for Improv test");
-            }
+              if (writer) {
+                writer.releaseLock();
+                this.esploader._writer = undefined;
+                this.logger.log("Writer released after flash");
+              }
 
-            // Invalidate stub - will be recreated if needed
-            this._espStub = undefined;
-            this._improvChecked = false; // Allow Improv test with new firmware
+              // Reset ESP state completely
+              this._espStub = undefined;
+              this.esploader.IS_STUB = false;
+              this.esploader.chipFamily = null;
+              this._improvChecked = false;
+              this.logger.log("ESP state reset for Improv test");
 
-            // Test Improv with new firmware
-            sleep(100)
-              .then(() => this._initialize(true))
-              .then(() => this.requestUpdate());
+              // Test Improv with new firmware
+              await this._initialize(true);
+              this.requestUpdate();
+            });
           }
         },
         loaderToUse,
@@ -1251,30 +1254,36 @@ export class EwtInstallDialog extends LitElement {
         this._installState = state;
 
         if (state.state === FlashStateType.FINISHED) {
-          // Release locks so we can test Improv with new firmware
-          const reader = this.esploader._reader;
-          const writer = this.esploader._writer;
+          // Release locks and reset ESP state for Improv test
+          sleep(100).then(async () => {
+            const reader = this.esploader._reader;
+            const writer = this.esploader._writer;
 
-          if (reader) {
-            reader.cancel().then(() => {
+            if (reader) {
+              await reader.cancel();
               reader.releaseLock();
               this.esploader._reader = undefined;
-              this.logger.log("Reader released after flash for Improv test");
-            });
-          }
+              this.logger.log("Reader released after flash");
+            }
 
-          if (writer) {
-            writer.releaseLock();
-            this.esploader._writer = undefined;
-            this.logger.log("Writer released after flash for Improv test");
-          }
+            if (writer) {
+              writer.releaseLock();
+              this.esploader._writer = undefined;
+              this.logger.log("Writer released after flash");
+            }
 
-          // Invalidate stub - will be recreated if needed
-          this._espStub = undefined;
-          this._improvChecked = false; // Allow Improv test with new firmware
+            // Reset ESP state completely
+            this._espStub = undefined;
+            this.esploader.IS_STUB = false;
+            this.esploader.chipFamily = null;
+            this._improvChecked = false;
+            this.logger.log("ESP state reset for Improv test");
 
-          // Test Improv with new firmware
-          sleep(100)
+            // Test Improv with new firmware
+            await this._initialize(true);
+            this.requestUpdate();
+          });
+        }
             .then(() => this._initialize(true))
             .then(() => this.requestUpdate());
         }
