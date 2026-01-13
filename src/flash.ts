@@ -272,13 +272,22 @@ export const flash = async (
   await sleep(100);
 
   // Release the reader so Improv can use the port
-  // Access private _reader property (it exists but is private)
+  // The reader is in the parent ESPLoader, not in the stub
   try {
-    const reader = (espStub as any)._reader;
+    // Try to access reader from parent (esploader) first
+    let reader = (esploader as any)._reader;
+    
+    // If not found, try from stub's parent
+    if (!reader && (espStub as any)._parent) {
+      reader = ((espStub as any)._parent as any)._reader;
+    }
+    
     if (reader) {
       await reader.cancel();
       reader.releaseLock();
       logger.log("Reader released successfully");
+    } else {
+      logger.log("No reader found to release");
     }
   } catch (err) {
     logger.log("Could not release reader:", err);
