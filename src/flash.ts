@@ -287,6 +287,7 @@ export const flash = async (
     if (reader) {
       await reader.cancel();
       reader.releaseLock();
+      esploader._reader = undefined;
       logger.log("Reader released successfully");
     } else {
       logger.log("No reader found to release");
@@ -296,6 +297,7 @@ export const flash = async (
       // Release the lock, but do NOT close the stream
       // This allows other code (like Improv or Filesystem) to get a new writer
       writer.releaseLock();
+      esploader._writer = undefined;
       logger.log("Writer lock released successfully");
     } else {
       logger.log("No writer found to release");

@@ -915,11 +915,13 @@ export class EwtInstallDialog extends LitElement {
         if (reader) {
           await reader.cancel();
           reader.releaseLock();
+          this.esploader._reader = undefined;
           this.logger.log("Reader released after partition read");
         }
 
         if (writer) {
           writer.releaseLock();
+          this.esploader._writer = undefined;
           this.logger.log("Writer lock released after partition read");
         }
       } catch (err) {
