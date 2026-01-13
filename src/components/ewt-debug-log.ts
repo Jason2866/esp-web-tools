@@ -83,7 +83,7 @@ export class EwtDebugLog extends LitElement {
         width: 250px;
         bottom: 60px;
       }
-      
+
       .logs {
         max-height: 150px;
       }
