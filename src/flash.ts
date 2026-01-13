@@ -271,15 +271,18 @@ export const flash = async (
 
   await sleep(100);
 
-  // Release the reader so Improv can use the port
-  // The reader is in the parent ESPLoader, not in the stub
+  // Release the reader AND writer so Improv can use the port
+  // Both are in the parent ESPLoader, not in the stub
   try {
-    // Try to access reader from parent (esploader) first
+    // Try to access reader and writer from parent (esploader) first
     let reader = (esploader as any)._reader;
-
+    let writer = (esploader as any)._writer;
+    
     // If not found, try from stub's parent
-    if (!reader && (espStub as any)._parent) {
-      reader = ((espStub as any)._parent as any)._reader;
+    if ((!reader || !writer) && (espStub as any)._parent) {
+      const parent = (espStub as any)._parent;
+      if (!reader) reader = (parent as any)._reader;
+      if (!writer) writer = (parent as any)._writer;
     }
 
     if (reader) {
@@ -289,8 +292,15 @@ export const flash = async (
     } else {
       logger.log("No reader found to release");
     }
+    
+    if (writer) {
+      await writer.close();
+      logger.log("Writer released successfully");
+    } else {
+      logger.log("No writer found to release");
+    }
   } catch (err) {
-    logger.log("Could not release reader:", err);
+    logger.log("Could not release reader/writer:", err);
   }
 
   fireStateEvent({
