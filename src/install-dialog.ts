@@ -1110,7 +1110,10 @@ export class EwtInstallDialog extends LitElement {
         this.logger.log("Writer released before initialize");
       }
     } catch (releaseErr) {
-      this.logger.log("Could not release reader/writer before initialize:", releaseErr);
+      this.logger.log(
+        "Could not release reader/writer before initialize:",
+        releaseErr,
+      );
     }
 
     try {
@@ -1159,7 +1162,7 @@ export class EwtInstallDialog extends LitElement {
         this._client = null; // not supported
         this.logger.error("Improv initialization failed.", err);
       }
-      
+
       // Release locks again after error (in case Improv created them)
       try {
         const reader = this.esploader._reader;
@@ -1178,7 +1181,10 @@ export class EwtInstallDialog extends LitElement {
           this.logger.log("Writer released after Improv error");
         }
       } catch (releaseErr) {
-        this.logger.log("Could not release reader/writer after error:", releaseErr);
+        this.logger.log(
+          "Could not release reader/writer after error:",
+          releaseErr,
+        );
       }
     }
   }
