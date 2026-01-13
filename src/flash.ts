@@ -127,27 +127,13 @@ export const flash = async (
     details: { done: true },
   });
 
-  if (eraseFirst) {
-    fireStateEvent({
-      state: FlashStateType.ERASING,
-      message: "Erasing device...",
-      details: { done: false },
-    });
-    await esploader.eraseFlash();
-    fireStateEvent({
-      state: FlashStateType.ERASING,
-      message: "Device erased",
-      details: { done: true },
-    });
-  }
-
   fireStateEvent({
     state: FlashStateType.PREPARING,
     message: "Preparing installation...",
     details: { done: false },
   });
 
-  // Run the stub
+  // Run the stub FIRST - needed for all flash operations
   const espStub = await esploader.runStub();
 
   // Change baud rate if specified (must be done AFTER runStub, BEFORE flashing)
@@ -158,6 +144,21 @@ export const flash = async (
     } catch (err: any) {
       logger.log(`Could not change baud rate to ${baudRate}: ${err.message}`);
     }
+  }
+
+  // Erase flash if requested (must be done AFTER runStub)
+  if (eraseFirst) {
+    fireStateEvent({
+      state: FlashStateType.ERASING,
+      message: "Erasing device...",
+      details: { done: false },
+    });
+    await espStub.eraseFlash();
+    fireStateEvent({
+      state: FlashStateType.ERASING,
+      message: "Device erased",
+      details: { done: true },
+    });
   }
 
   // Fetch firmware files
