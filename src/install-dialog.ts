@@ -1091,6 +1091,28 @@ export class EwtInstallDialog extends LitElement {
       return;
     }
 
+    // CRITICAL: Always release locks FIRST before trying to initialize
+    // This ensures we can retry after errors
+    try {
+      const reader = this.esploader._reader;
+      const writer = this.esploader._writer;
+
+      if (reader) {
+        await reader.cancel();
+        reader.releaseLock();
+        this.esploader._reader = undefined;
+        this.logger.log("Reader released before initialize");
+      }
+
+      if (writer) {
+        writer.releaseLock();
+        this.esploader._writer = undefined;
+        this.logger.log("Writer released before initialize");
+      }
+    } catch (releaseErr) {
+      this.logger.log("Could not release reader/writer before initialize:", releaseErr);
+    }
+
     try {
       // If local file upload via browser is used, we already provide a manifest as a JSON string and not a URL to it
       this._manifest = JSON.parse(this.manifestPath);
@@ -1136,6 +1158,27 @@ export class EwtInstallDialog extends LitElement {
       } else {
         this._client = null; // not supported
         this.logger.error("Improv initialization failed.", err);
+      }
+      
+      // Release locks again after error (in case Improv created them)
+      try {
+        const reader = this.esploader._reader;
+        const writer = this.esploader._writer;
+
+        if (reader) {
+          await reader.cancel();
+          reader.releaseLock();
+          this.esploader._reader = undefined;
+          this.logger.log("Reader released after Improv error");
+        }
+
+        if (writer) {
+          writer.releaseLock();
+          this.esploader._writer = undefined;
+          this.logger.log("Writer released after Improv error");
+        }
+      } catch (releaseErr) {
+        this.logger.log("Could not release reader/writer after error:", releaseErr);
       }
     }
   }
