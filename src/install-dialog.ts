@@ -1204,9 +1204,10 @@ export class EwtInstallDialog extends LitElement {
           this._installState = state;
 
           if (state.state === FlashStateType.FINISHED) {
-            sleep(100)
-              .then(() => this._initialize(true))
-              .then(() => this.requestUpdate());
+            // Don't call _initialize() - it would try to start Improv again
+            // The stub is still running and reader is locked
+            // Just update the UI
+            sleep(100).then(() => this.requestUpdate());
           }
         },
         loaderToUse,
@@ -1228,9 +1229,10 @@ export class EwtInstallDialog extends LitElement {
         this._installState = state;
 
         if (state.state === FlashStateType.FINISHED) {
-          sleep(100)
-            .then(() => this._initialize(true))
-            .then(() => this.requestUpdate());
+          // Don't call _initialize() - it would try to start Improv again
+          // The stub is still running and reader is locked
+          // Just update the UI
+          sleep(100).then(() => this.requestUpdate());
         }
       },
       loaderToUse,
