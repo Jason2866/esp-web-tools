@@ -1164,6 +1164,15 @@ export class EwtInstallDialog extends LitElement {
     } catch (err: any) {
       // Clear old value
       this._info = undefined;
+      
+      // CRITICAL: Close the Improv client to release its reader
+      try {
+        await this._closeClientWithoutEvents(client);
+        this.logger.log("Improv client closed after error");
+      } catch (closeErr) {
+        this.logger.log("Could not close Improv client:", closeErr);
+      }
+      
       if (err instanceof PortNotReady) {
         this._state = "ERROR";
         this._error =
@@ -1173,7 +1182,7 @@ export class EwtInstallDialog extends LitElement {
         this.logger.error("Improv initialization failed.", err);
       }
 
-      // Release locks again after error (in case Improv created them)
+      // Release locks again after error (in case anything else created them)
       try {
         const reader = this.esploader._reader;
         const writer = this.esploader._writer;
