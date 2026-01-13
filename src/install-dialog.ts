@@ -1259,7 +1259,7 @@ export class EwtInstallDialog extends LitElement {
 
       this._espStub = undefined;
       this.logger.log("Stub invalidated before flash");
-      
+
       // CRITICAL: Reset chipFamily to force re-initialization
       // This will reset the ESP and sync properly before flashing
       this.esploader.chipFamily = null;
