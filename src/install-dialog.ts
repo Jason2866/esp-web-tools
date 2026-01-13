@@ -174,6 +174,7 @@ export class EwtInstallDialog extends LitElement {
     this._debugLog?.addLog("error", message);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private _logWarn(message: string) {
     console.warn(message);
     this._debugLog?.addLog("warn", message);
