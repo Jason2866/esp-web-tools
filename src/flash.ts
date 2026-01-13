@@ -278,7 +278,7 @@ export const flash = async (
     // These are now public properties in tasmota-webserial-esptool 9.1.4+
     const reader = esploader._reader;
     const writer = esploader._writer;
-    
+
     if (reader) {
       await reader.cancel();
       reader.releaseLock();
@@ -286,7 +286,7 @@ export const flash = async (
     } else {
       logger.log("No reader found to release");
     }
-    
+
     if (writer) {
       await writer.close();
       logger.log("Writer released successfully");
