@@ -835,33 +835,22 @@ export class EwtInstallDialog extends LitElement {
     try {
       this.logger.log("Reading partition table from 0x8000...");
 
-      // Import ESPLoader from the package
-      const { ESPLoader } = await import("tasmota-webserial-esptool");
-
-      let currentPort = this._port;
-      let esploader =
-        this.esploader ||
-        new ESPLoader(currentPort, {
-          log: (msg: string, ...args: string[]) =>
-            this.logger.log(msg, ...args),
-          debug: (msg: string, ...args: string[]) =>
-            this.logger.debug?.(msg, ...args),
-          error: (msg: string, ...args: string[]) =>
-            this.logger.error(msg, ...args),
-        });
-
-      // Initialize ESP loader
-      this.logger.log("Initializing ESP loader...");
-
-      try {
-        await esploader.initialize();
-        this.logger.log("ESP loader initialized successfully");
-      } catch (err: any) {
-        throw err;
+      // Use existing esploader from connect.ts
+      if (!this.esploader) {
+        throw new Error("ESPLoader not initialized");
       }
 
-      this.logger.log("Running stub...");
-      const espStub = await esploader.runStub();
+      // Check if stub is already running, if not run it
+      let espStub;
+      if (this.esploader.chip && this.esploader.chip.IS_STUB) {
+        // Stub already running, use it
+        this.logger.log("Using existing stub...");
+        espStub = this.esploader;
+      } else {
+        // Need to run stub
+        this.logger.log("Running stub...");
+        espStub = await this.esploader.runStub();
+      }
       this._espStub = espStub;
 
       // Set baudrate for reading flash (use user-selected baudrate if available)
