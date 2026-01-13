@@ -1164,7 +1164,7 @@ export class EwtInstallDialog extends LitElement {
     } catch (err: any) {
       // Clear old value
       this._info = undefined;
-      
+
       // CRITICAL: Close the Improv client to release its reader
       try {
         await this._closeClientWithoutEvents(client);
@@ -1172,7 +1172,7 @@ export class EwtInstallDialog extends LitElement {
       } catch (closeErr) {
         this.logger.log("Could not close Improv client:", closeErr);
       }
-      
+
       if (err instanceof PortNotReady) {
         this._state = "ERROR";
         this._error =
