@@ -92,6 +92,9 @@ export class EwtInstallDialog extends LitElement {
   @state() private _partitions?: Partition[];
   @state() private _selectedPartition?: Partition;
   @state() private _espStub?: any;
+  
+  // Track if Improv was already checked (to avoid repeated attempts)
+  private _improvChecked = false;
 
   // Helper to get port from esploader
   private get _port(): SerialPort {
@@ -1145,6 +1148,19 @@ export class EwtInstallDialog extends LitElement {
       return;
     }
 
+    // Skip Improv if we already checked and it's not supported
+    if (this._improvChecked && this._client === null) {
+      this.logger.log("Improv already checked - not supported, skipping");
+      return;
+    }
+
+    // Skip Improv if we already have a working client
+    if (this._client) {
+      this.logger.log("Improv client already active, skipping initialization");
+      return;
+    }
+
+    this._improvChecked = true;
     const client = new ImprovSerial(this._port, this.logger);
     client.addEventListener("state-changed", () => {
       this.requestUpdate();
@@ -1181,6 +1197,11 @@ export class EwtInstallDialog extends LitElement {
         this._client = null; // not supported
         this.logger.error("Improv initialization failed.", err);
       }
+
+      // CRITICAL: Invalidate the stub because Improv may have changed baudrate
+      // This forces a fresh stub with correct baudrate on next operation
+      this._espStub = undefined;
+      this.logger.log("Stub invalidated after Improv error");
 
       // Release locks again after error (in case anything else created them)
       try {
