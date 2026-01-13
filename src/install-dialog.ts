@@ -935,7 +935,7 @@ export class EwtInstallDialog extends LitElement {
       // - User clicks "Back" to dashboard (calls _initialize)
       // - User clicks "Install Firmware" (flash.ts releases them)
       // - Dialog is closed (calls _handleClose)
-      
+
       this._busy = false;
     }
   }
