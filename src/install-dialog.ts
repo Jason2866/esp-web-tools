@@ -29,17 +29,12 @@ import { downloadManifest } from "./util/manifest";
 import { dialogStyles } from "./styles";
 import { parsePartitionTable, type Partition } from "./partition.js";
 import { detectFilesystemType } from "./util/partition.js";
-import {
-  isESP32S2NativeUSB,
-  isESP32S2ReconnectError,
-  closeAndForgetPort,
-} from "./util/esp32s2-reconnect";
 
 const ERROR_ICON = "⚠️";
 const OK_ICON = "🎉";
 
 export class EwtInstallDialog extends LitElement {
-  public port!: SerialPort;
+  public esploader!: any; // ESPLoader instance from tasmota-webserial-esptool
 
   public manifestPath!: string;
 
@@ -71,8 +66,7 @@ export class EwtInstallDialog extends LitElement {
     | "ASK_ERASE"
     | "LOGS"
     | "PARTITIONS"
-    | "LITTLEFS"
-    | "ESP32S2_RECONNECT" = "DASHBOARD";
+    | "LITTLEFS" = "DASHBOARD";
 
   @state() private _installErase = false;
   @state() private _installConfirmed = false;
@@ -84,9 +78,6 @@ export class EwtInstallDialog extends LitElement {
   @state() private _error?: string;
 
   @state() private _busy = false;
-
-  // Prevent recursive ESP32-S2 reconnect attempts
-  private _esp32s2ReconnectInProgress = false;
 
   // undefined = not loaded
   // null = not available
@@ -100,8 +91,13 @@ export class EwtInstallDialog extends LitElement {
   @state() private _selectedPartition?: Partition;
   @state() private _espStub?: any;
 
+  // Helper to get port from esploader
+  private get _port(): SerialPort {
+    return this.esploader.port;
+  }
+
   protected render() {
-    if (!this.port) {
+    if (!this.esploader) {
       return html``;
     }
     let heading: string | undefined;
@@ -139,8 +135,6 @@ export class EwtInstallDialog extends LitElement {
       [heading, content, hideActions] = this._renderPartitions();
     } else if (this._state === "LITTLEFS") {
       [heading, content, hideActions, allowClosing] = this._renderLittleFS();
-    } else if (this._state === "ESP32S2_RECONNECT") {
-      [heading, content, hideActions] = this._renderESP32S2Reconnect();
     }
 
     return html`
@@ -695,30 +689,6 @@ export class EwtInstallDialog extends LitElement {
           }}
         ></ewt-button>
       `;
-    } else if (
-      this._installState.state === FlashStateType.ESP32_S2_USB_RECONNECT
-    ) {
-      // ESP32-S2 Native USB has switched to CDC mode - need to select new port
-      heading = "ESP32-S2 USB Port Changed";
-      content = html`
-        <ewt-page-message
-          .icon=${"⚠️"}
-          .label=${"The ESP32-S2 has switched from ROM bootloader to USB CDC mode. Please select the new USB port to continue."}
-        ></ewt-page-message>
-        <ewt-button
-          slot="primaryAction"
-          label="Select New Port"
-          @click=${this._handleESP32S2Reconnect}
-        ></ewt-button>
-        <ewt-button
-          slot="secondaryAction"
-          label="Cancel"
-          @click=${() => {
-            this._state = "DASHBOARD";
-            this._installState = undefined;
-          }}
-        ></ewt-button>
-      `;
     }
     return [heading, content!, hideActions, allowClosing];
   }
@@ -729,7 +699,7 @@ export class EwtInstallDialog extends LitElement {
     let hideActions = false;
 
     content = html`
-      <ewt-console .port=${this.port} .logger=${this.logger}></ewt-console>
+      <ewt-console .port=${this._port} .logger=${this.logger}></ewt-console>
       <ewt-button
         slot="primaryAction"
         label="Back"
@@ -855,59 +825,6 @@ export class EwtInstallDialog extends LitElement {
     return [heading, content, hideActions, allowClosing];
   }
 
-  _renderESP32S2Reconnect(): [string | undefined, TemplateResult, boolean] {
-    const heading = "ESP32-S2 USB Port Changed";
-    const content = html`
-      <ewt-page-message
-        .icon=${"⚠️"}
-        .label=${"The ESP32-S2 has switched to USB CDC mode. Please select the new USB port to continue."}
-      ></ewt-page-message>
-      <ewt-button
-        slot="primaryAction"
-        label="Select New Port"
-        @click=${this._handleESP32S2ReconnectClick}
-      ></ewt-button>
-      <ewt-button
-        slot="secondaryAction"
-        label="Cancel"
-        @click=${() => {
-          this._state = "DASHBOARD";
-        }}
-      ></ewt-button>
-    `;
-    const hideActions = false;
-
-    return [heading, content, hideActions];
-  }
-
-  private async _handleESP32S2ReconnectClick() {
-    try {
-      this._busy = true;
-
-      // Request new port (this is triggered by user click, so it works)
-      this.logger.log("Requesting new port selection...");
-      const newPort = await navigator.serial.requestPort();
-      await newPort.open({ baudRate: 115200 });
-
-      this.logger.log("New port selected, updating...");
-      this.port = newPort;
-
-      // Restart partition table reading with new port
-      this._state = "PARTITIONS";
-      await this._readPartitionTable();
-    } catch (err: any) {
-      if (err.name === "NotFoundError") {
-        this.logger.log("Port selection cancelled");
-        this._state = "DASHBOARD";
-      } else {
-        this._error = `Failed to reconnect: ${err.message}`;
-        this._state = "ERROR";
-      }
-    } finally {
-      this._busy = false;
-    }
-  }
-
   private async _readPartitionTable() {
     const PARTITION_TABLE_OFFSET = 0x8000;
     const PARTITION_TABLE_SIZE = 0x1000;
@@ -921,25 +838,17 @@ export class EwtInstallDialog extends LitElement {
       // Import ESPLoader from the package
       const { ESPLoader } = await import("tasmota-webserial-esptool");
 
-      let currentPort = this.port;
-      let esploader = new ESPLoader(currentPort, {
-        log: (msg: string, ...args: string[]) => this.logger.log(msg, ...args),
-        debug: (msg: string, ...args: string[]) =>
-          this.logger.debug?.(msg, ...args),
-        error: (msg: string, ...args: string[]) =>
-          this.logger.error(msg, ...args),
-      });
-
-      // Set up ESP32-S2 reconnect handler BEFORE initialize
-      const reconnectHandler = async (event: any) => {
-        this.logger.log("ESP32-S2 USB reconnect event:", event.detail.message);
-        await closeAndForgetPort(currentPort);
-        this.logger.log("Please select the new ESP32-S2 USB CDC port");
-      };
-
-      esploader.addEventListener("esp32s2-usb-reconnect", reconnectHandler, {
-        once: true,
-      });
+      let currentPort = this._port;
+      let esploader =
+        this.esploader ||
+        new ESPLoader(currentPort, {
+          log: (msg: string, ...args: string[]) =>
+            this.logger.log(msg, ...args),
+          debug: (msg: string, ...args: string[]) =>
+            this.logger.debug?.(msg, ...args),
+          error: (msg: string, ...args: string[]) =>
+            this.logger.error(msg, ...args),
+        });
 
       // Initialize ESP loader
       this.logger.log("Initializing ESP loader...");
@@ -948,22 +857,7 @@ export class EwtInstallDialog extends LitElement {
         await esploader.initialize();
         this.logger.log("ESP loader initialized successfully");
       } catch (err: any) {
-        // Check if this is an ESP32-S2 reconnect scenario
-        if (isESP32S2NativeUSB(currentPort) && isESP32S2ReconnectError(err)) {
-          this.logger.log(
-            "ESP32-S2 USB port changed - user needs to select new port",
-          );
-
-          // Close and forget old port
-          await closeAndForgetPort(currentPort);
-
-          // Show UI with button for user to click
-          this._busy = false;
-          this._state = "ESP32S2_RECONNECT";
-          return;
-        } else {
-          throw err;
-        }
+        throw err;
       }
 
       this.logger.log("Running stub...");
@@ -1142,7 +1036,7 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _initialize(justInstalled = false) {
-    if (this.port.readable === null || this.port.writable === null) {
+    if (this._port.readable === null || this._port.writable === null) {
       this._state = "ERROR";
       this._error =
         "Serial port is not readable/writable. Close any other application using it and try again.";
@@ -1168,7 +1062,7 @@ export class EwtInstallDialog extends LitElement {
       return;
     }
 
-    const client = new ImprovSerial(this.port!, this.logger);
+    const client = new ImprovSerial(this._port, this.logger);
     client.addEventListener("state-changed", () => {
       this.requestUpdate();
     });
@@ -1202,76 +1096,11 @@ export class EwtInstallDialog extends LitElement {
     this._state = "INSTALL";
     this._installErase = erase;
     this._installConfirmed = false;
-    // Reset reconnect flag when starting a fresh installation
-    this._esp32s2ReconnectInProgress = false;
-  }
-
-  /**
-   * Handle ESP32-S2 Native USB reconnect.
-   * When the ESP32-S2 switches from ROM bootloader to USB CDC mode,
-   * the USB port changes and we need to let the user select the new port.
-   */
-  private async _handleESP32S2Reconnect() {
-    // Prevent recursive reconnect attempts
-    if (this._esp32s2ReconnectInProgress) {
-      this.logger.log("ESP32-S2 reconnect already in progress, ignoring");
-      this._error = "Reconnection failed. Please try again manually.";
-      this._state = "ERROR";
-      return;
-    }
-
-    this._esp32s2ReconnectInProgress = true;
-
-    try {
-      // Close the old port if still accessible
-      try {
-        await this.port.close();
-      } catch {
-        // Port may already be closed
-      }
-
-      // Forget the old port to allow reselection
-      try {
-        await this.port.forget();
-      } catch {
-        // Forget may not be supported or port already released
-      }
-
-      // Request new port from user
-      const newPort = await navigator.serial.requestPort();
-
-      // Open the new port
-      await newPort.open({ baudRate: 115200 });
-
-      // Update the port reference
-      this.port = newPort;
-
-      // Reset install state and restart installation
-      this._installState = undefined;
-      this._installConfirmed = false;
-
-      // Restart the install process with the same erase setting
-      this._confirmInstall();
-    } catch (err: any) {
-      this._esp32s2ReconnectInProgress = false;
-
-      if ((err as DOMException).name === "NotFoundError") {
-        // User cancelled port selection - stay on reconnect screen
-        this.logger.log("User cancelled port selection");
-        return;
-      }
-
-      // Show error and go back to dashboard
-      this._error = `Failed to reconnect: ${err.message}`;
-      this._state = "ERROR";
-    }
   }
 
   private async _confirmInstall() {
     this._installConfirmed = true;
     this._installState = undefined;
-    // Reset reconnect flag when starting a new installation
-    this._esp32s2ReconnectInProgress = false;
 
     if (this._client) {
       await this._closeClientWithoutEvents(this._client);
@@ -1295,7 +1124,7 @@ export class EwtInstallDialog extends LitElement {
               .then(() => this.requestUpdate());
           }
         },
-        this.port,
+        this.esploader!,
         this.logger,
         this.manifestPath,
         this._installErase,
@@ -1316,7 +1145,7 @@ export class EwtInstallDialog extends LitElement {
             .then(() => this.requestUpdate());
         }
       },
-      this.port,
+      this.esploader!,
       this.logger,
       this.manifestPath,
       this._installErase,

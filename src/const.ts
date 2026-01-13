@@ -80,11 +80,6 @@ export interface ErrorState extends BaseFlashState {
   details: { error: FlashError; details: string | Error };
 }
 
-export interface ESP32S2USBReconnectState extends BaseFlashState {
-  state: FlashStateType.ESP32_S2_USB_RECONNECT;
-  details: { oldPort: SerialPort };
-}
-
 export type FlashState =
   | InitializingState
   | ManifestState
@@ -92,8 +87,7 @@ export type FlashState =
   | ErasingState
   | WritingState
   | FinishedState
-  | ErrorState
-  | ESP32S2USBReconnectState;
+  | ErrorState;
 
 export const enum FlashStateType {
   INITIALIZING = "initializing",
@@ -103,7 +97,6 @@ export const enum FlashStateType {
   WRITING = "writing",
   FINISHED = "finished",
   ERROR = "error",
-  ESP32_S2_USB_RECONNECT = "esp32_s2_usb_reconnect",
 }
 
 export const enum FlashError {
@@ -112,7 +105,6 @@ export const enum FlashError {
   NOT_SUPPORTED = "not_supported",
   FAILED_FIRMWARE_DOWNLOAD = "failed_firmware_download",
   WRITE_FAILED = "write_failed",
-  ESP32_S2_USB_RECONNECT = "esp32_s2_usb_reconnect",
 }
 
 declare global {

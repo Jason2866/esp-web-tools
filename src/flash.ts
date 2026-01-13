@@ -1,4 +1,4 @@
-import { ESPLoader, Logger } from "tasmota-webserial-esptool";
+import { Logger } from "tasmota-webserial-esptool";
 import {
   Build,
   FlashError,
@@ -8,15 +8,10 @@ import {
 } from "./const";
 import { getChipFamilyName } from "./util/chip-family-name";
 import { sleep } from "./util/sleep";
-import {
-  isESP32S2NativeUSB,
-  isESP32S2ReconnectError,
-  closeAndForgetPort,
-} from "./util/esp32s2-reconnect";
 
 export const flash = async (
   onEvent: (state: FlashState) => void,
-  port: SerialPort,
+  esploader: any, // ESPLoader instance from tasmota-webserial-esptool
   logger: Logger,
   manifestPath: string,
   eraseFirst: boolean,
@@ -27,7 +22,6 @@ export const flash = async (
   let build: Build | undefined;
   let chipFamily: ReturnType<typeof getChipFamilyName>;
   let chipVariant: string | null = null;
-  const isS2NativeUSB = isESP32S2NativeUSB(port);
 
   const fireStateEvent = (stateUpdate: FlashState) =>
     onEvent({
@@ -50,33 +44,9 @@ export const flash = async (
     );
   }
 
-  const esploader = new ESPLoader(port, logger);
-
+  // Use the provided ESPLoader instance - NO port logic here!
   // For debugging
   (window as any).esploader = esploader;
-
-  // ESP32-S2 Native USB event handler - listen on ESPLoader instance
-  const handleESP32S2Reconnect = () => {
-    logger.log(
-      "ESP32-S2 Native USB disconnect detected - reconnection required",
-    );
-  };
-
-  // Register event listener for ESP32-S2 Native USB reconnect on ESPLoader
-  if (isS2NativeUSB) {
-    esploader.addEventListener("esp32s2-usb-reconnect", handleESP32S2Reconnect);
-    logger.log("ESP32-S2 Native USB detected - monitoring for port switch");
-  }
-
-  // Cleanup function to remove event listener
-  const cleanup = () => {
-    if (isS2NativeUSB) {
-      esploader.removeEventListener(
-        "esp32s2-usb-reconnect",
-        handleESP32S2Reconnect,
-      );
-    }
-  };
 
   fireStateEvent({
     state: FlashStateType.INITIALIZING,
@@ -89,23 +59,6 @@ export const flash = async (
   } catch (err: any) {
     logger.error(err);
 
-    // Check if this is an ESP32-S2 Native USB reconnect situation
-    if (isS2NativeUSB && isESP32S2ReconnectError(err)) {
-      cleanup();
-
-      // Close and forget the old port
-      await closeAndForgetPort(port);
-
-      // Fire reconnect event to trigger port reselection dialog
-      fireStateEvent({
-        state: FlashStateType.ESP32_S2_USB_RECONNECT,
-        message: "ESP32-S2 USB port changed - please select the new port",
-        details: { oldPort: port },
-      });
-      return;
-    }
-
-    cleanup();
     fireStateEvent({
       state: FlashStateType.ERROR,
       message:
@@ -135,7 +88,6 @@ export const flash = async (
   try {
     manifest = await manifestProm;
   } catch (err: any) {
-    cleanup();
     fireStateEvent({
       state: FlashStateType.ERROR,
       message: `Unable to fetch manifest: ${err}`,
@@ -150,32 +102,43 @@ export const flash = async (
     if (b.chipFamily !== chipFamily) {
       return false;
     }
-    // If build specifies a chipVariant, it must match
-    if (b.chipVariant !== undefined) {
-      return b.chipVariant === chipVariant;
+
+    // If build specifies chipVariant, it must match
+    if (b.chipVariant && b.chipVariant !== chipVariant) {
+      return false;
     }
-    // If build doesn't specify chipVariant, it matches any variant
+
     return true;
   });
 
-  fireStateEvent({
-    state: FlashStateType.MANIFEST,
-    message: `Found manifest for ${manifest.name}`,
-    details: { done: true },
-  });
-
   if (!build) {
-    const chipInfo = chipVariant
-      ? `${chipFamily} (${chipVariant})`
-      : chipFamily;
-    cleanup();
     fireStateEvent({
       state: FlashStateType.ERROR,
-      message: `Your ${chipInfo} board is not supported.`,
-      details: { error: FlashError.NOT_SUPPORTED, details: chipInfo },
+      message: `Your ${chipFamily}${chipVariant ? ` (${chipVariant})` : ""} is not supported by this firmware.`,
+      details: { error: FlashError.NOT_SUPPORTED, details: chipFamily },
     });
     await esploader.disconnect();
     return;
+  }
+
+  fireStateEvent({
+    state: FlashStateType.MANIFEST,
+    message: "Manifest fetched",
+    details: { done: true },
+  });
+
+  if (eraseFirst) {
+    fireStateEvent({
+      state: FlashStateType.ERASING,
+      message: "Erasing device...",
+      details: { done: false },
+    });
+    await esploader.eraseFlash();
+    fireStateEvent({
+      state: FlashStateType.ERASING,
+      message: "Device erased",
+      details: { done: true },
+    });
   }
 
   fireStateEvent({
@@ -184,35 +147,37 @@ export const flash = async (
     details: { done: false },
   });
 
-  const filePromises = build.parts.map(async (part) => {
-    if (firmwareBuffer.length == 0) {
-      //No firmware buffer provided, now download ...
-      const url = new URL(part.path, manifestURL).toString();
-      const resp = await fetch(url);
-      if (!resp.ok) {
-        throw new Error(
-          `Downlading firmware ${part.path} failed: ${resp.status}`,
-        );
-      }
-      return resp.arrayBuffer();
-    }
-    // buffer from local file upload
-    return firmwareBuffer;
-  });
-
-  // Run the stub while we wait for files to download
+  // Run the stub
   const espStub = await esploader.runStub();
 
-  // Increase baud rate for faster flashing if specified via baud-rate attribute
-  // Default: No change (115200 baud - stub default)
-  // Can be set via baud-rate attribute in HTML (e.g., baud-rate="2000000")
+  // Change baud rate if specified (must be done AFTER runStub, BEFORE flashing)
   if (baudRate !== undefined && baudRate > 115200) {
     try {
       await espStub.setBaudrate(baudRate);
+      logger.log(`Baud rate changed to ${baudRate}`);
     } catch (err: any) {
-      // If baud rate change fails, continue with default 115200
       logger.log(`Could not change baud rate to ${baudRate}: ${err.message}`);
     }
+  }
+
+  // Fetch firmware files
+  const filePromises = build.parts.map(async (part) => {
+    const url = new URL(
+      part.path,
+      manifestURL || location.toString(),
+    ).toString();
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      throw new Error(
+        `Downlading firmware ${part.path} failed: ${resp.status}`,
+      );
+    }
+    return resp.arrayBuffer();
+  });
+
+  // If firmwareBuffer is provided, use it instead of fetching
+  if (firmwareBuffer) {
+    filePromises.push(Promise.resolve(firmwareBuffer.buffer as ArrayBuffer));
   }
 
   const files: (ArrayBuffer | Uint8Array)[] = [];
@@ -221,17 +186,13 @@ export const flash = async (
   for (const prom of filePromises) {
     try {
       const data = await prom;
-      files.push(data instanceof ArrayBuffer ? new Uint8Array(data) : data);
+      files.push(data);
       totalSize += data.byteLength;
     } catch (err: any) {
-      cleanup();
       fireStateEvent({
         state: FlashStateType.ERROR,
         message: err.message,
-        details: {
-          error: FlashError.FAILED_FIRMWARE_DOWNLOAD,
-          details: err.message,
-        },
+        details: { error: FlashError.FAILED_FIRMWARE_DOWNLOAD, details: err },
       });
       await esploader.disconnect();
       return;
@@ -244,44 +205,29 @@ export const flash = async (
     details: { done: true },
   });
 
-  if (eraseFirst) {
-    fireStateEvent({
-      state: FlashStateType.ERASING,
-      message: "Erasing device...",
-      details: { done: false },
-    });
-    await espStub.eraseFlash();
-    fireStateEvent({
-      state: FlashStateType.ERASING,
-      message: "Device erased",
-      details: { done: true },
-    });
-  }
-
-  let lastPct = 0;
-
   fireStateEvent({
     state: FlashStateType.WRITING,
-    message: `Writing progress: ${lastPct}%`,
+    message: `Writing progress: 0 %`,
     details: {
       bytesTotal: totalSize,
       bytesWritten: 0,
-      percentage: lastPct,
+      percentage: 0,
     },
   });
 
-  let totalWritten = 0;
+  let lastPct = 0;
+  let totalBytesWritten = 0;
 
-  for (const part of build.parts) {
-    const file = files.shift()!;
-    const fileBuffer =
-      file instanceof Uint8Array ? new Uint8Array(file).buffer : file;
-    try {
+  try {
+    for (let i = 0; i < build.parts.length; i++) {
+      const part = build.parts[i];
+      const data = files[i];
+
       await espStub.flashData(
-        fileBuffer as ArrayBuffer,
-        (bytesWritten: number) => {
+        data,
+        (bytesWritten: number, bytesTotal: number) => {
           const newPct = Math.floor(
-            ((totalWritten + bytesWritten) / totalSize) * 100,
+            ((totalBytesWritten + bytesWritten) / totalSize) * 100,
           );
           if (newPct === lastPct) {
             return;
@@ -289,28 +235,27 @@ export const flash = async (
           lastPct = newPct;
           fireStateEvent({
             state: FlashStateType.WRITING,
-            message: `Writing progress: ${newPct}%`,
+            message: `Writing progress: ${newPct} %`,
             details: {
               bytesTotal: totalSize,
-              bytesWritten: totalWritten + bytesWritten,
+              bytesWritten: totalBytesWritten + bytesWritten,
               percentage: newPct,
             },
           });
         },
         part.offset,
-        true,
       );
-    } catch (err: any) {
-      cleanup();
-      fireStateEvent({
-        state: FlashStateType.ERROR,
-        message: err.message,
-        details: { error: FlashError.WRITE_FAILED, details: err },
-      });
-      await esploader.disconnect();
-      return;
+
+      totalBytesWritten += data.byteLength;
     }
-    totalWritten += file.byteLength;
+  } catch (err: any) {
+    fireStateEvent({
+      state: FlashStateType.ERROR,
+      message: err.message,
+      details: { error: FlashError.WRITE_FAILED, details: err },
+    });
+    await esploader.disconnect();
+    return;
   }
 
   fireStateEvent({
@@ -318,18 +263,18 @@ export const flash = async (
     message: "Writing complete",
     details: {
       bytesTotal: totalSize,
-      bytesWritten: totalWritten,
+      bytesWritten: totalSize,
       percentage: 100,
     },
   });
 
   await sleep(100);
-  console.log("DISCONNECT");
-  await esploader.disconnect();
-  console.log("HARD RESET");
-  await esploader.hardReset();
 
-  cleanup();
+  logger.log("Hard resetting device...");
+  await espStub.hardReset();
+
+  await sleep(100);
+
   fireStateEvent({
     state: FlashStateType.FINISHED,
     message: "All done!",

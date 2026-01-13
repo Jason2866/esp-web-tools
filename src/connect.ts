@@ -21,12 +21,10 @@ const loadWebUSBSerial = async (): Promise<void> => {
   // Dynamically load the WebUSB serial script from the npm package
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.type = "module"; // CRITICAL: Load as ES6 module to support export statements
-    // Load from the installed npm package (tasmota-webserial-esptool)
+    script.type = "module";
     script.src =
       "https://unpkg.com/tasmota-webserial-esptool/js/webusb-serial.js";
     script.onload = () => {
-      // Verify it loaded correctly
       if ((globalThis as any).requestSerialPort) {
         resolve();
       } else {
@@ -56,8 +54,7 @@ export const connect = async (button: InstallButton) => {
     }
   }
 
-  // Use tasmota-webserial-esptool's connect() function
-  // This handles ALL port logic (request, open, platform detection)
+  // Use tasmota-webserial-esptool's connect() - handles ALL port logic
   let esploader;
   try {
     esploader = await esptoolConnect({
@@ -76,22 +73,13 @@ export const connect = async (button: InstallButton) => {
     return;
   }
 
-  if (!esploader || !esploader.port) {
+  if (!esploader) {
     alert("Failed to connect to device");
     return;
   }
 
-  const port = esploader.port;
-
-  // Disconnect the esploader since we only needed it for port setup
-  try {
-    await esploader.disconnect();
-  } catch (err) {
-    // Ignore disconnect errors
-  }
-
   const el = document.createElement("ewt-install-dialog");
-  el.port = port;
+  el.esploader = esploader; // Pass ESPLoader instead of port
   el.manifestPath = button.manifest || button.getAttribute("manifest")!;
   el.overrides = button.overrides;
   el.firmwareFile = button.firmwareFile;
@@ -109,8 +97,12 @@ export const connect = async (button: InstallButton) => {
 
   el.addEventListener(
     "closed",
-    () => {
-      port!.close();
+    async () => {
+      try {
+        await esploader.disconnect();
+      } catch (err) {
+        // Ignore disconnect errors
+      }
     },
     { once: true },
   );
