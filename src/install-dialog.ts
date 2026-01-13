@@ -99,7 +99,9 @@ export class EwtInstallDialog extends LitElement {
   // Ensure stub is initialized (called before any operation that needs it)
   private async _ensureStub(): Promise<any> {
     if (this._espStub && this._espStub.IS_STUB) {
-      this.logger.log("Using existing stub");
+      this.logger.log(
+        `Existing stub: IS_STUB=${this._espStub.IS_STUB}, chipFamily=${this._espStub.chipFamily}`,
+      );
       return this._espStub;
     }
 
@@ -110,19 +112,28 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log(`Found ${this.esploader.chipFamily}`);
     }
 
-    // Check if esploader itself is already a stub
-    if (this.esploader.IS_STUB) {
-      this.logger.log("ESPLoader is already a stub, using it directly");
-      this._espStub = this.esploader;
-      return this._espStub;
-    }
+    // Save chipFamily and other properties before running stub
+    const chipFamily = this.esploader.chipFamily;
+    const chipName = this.esploader.chipName;
+    const chipRevision = this.esploader.chipRevision;
+    const chipVariant = this.esploader.chipVariant;
 
-    // Run stub for all operations
+    // Always run stub - esploader itself is never a stub
     this.logger.log("Running stub...");
     const espStub = await this.esploader.runStub();
+
+    // CRITICAL: Copy properties from parent to stub (library bug - these are not inherited)
+    espStub.chipFamily = chipFamily;
+    espStub.chipName = chipName;
+    espStub.chipRevision = chipRevision;
+    espStub.chipVariant = chipVariant;
+
+    this.logger.log(
+      `Stub created: IS_STUB=${espStub.IS_STUB}, chipFamily=${espStub.chipFamily}`,
+    );
     this._espStub = espStub;
 
-    // Set baudrate once (use user-selected baudrate if available)
+    // Set baudrate BEFORE any operations (use user-selected baudrate if available)
     if (this.baudRate && this.baudRate > 115200) {
       this.logger.log(`Setting baudrate to ${this.baudRate}...`);
       try {
@@ -135,6 +146,9 @@ export class EwtInstallDialog extends LitElement {
       }
     }
 
+    this.logger.log(
+      `Returning stub: IS_STUB=${this._espStub.IS_STUB}, chipFamily=${this._espStub.chipFamily}`,
+    );
     return this._espStub;
   }
 
