@@ -137,10 +137,10 @@ export const flash = async (
   });
 
   // Run the stub FIRST - needed for all flash operations
-  // Check if stub is already running (e.g., after reading partitions)
+  // Check if the esploader itself is already a stub (e.g., after reading partitions)
   let espStub;
   if (esploader.IS_STUB) {
-    logger.log("Stub already running, reusing it");
+    logger.log("ESPLoader is already a stub, using it directly");
     espStub = esploader;
   } else {
     logger.log("Running stub...");

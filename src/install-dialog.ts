@@ -1127,6 +1127,9 @@ export class EwtInstallDialog extends LitElement {
     }
     this._client = undefined;
 
+    // Use stub if available (e.g., after reading partitions), otherwise use parent loader
+    const loaderToUse = this._espStub || this.esploader!;
+
     if (this.firmwareFile != undefined) {
       // If a uploaded File was provided -> create Uint8Array of content
       new Blob([this.firmwareFile])
@@ -1144,7 +1147,7 @@ export class EwtInstallDialog extends LitElement {
               .then(() => this.requestUpdate());
           }
         },
-        this.esploader!,
+        loaderToUse,
         this.logger,
         this.manifestPath,
         this._installErase,
@@ -1155,6 +1158,9 @@ export class EwtInstallDialog extends LitElement {
   }
 
   async _flashFilebuffer(fileBuffer: Uint8Array) {
+    // Use stub if available (e.g., after reading partitions), otherwise use parent loader
+    const loaderToUse = this._espStub || this.esploader!;
+
     flash(
       (state) => {
         this._installState = state;
@@ -1165,7 +1171,7 @@ export class EwtInstallDialog extends LitElement {
             .then(() => this.requestUpdate());
         }
       },
-      this.esploader!,
+      loaderToUse,
       this.logger,
       this.manifestPath,
       this._installErase,
