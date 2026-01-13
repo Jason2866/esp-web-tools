@@ -137,22 +137,13 @@ export const flash = async (
   });
 
   // Run the stub FIRST - needed for all flash operations
-  // Check if the esploader itself is already a stub (e.g., after reading partitions)
+  // Check if the esploader itself is already a stub (e.g., after _ensureStub())
   let espStub;
   if (esploader.IS_STUB) {
     logger.log("ESPLoader is already a stub, using it directly");
     espStub = esploader;
-
-    // Re-set baudrate even if stub already exists
-    // The partition read may have set a different baudrate
-    if (baudRate !== undefined && baudRate > 115200) {
-      try {
-        await espStub.setBaudrate(baudRate);
-        logger.log(`Baud rate re-set to ${baudRate} for existing stub`);
-      } catch (err: any) {
-        logger.log(`Could not re-set baud rate to ${baudRate}: ${err.message}`);
-      }
-    }
+    // DON'T set baudrate - it was already set in _ensureStub()
+    logger.log("Baudrate already configured, skipping");
   } else {
     logger.log("Running stub...");
     espStub = await esploader.runStub();

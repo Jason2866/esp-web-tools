@@ -96,6 +96,48 @@ export class EwtInstallDialog extends LitElement {
   // Track if Improv was already checked (to avoid repeated attempts)
   private _improvChecked = false;
 
+  // Ensure stub is initialized (called before any operation that needs it)
+  private async _ensureStub(): Promise<any> {
+    if (this._espStub && this._espStub.IS_STUB) {
+      this.logger.log("Using existing stub");
+      return this._espStub;
+    }
+
+    // Initialize if not already done
+    if (!this.esploader.chipFamily) {
+      this.logger.log("Initializing ESP loader...");
+      await this.esploader.initialize();
+      this.logger.log(`Found ${this.esploader.chipFamily}`);
+    }
+
+    // Check if esploader itself is already a stub
+    if (this.esploader.IS_STUB) {
+      this.logger.log("ESPLoader is already a stub, using it directly");
+      this._espStub = this.esploader;
+      return this._espStub;
+    }
+
+    // Run stub for all operations
+    this.logger.log("Running stub...");
+    const espStub = await this.esploader.runStub();
+    this._espStub = espStub;
+
+    // Set baudrate once (use user-selected baudrate if available)
+    if (this.baudRate && this.baudRate > 115200) {
+      this.logger.log(`Setting baudrate to ${this.baudRate}...`);
+      try {
+        await espStub.setBaudrate(this.baudRate);
+        this.logger.log(`Baudrate set to ${this.baudRate}`);
+      } catch (baudErr: any) {
+        this.logger.log(
+          `Failed to set baudrate: ${baudErr.message}, continuing with default`,
+        );
+      }
+    }
+
+    return this._espStub;
+  }
+
   // Helper to get port from esploader
   private get _port(): SerialPort {
     return this.esploader.port;
@@ -856,47 +898,8 @@ export class EwtInstallDialog extends LitElement {
     try {
       this.logger.log("Reading partition table from 0x8000...");
 
-      // Use existing esploader from connect.ts
-      if (!this.esploader) {
-        throw new Error("ESPLoader not initialized");
-      }
-
-      // Initialize if not already done
-      if (!this.esploader.chipFamily) {
-        this.logger.log("Initializing ESP loader...");
-        await this.esploader.initialize();
-        this.logger.log(`Found ${this.esploader.chipFamily}`);
-      }
-
-      // Run stub for flash operations - but only if not already running
-      let espStub;
-      if (this._espStub && this._espStub.IS_STUB) {
-        this.logger.log("Using existing stub");
-        espStub = this._espStub;
-      } else if (this.esploader.IS_STUB) {
-        this.logger.log("ESPLoader is already a stub, using it directly");
-        espStub = this.esploader;
-        this._espStub = espStub;
-      } else {
-        this.logger.log("Running stub...");
-        espStub = await this.esploader.runStub();
-        this._espStub = espStub;
-      }
-
-      // Set baudrate for reading flash (use user-selected baudrate if available)
-      if (this.baudRate && this.baudRate > 115200) {
-        this.logger.log(
-          `Setting baudrate to ${this.baudRate} for flash reading...`,
-        );
-        try {
-          await espStub.setBaudrate(this.baudRate);
-          this.logger.log(`Baudrate set to ${this.baudRate}`);
-        } catch (baudErr: any) {
-          this.logger.log(
-            `Failed to set baudrate: ${baudErr.message}, continuing with default`,
-          );
-        }
-      }
+      // Ensure stub is initialized
+      const espStub = await this._ensureStub();
 
       // Add a small delay after stub is running
       await sleep(100);
@@ -1183,10 +1186,11 @@ export class EwtInstallDialog extends LitElement {
     }
     this._client = undefined;
 
-    // Don't reset anything - let flash() handle the existing state
-    // If we came from partition read, the stub is already running
-    // Use the stub if available, otherwise use parent loader
-    const loaderToUse = this._espStub || this.esploader!;
+    // Ensure stub is initialized before flash
+    await this._ensureStub();
+
+    // Use the stub for flash
+    const loaderToUse = this._espStub!;
 
     if (this.firmwareFile != undefined) {
       // If a uploaded File was provided -> create Uint8Array of content
@@ -1216,8 +1220,8 @@ export class EwtInstallDialog extends LitElement {
   }
 
   async _flashFilebuffer(fileBuffer: Uint8Array) {
-    // Use the stub if available, otherwise use parent loader
-    const loaderToUse = this._espStub || this.esploader!;
+    // Stub is already ensured in _confirmInstall
+    const loaderToUse = this._espStub!;
 
     flash(
       (state) => {
