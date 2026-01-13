@@ -1214,6 +1214,14 @@ export class EwtInstallDialog extends LitElement {
       }
     }
 
+    // ALWAYS skip Improv on Android - it causes connection issues
+    if (this._isAndroid) {
+      this.logger.log("Skipping Improv on Android (WebUSB) - not supported");
+      this._client = null;
+      this._improvChecked = true;
+      return;
+    }
+
     // Skip Improv if requested (e.g., when returning from console or filesystem manager)
     if (skipImprov) {
       this.logger.log("Skipping Improv test (not needed for this operation)");
@@ -1351,12 +1359,16 @@ export class EwtInstallDialog extends LitElement {
                 } catch (resetErr: any) {
                   this.logger.log(`Hard reset failed: ${resetErr.message}`);
                 }
+
+                // Test Improv with new firmware (Desktop only)
+                await this._initialize(true);
               } else {
                 this.logger.log("Skipping hard reset on Android (WebUSB)");
+                // On Android, skip Improv completely
+                this._client = null;
+                this._improvChecked = true;
               }
-
-              // Test Improv with new firmware
-              await this._initialize(true);
+              
               this.requestUpdate();
             });
           }
@@ -1416,12 +1428,16 @@ export class EwtInstallDialog extends LitElement {
               } catch (resetErr: any) {
                 this.logger.log(`Hard reset failed: ${resetErr.message}`);
               }
+
+              // Test Improv with new firmware (Desktop only)
+              await this._initialize(true);
             } else {
               this.logger.log("Skipping hard reset on Android (WebUSB)");
+              // On Android, skip Improv completely
+              this._client = null;
+              this._improvChecked = true;
             }
-
-            // Test Improv with new firmware
-            await this._initialize(true);
+            
             this.requestUpdate();
           });
         }

@@ -144,31 +144,11 @@ export const flash = async (
   if (!espStub.chipFamily) {
     logger.error("Stub missing chipFamily - this should not happen!");
     fireStateEvent({
-      state: FlashStateType.ERASING,
-      message: "Erasing flash...",
-      details: { done: false },
+      state: FlashStateType.ERROR,
+      message: "Internal error: Stub not properly initialized",
+      details: { error: FlashError.FAILED_INITIALIZING, details: "Missing chipFamily" },
     });
-
-    try {
-      logger.log("Erasing flash memory...");
-      await espStub.eraseFlash();
-      logger.log("Flash erased successfully");
-
-      fireStateEvent({
-        state: FlashStateType.ERASING,
-        message: "Flash erased",
-        details: { done: true },
-      });
-    } catch (err: any) {
-      logger.error(`Flash erase failed: ${err.message}`);
-      fireStateEvent({
-        state: FlashStateType.ERROR,
-        message: `Failed to erase flash: ${err.message}`,
-        details: { error: FlashError.WRITE_FAILED, details: err },
-      });
-      await esploader.disconnect();
-      return;
-    }
+    return;
   }
 
   logger.log(
