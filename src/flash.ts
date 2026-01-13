@@ -54,21 +54,24 @@ export const flash = async (
     details: { done: false },
   });
 
-  try {
-    await esploader.initialize();
-  } catch (err: any) {
-    logger.error(err);
+  // Only initialize if not already done
+  if (!esploader.chipFamily) {
+    try {
+      await esploader.initialize();
+    } catch (err: any) {
+      logger.error(err);
 
-    fireStateEvent({
-      state: FlashStateType.ERROR,
-      message:
-        "Failed to initialize. Try resetting your device or holding the BOOT button while clicking INSTALL.",
-      details: { error: FlashError.FAILED_INITIALIZING, details: err },
-    });
-    if (esploader.connected) {
-      await esploader.disconnect();
+      fireStateEvent({
+        state: FlashStateType.ERROR,
+        message:
+          "Failed to initialize. Try resetting your device or holding the BOOT button while clicking INSTALL.",
+        details: { error: FlashError.FAILED_INITIALIZING, details: err },
+      });
+      if (esploader.connected) {
+        await esploader.disconnect();
+      }
+      return;
     }
-    return;
   }
 
   chipFamily = getChipFamilyName(esploader);
