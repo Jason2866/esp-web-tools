@@ -43,6 +43,14 @@ const loadWebUSBSerial = async (): Promise<void> => {
 
 export const connect = async (button: InstallButton) => {
   import("./install-dialog.js");
+  import("./components/ewt-debug-log.js");
+
+  // Create debug log FIRST - it stays visible always
+  let debugLog = document.querySelector("ewt-debug-log");
+  if (!debugLog) {
+    debugLog = document.createElement("ewt-debug-log");
+    document.body.appendChild(debugLog);
+  }
 
   // Android: Load WebUSB support first
   if (isAndroid() && "usb" in navigator) {

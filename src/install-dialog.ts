@@ -156,12 +156,11 @@ export class EwtInstallDialog extends LitElement {
           : ""}
         ${content!}
       </ewt-dialog>
-      <ewt-debug-log></ewt-debug-log>
     `;
   }
 
   private get _debugLog(): EwtDebugLog | null {
-    return this.shadowRoot?.querySelector("ewt-debug-log") || null;
+    return document.querySelector("ewt-debug-log");
   }
 
   _renderProgress(label: string | TemplateResult, progress?: number) {
