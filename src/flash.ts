@@ -166,12 +166,12 @@ export const flash = async (
       message: "Erasing flash...",
       details: { done: false },
     });
-    
+
     try {
       logger.log("Erasing flash memory...");
       await espStub.eraseFlash();
       logger.log("Flash erased successfully");
-      
+
       fireStateEvent({
         state: FlashStateType.ERASING,
         message: "Flash erased",
