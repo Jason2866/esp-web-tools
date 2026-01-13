@@ -24,10 +24,11 @@ export class EwtDebugLog extends LitElement {
       color: #fff;
       font-family: monospace;
       font-size: 12px;
-      z-index: 10000;
+      z-index: 999999;
       max-height: 40vh;
       overflow: hidden;
       border-top: 2px solid #333;
+      pointer-events: auto;
     }
 
     .header {
@@ -113,10 +114,15 @@ export class EwtDebugLog extends LitElement {
       border-radius: 3px;
       cursor: pointer;
       font-size: 11px;
+      pointer-events: auto;
     }
 
     button:hover {
       background: #555;
+    }
+
+    button:active {
+      background: #666;
     }
 
     .collapsed .logs {
@@ -154,7 +160,8 @@ export class EwtDebugLog extends LitElement {
     this._expanded = !this._expanded;
   }
 
-  private _copyLogs() {
+  private _copyLogs(e: Event) {
+    e.stopPropagation();
     const text = this._logs
       .map(
         (log) =>
@@ -164,6 +171,12 @@ export class EwtDebugLog extends LitElement {
     navigator.clipboard.writeText(text).then(() => {
       alert("Logs copied to clipboard!");
     });
+  }
+
+  private _clearLogs(e: Event) {
+    e.stopPropagation();
+    this._logs = [];
+    this.requestUpdate();
   }
 
   render() {
@@ -186,9 +199,9 @@ export class EwtDebugLog extends LitElement {
                 >`
               : ""}
           </div>
-          <div class="buttons" @click=${(e: Event) => e.stopPropagation()}>
+          <div class="buttons">
             <button @click=${this._copyLogs}>Copy</button>
-            <button @click=${this.clear}>Clear</button>
+            <button @click=${this._clearLogs}>Clear</button>
             <span class="count">${this._logs.length} entries</span>
           </div>
         </div>
