@@ -850,7 +850,14 @@ export class EwtInstallDialog extends LitElement {
         throw new Error("ESPLoader not initialized");
       }
 
-      // Always run stub for flash operations
+      // Initialize if not already done
+      if (!this.esploader.chipFamily) {
+        this.logger.log("Initializing ESP loader...");
+        await this.esploader.initialize();
+        this.logger.log(`Found ${this.esploader.chipFamily}`);
+      }
+
+      // Run stub for flash operations
       this.logger.log("Running stub...");
       const espStub = await this.esploader.runStub();
       this._espStub = espStub;
