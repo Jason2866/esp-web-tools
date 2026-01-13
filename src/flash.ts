@@ -271,11 +271,6 @@ export const flash = async (
 
   await sleep(100);
 
-  logger.log("Hard resetting device...");
-  await espStub.hardReset();
-
-  await sleep(100);
-
   fireStateEvent({
     state: FlashStateType.FINISHED,
     message: "All done!",
