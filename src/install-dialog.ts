@@ -865,10 +865,20 @@ export class EwtInstallDialog extends LitElement {
         this.logger.log(`Found ${this.esploader.chipFamily}`);
       }
 
-      // Run stub for flash operations
-      this.logger.log("Running stub...");
-      const espStub = await this.esploader.runStub();
-      this._espStub = espStub;
+      // Run stub for flash operations - but only if not already running
+      let espStub;
+      if (this._espStub && this._espStub.IS_STUB) {
+        this.logger.log("Using existing stub");
+        espStub = this._espStub;
+      } else if (this.esploader.IS_STUB) {
+        this.logger.log("ESPLoader is already a stub, using it directly");
+        espStub = this.esploader;
+        this._espStub = espStub;
+      } else {
+        this.logger.log("Running stub...");
+        espStub = await this.esploader.runStub();
+        this._espStub = espStub;
+      }
 
       // Set baudrate for reading flash (use user-selected baudrate if available)
       if (this.baudRate && this.baudRate > 115200) {
