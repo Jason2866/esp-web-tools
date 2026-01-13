@@ -906,6 +906,26 @@ export class EwtInstallDialog extends LitElement {
 
       this._state = "ERROR";
     } finally {
+      // Release reader and writer locks so the port can be used again
+      // (e.g., for Install Firmware after viewing partitions)
+      try {
+        const reader = this.esploader._reader;
+        const writer = this.esploader._writer;
+
+        if (reader) {
+          await reader.cancel();
+          reader.releaseLock();
+          this.logger.log("Reader released after partition read");
+        }
+
+        if (writer) {
+          writer.releaseLock();
+          this.logger.log("Writer lock released after partition read");
+        }
+      } catch (err) {
+        this.logger.log("Could not release reader/writer:", err);
+      }
+
       this._busy = false;
     }
   }
