@@ -68,13 +68,13 @@ export class EwtDebugLog extends LitElement {
       minute: "2-digit",
       second: "2-digit",
     });
-    
+
     this._logs = [
       ...this._logs.slice(-this._maxLogs + 1),
       `[${timestamp}] ${level.toUpperCase()}: ${message}`,
     ];
     this.requestUpdate();
-    
+
     // Auto-scroll to bottom
     setTimeout(() => {
       const logsDiv = this.shadowRoot?.querySelector(".logs");
@@ -88,12 +88,14 @@ export class EwtDebugLog extends LitElement {
     return html`
       <div class="header">🐛 Debug Log (${this._logs.length})</div>
       <div class="logs">
-        ${this._logs.map(
-          (log) => {
-            const level = log.includes("ERROR:") ? "error" : log.includes("WARN:") ? "warn" : "log";
-            return html`<div class="log-entry ${level}">${log}</div>`;
-          }
-        )}
+        ${this._logs.map((log) => {
+          const level = log.includes("ERROR:")
+            ? "error"
+            : log.includes("WARN:")
+              ? "warn"
+              : "log";
+          return html`<div class="log-entry ${level}">${log}</div>`;
+        })}
       </div>
     `;
   }
