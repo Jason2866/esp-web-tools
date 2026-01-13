@@ -272,11 +272,13 @@ export const flash = async (
   await sleep(100);
 
   // Release the reader so Improv can use the port
-  // Don't disconnect completely, just stop reading
+  // Access private _reader property (it exists but is private)
   try {
-    if (espStub.transport && espStub.transport.reader) {
-      await espStub.transport.reader.cancel();
-      espStub.transport.reader.releaseLock();
+    const reader = (espStub as any)._reader;
+    if (reader) {
+      await reader.cancel();
+      reader.releaseLock();
+      logger.log("Reader released successfully");
     }
   } catch (err) {
     logger.log("Could not release reader:", err);
