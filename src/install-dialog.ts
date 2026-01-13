@@ -96,6 +96,12 @@ export class EwtInstallDialog extends LitElement {
   // Track if Improv was already checked (to avoid repeated attempts)
   private _improvChecked = false;
 
+  // Check if running on Android with WebUSB
+  private get _isAndroid(): boolean {
+    const port = this.esploader?.port as any;
+    return port?.isWebUSB === true;
+  }
+
   // Ensure stub is initialized (called before any operation that needs it)
   private async _ensureStub(): Promise<any> {
     if (this._espStub && this._espStub.IS_STUB) {
@@ -1337,11 +1343,16 @@ export class EwtInstallDialog extends LitElement {
               this.logger.log("ESP state reset for Improv test");
 
               // Hard reset the ESP to boot into new firmware
-              try {
-                await this.esploader.hardReset();
-                this.logger.log("ESP hard reset complete");
-              } catch (resetErr: any) {
-                this.logger.log(`Hard reset failed: ${resetErr.message}`);
+              // SKIP on Android - hardReset destroys the WebUSB connection
+              if (!this._isAndroid) {
+                try {
+                  await this.esploader.hardReset();
+                  this.logger.log("ESP hard reset complete");
+                } catch (resetErr: any) {
+                  this.logger.log(`Hard reset failed: ${resetErr.message}`);
+                }
+              } else {
+                this.logger.log("Skipping hard reset on Android (WebUSB)");
               }
 
               // Test Improv with new firmware
@@ -1397,11 +1408,16 @@ export class EwtInstallDialog extends LitElement {
             this.logger.log("ESP state reset for Improv test");
 
             // Hard reset the ESP to boot into new firmware
-            try {
-              await this.esploader.hardReset();
-              this.logger.log("ESP hard reset complete");
-            } catch (resetErr: any) {
-              this.logger.log(`Hard reset failed: ${resetErr.message}`);
+            // SKIP on Android - hardReset destroys the WebUSB connection
+            if (!this._isAndroid) {
+              try {
+                await this.esploader.hardReset();
+                this.logger.log("ESP hard reset complete");
+              } catch (resetErr: any) {
+                this.logger.log(`Hard reset failed: ${resetErr.message}`);
+              }
+            } else {
+              this.logger.log("Skipping hard reset on Android (WebUSB)");
             }
 
             // Test Improv with new firmware
