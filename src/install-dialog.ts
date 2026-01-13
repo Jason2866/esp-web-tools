@@ -92,7 +92,7 @@ export class EwtInstallDialog extends LitElement {
   @state() private _partitions?: Partition[];
   @state() private _selectedPartition?: Partition;
   @state() private _espStub?: any;
-  
+
   // Track if Improv was already checked (to avoid repeated attempts)
   private _improvChecked = false;
 
