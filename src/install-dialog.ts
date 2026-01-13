@@ -336,7 +336,7 @@ export class EwtInstallDialog extends LitElement {
                 await this._closeClientWithoutEvents(this._client);
                 this._client = undefined;
               }
-              
+
               // If we just checked Improv (whether it worked or not), we need to reset
               // ESP state to put it back into bootloader mode
               if (this._improvChecked) {
@@ -344,9 +344,11 @@ export class EwtInstallDialog extends LitElement {
                 this.esploader.IS_STUB = false;
                 this.esploader.chipFamily = null;
                 this._improvChecked = false; // Clear flag so we don't reset again
-                this.logger.log("ESP state reset - will re-initialize for filesystem access");
+                this.logger.log(
+                  "ESP state reset - will re-initialize for filesystem access",
+                );
               }
-              
+
               this._state = "PARTITIONS";
               this._readPartitionTable();
             }}
@@ -424,7 +426,7 @@ export class EwtInstallDialog extends LitElement {
                 await this._closeClientWithoutEvents(this._client);
                 this._client = undefined;
               }
-              
+
               // If we just checked Improv (whether it worked or not), we need to reset
               // ESP state to put it back into bootloader mode
               if (this._improvChecked) {
@@ -432,9 +434,11 @@ export class EwtInstallDialog extends LitElement {
                 this.esploader.IS_STUB = false;
                 this.esploader.chipFamily = null;
                 this._improvChecked = false; // Clear flag so we don't reset again
-                this.logger.log("ESP state reset - will re-initialize for filesystem access");
+                this.logger.log(
+                  "ESP state reset - will re-initialize for filesystem access",
+                );
               }
-              
+
               this._state = "PARTITIONS";
               this._readPartitionTable();
             }}
@@ -1186,19 +1190,19 @@ export class EwtInstallDialog extends LitElement {
       } else {
         this._client = null; // not supported
         this.logger.error("Improv initialization failed.", err);
-        
+
         // IMMER wenn Improv fehlschlägt: Port schließen und neu öffnen
         // (wie beim initialen Connect - behandelt Device als neu verbunden)
         this.logger.log("Closing port for reconnect after Improv failure...");
         try {
           await this._port.close();
           this.logger.log("Port closed");
-          
+
           await sleep(100);
-          
+
           await this._port.open({ baudRate: 115200 });
           this.logger.log("Port reopened - device ready as new connection");
-          
+
           // Reset ESP state completely
           this._espStub = undefined;
           this.esploader.IS_STUB = false;
