@@ -112,21 +112,9 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log(`Found ${this.esploader.chipFamily}`);
     }
 
-    // Save chipFamily and other properties before running stub
-    const chipFamily = this.esploader.chipFamily;
-    const chipName = this.esploader.chipName;
-    const chipRevision = this.esploader.chipRevision;
-    const chipVariant = this.esploader.chipVariant;
-
-    // Always run stub - esploader itself is never a stub
+    // Run stub - chip properties are now automatically inherited from parent
     this.logger.log("Running stub...");
     const espStub = await this.esploader.runStub();
-
-    // CRITICAL: Copy properties from parent to stub (library bug - these are not inherited)
-    espStub.chipFamily = chipFamily;
-    espStub.chipName = chipName;
-    espStub.chipRevision = chipRevision;
-    espStub.chipVariant = chipVariant;
 
     this.logger.log(
       `Stub created: IS_STUB=${espStub.IS_STUB}, chipFamily=${espStub.chipFamily}`,
