@@ -1133,7 +1133,7 @@ import{l as e,o as t,_ as i,n as o,B as n,i as r,a as d,t as a,e as l,b as s,R a
           label="Back"
           @click=${()=>{this._state="DASHBOARD"}}
         ></ewt-button>
-      `,["Partition Table",e,!1]}_renderLittleFS(){return[undefined,m`
+      `,["Partition Table",e,!1]}_renderLittleFS(){return[void 0,m`
       <ewt-littlefs-manager
         .partition=${this._selectedPartition}
         .espStub=${this._espStub}
