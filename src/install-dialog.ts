@@ -1016,7 +1016,7 @@ export class EwtInstallDialog extends LitElement {
       const partitions = parsePartitionTable(data);
 
       if (partitions.length === 0) {
-        this.logger.error("No valid partition table found");
+        this.logger.log("No valid partition table found");
         this._partitions = [];
       } else {
         this.logger.log(`Found ${partitions.length} partition(s)`);
@@ -1027,11 +1027,12 @@ export class EwtInstallDialog extends LitElement {
 
       if (e.message === "Port selection cancelled") {
         this._error = "Port selection cancelled";
+        this._state = "ERROR";
       } else {
-        this._error = `Failed to read partition table: ${e.message || e}. Try resetting your device.`;
+        // Don't throw exception, just show empty partition list
+        this.logger.log("Returning to partition view with no partitions");
+        this._partitions = [];
       }
-
-      this._state = "ERROR";
     } finally {
       // DON'T release reader/writer locks here!
       // Keep them so the stub remains usable for:
