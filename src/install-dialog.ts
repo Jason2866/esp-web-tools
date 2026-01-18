@@ -373,6 +373,27 @@ export class EwtInstallDialog extends LitElement {
                 this._client = undefined;
               }
 
+              // Release esploader reader/writer if locked
+              if (this.esploader._reader) {
+                try {
+                  await this.esploader._reader.cancel();
+                  this.esploader._reader.releaseLock();
+                  this.esploader._reader = undefined;
+                  this.logger.log("Reader released for filesystem access");
+                } catch (err) {
+                  this.logger.log("Could not release reader:", err);
+                }
+              }
+              if (this.esploader._writer) {
+                try {
+                  this.esploader._writer.releaseLock();
+                  this.esploader._writer = undefined;
+                  this.logger.log("Writer released for filesystem access");
+                } catch (err) {
+                  this.logger.log("Could not release writer:", err);
+                }
+              }
+
               // Reset ESP state to put it back into bootloader mode
               this._espStub = undefined;
               this.esploader.IS_STUB = false;
@@ -480,6 +501,27 @@ export class EwtInstallDialog extends LitElement {
               if (this._client) {
                 await this._closeClientWithoutEvents(this._client);
                 this._client = undefined;
+              }
+
+              // Release esploader reader/writer if locked
+              if (this.esploader._reader) {
+                try {
+                  await this.esploader._reader.cancel();
+                  this.esploader._reader.releaseLock();
+                  this.esploader._reader = undefined;
+                  this.logger.log("Reader released for filesystem access");
+                } catch (err) {
+                  this.logger.log("Could not release reader:", err);
+                }
+              }
+              if (this.esploader._writer) {
+                try {
+                  this.esploader._writer.releaseLock();
+                  this.esploader._writer = undefined;
+                  this.logger.log("Writer released for filesystem access");
+                } catch (err) {
+                  this.logger.log("Could not release writer:", err);
+                }
               }
 
               // Reset ESP state to put it back into bootloader mode
