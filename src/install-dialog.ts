@@ -1247,7 +1247,9 @@ export class EwtInstallDialog extends LitElement {
         await this._port.open({ baudRate: 115200 });
         this.logger.log("Port reopened at 115200 baud for Improv");
       } catch (portErr: any) {
-        this.logger.log(`Port reopen failed: ${portErr.message}, continuing anyway`);
+        this.logger.log(
+          `Port reopen failed: ${portErr.message}, continuing anyway`,
+        );
       }
     }
 
@@ -1268,7 +1270,7 @@ export class EwtInstallDialog extends LitElement {
       this._info = await client.initialize(timeout);
       this._client = client;
       client.addEventListener("disconnect", this._handleDisconnect);
-      
+
       // After successful Improv: prepare ESP for potential flash operations
       // Close Improv client and reopen port to reset ESP into bootloader mode
       if (!justInstalled) {
@@ -1276,15 +1278,15 @@ export class EwtInstallDialog extends LitElement {
           // CRITICAL: Close Improv client first to release reader lock
           await this._closeClientWithoutEvents(client);
           this.logger.log("Improv client closed");
-          
+
           await sleep(100);
-          
+
           await this._port.close();
           this.logger.log("Port closed after Improv test");
           await sleep(100);
           await this._port.open({ baudRate: 115200 });
           this.logger.log("Port reopened for bootloader mode");
-          
+
           // Reset ESP state so stub will be loaded fresh if needed
           this._espStub = undefined;
           this.esploader.IS_STUB = false;
@@ -1313,7 +1315,7 @@ export class EwtInstallDialog extends LitElement {
       } else {
         this._client = null; // not supported
         this.logger.error("Improv initialization failed.", err);
-        
+
         // After failed Improv: prepare ESP for flash operations anyway
         // Close and reopen port to reset ESP into bootloader mode
         if (!justInstalled) {
@@ -1323,7 +1325,7 @@ export class EwtInstallDialog extends LitElement {
             await sleep(100);
             await this._port.open({ baudRate: 115200 });
             this.logger.log("Port reopened for bootloader mode");
-            
+
             // Reset ESP state so stub will be loaded fresh if needed
             this._espStub = undefined;
             this.esploader.IS_STUB = false;
@@ -1403,19 +1405,23 @@ export class EwtInstallDialog extends LitElement {
                 try {
                   // Disconnect from bootloader stub (this also closes the port)
                   await this.esploader.disconnect();
-                  this.logger.log("ESP disconnected from bootloader (port closed)");
-                  
+                  this.logger.log(
+                    "ESP disconnected from bootloader (port closed)",
+                  );
+
                   // Wait a bit before reopening
                   await sleep(500);
-                  
+
                   // Reopen port for application firmware
                   await this._port.open({ baudRate: 115200 });
                   this.logger.log("Port reopened at 115200 baud");
-                  
+
                   // Wait for ESP to boot into application firmware
-                  this.logger.log("Waiting for ESP to boot into new firmware...");
+                  this.logger.log(
+                    "Waiting for ESP to boot into new firmware...",
+                  );
                   await sleep(3000);
-                  
+
                   // Check if we're receiving any data
                   this.logger.log("Checking for serial data...");
                   const reader = this._port.readable!.getReader();
@@ -1423,7 +1429,13 @@ export class EwtInstallDialog extends LitElement {
                     reader.read().then((result) => {
                       reader.releaseLock();
                       if (result.value && result.value.length > 0) {
-                        this.logger.log(`Received ${result.value.length} bytes from ESP: ${Array.from(result.value).map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
+                        this.logger.log(
+                          `Received ${result.value.length} bytes from ESP: ${Array.from(
+                            result.value,
+                          )
+                            .map((b) => b.toString(16).padStart(2, "0"))
+                            .join(" ")}`,
+                        );
                         return true;
                       }
                       this.logger.log("No data received from ESP");
@@ -1433,13 +1445,17 @@ export class EwtInstallDialog extends LitElement {
                       reader.releaseLock();
                       this.logger.log("Timeout waiting for data from ESP");
                       return false;
-                    })
+                    }),
                   ]);
-                  
+
                   if (checkData) {
-                    this.logger.log("ESP is sending data - proceeding with Improv test");
+                    this.logger.log(
+                      "ESP is sending data - proceeding with Improv test",
+                    );
                   } else {
-                    this.logger.log("No data from ESP - Improv may not be available");
+                    this.logger.log(
+                      "No data from ESP - Improv may not be available",
+                    );
                   }
                 } catch (resetErr: any) {
                   this.logger.log(`Port reopen failed: ${resetErr.message}`);
@@ -1510,19 +1526,21 @@ export class EwtInstallDialog extends LitElement {
               try {
                 // Disconnect from bootloader stub (this also closes the port)
                 await this.esploader.disconnect();
-                this.logger.log("ESP disconnected from bootloader (port closed)");
-                
+                this.logger.log(
+                  "ESP disconnected from bootloader (port closed)",
+                );
+
                 // Wait a bit before reopening
                 await sleep(500);
-                
+
                 // Reopen port for application firmware
                 await this._port.open({ baudRate: 115200 });
                 this.logger.log("Port reopened at 115200 baud");
-                
+
                 // Wait for ESP to boot into application firmware
                 this.logger.log("Waiting for ESP to boot into new firmware...");
                 await sleep(3000);
-                
+
                 // Check if we're receiving any data
                 this.logger.log("Checking for serial data...");
                 const reader = this._port.readable!.getReader();
@@ -1530,7 +1548,13 @@ export class EwtInstallDialog extends LitElement {
                   reader.read().then((result) => {
                     reader.releaseLock();
                     if (result.value && result.value.length > 0) {
-                      this.logger.log(`Received ${result.value.length} bytes from ESP: ${Array.from(result.value).map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
+                      this.logger.log(
+                        `Received ${result.value.length} bytes from ESP: ${Array.from(
+                          result.value,
+                        )
+                          .map((b) => b.toString(16).padStart(2, "0"))
+                          .join(" ")}`,
+                      );
                       return true;
                     }
                     this.logger.log("No data received from ESP");
@@ -1540,13 +1564,17 @@ export class EwtInstallDialog extends LitElement {
                     reader.releaseLock();
                     this.logger.log("Timeout waiting for data from ESP");
                     return false;
-                  })
+                  }),
                 ]);
-                
+
                 if (checkData) {
-                  this.logger.log("ESP is sending data - proceeding with Improv test");
+                  this.logger.log(
+                    "ESP is sending data - proceeding with Improv test",
+                  );
                 } else {
-                  this.logger.log("No data from ESP - Improv may not be available");
+                  this.logger.log(
+                    "No data from ESP - Improv may not be available",
+                  );
                 }
               } catch (resetErr: any) {
                 this.logger.log(`Port reopen failed: ${resetErr.message}`);
