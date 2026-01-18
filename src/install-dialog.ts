@@ -29,6 +29,7 @@ import { downloadManifest } from "./util/manifest";
 import { dialogStyles } from "./styles";
 import { parsePartitionTable, type Partition } from "./partition.js";
 import { detectFilesystemType } from "./util/partition.js";
+import { getChipFamilyName } from "./util/chip-family-name";
 
 const ERROR_ICON = "⚠️";
 const OK_ICON = "🎉";
@@ -104,7 +105,7 @@ export class EwtInstallDialog extends LitElement {
   private async _ensureStub(): Promise<any> {
     if (this._espStub && this._espStub.IS_STUB) {
       this.logger.log(
-        `Existing stub: IS_STUB=${this._espStub.IS_STUB}, chipFamily=${this._espStub.chipFamily}`,
+        `Existing stub: IS_STUB=${this._espStub.IS_STUB}, chipFamily=${getChipFamilyName(this._espStub)}`,
       );
       return this._espStub;
     }
@@ -113,7 +114,7 @@ export class EwtInstallDialog extends LitElement {
     if (!this.esploader.chipFamily) {
       this.logger.log("Initializing ESP loader...");
       await this.esploader.initialize();
-      this.logger.log(`Found ${this.esploader.chipFamily}`);
+      this.logger.log(`Found ${getChipFamilyName(this.esploader)}`);
     }
 
     // Run stub - chip properties are now automatically inherited from parent
@@ -121,7 +122,7 @@ export class EwtInstallDialog extends LitElement {
     const espStub = await this.esploader.runStub();
 
     this.logger.log(
-      `Stub created: IS_STUB=${espStub.IS_STUB}, chipFamily=${espStub.chipFamily}`,
+      `Stub created: IS_STUB=${espStub.IS_STUB}, chipFamily=${getChipFamilyName(espStub)}`,
     );
     this._espStub = espStub;
 
@@ -139,7 +140,7 @@ export class EwtInstallDialog extends LitElement {
     }
 
     this.logger.log(
-      `Returning stub: IS_STUB=${this._espStub.IS_STUB}, chipFamily=${this._espStub.chipFamily}`,
+      `Returning stub: IS_STUB=${this._espStub.IS_STUB}, chipFamily=${getChipFamilyName(this._espStub)}`,
     );
     return this._espStub;
   }
