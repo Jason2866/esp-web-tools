@@ -360,17 +360,14 @@ export class EwtInstallDialog extends LitElement {
                 this._client = undefined;
               }
 
-              // If we just checked Improv (whether it worked or not), we need to reset
-              // ESP state to put it back into bootloader mode
-              if (this._improvChecked) {
-                this._espStub = undefined;
-                this.esploader.IS_STUB = false;
-                this.esploader.chipFamily = null;
-                this._improvChecked = false; // Clear flag so we don't reset again
-                this.logger.log(
-                  "ESP state reset - will re-initialize for filesystem access",
-                );
-              }
+              // Reset ESP state to put it back into bootloader mode
+              this._espStub = undefined;
+              this.esploader.IS_STUB = false;
+              this.esploader.chipFamily = null;
+              this._improvChecked = false; // Clear flag so Improv will be re-tested
+              this.logger.log(
+                "ESP state reset - will re-initialize for filesystem access",
+              );
 
               this._state = "PARTITIONS";
               this._readPartitionTable();
@@ -472,17 +469,14 @@ export class EwtInstallDialog extends LitElement {
                 this._client = undefined;
               }
 
-              // If we just checked Improv (whether it worked or not), we need to reset
-              // ESP state to put it back into bootloader mode
-              if (this._improvChecked) {
-                this._espStub = undefined;
-                this.esploader.IS_STUB = false;
-                this.esploader.chipFamily = null;
-                this._improvChecked = false; // Clear flag so we don't reset again
-                this.logger.log(
-                  "ESP state reset - will re-initialize for filesystem access",
-                );
-              }
+              // Reset ESP state to put it back into bootloader mode
+              this._espStub = undefined;
+              this.esploader.IS_STUB = false;
+              this.esploader.chipFamily = null;
+              this._improvChecked = false; // Clear flag so Improv will be re-tested
+              this.logger.log(
+                "ESP state reset - will re-initialize for filesystem access",
+              );
 
               this._state = "PARTITIONS";
               this._readPartitionTable();
@@ -818,7 +812,7 @@ export class EwtInstallDialog extends LitElement {
           slot="primaryAction"
           label="Back"
           @click=${async () => {
-            this._initialize(false, true); // skipImprov = true
+            this._initialize(); // Re-test Improv after failed flash
             this._state = "DASHBOARD";
           }}
         ></ewt-button>
@@ -865,7 +859,7 @@ export class EwtInstallDialog extends LitElement {
           }
 
           this._state = "DASHBOARD";
-          this._initialize(false, true); // skipImprov = true (from console)
+          this._initialize(); // Re-test Improv after console
         }}
       ></ewt-button>
       <ewt-button
