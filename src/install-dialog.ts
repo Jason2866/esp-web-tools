@@ -1237,6 +1237,20 @@ export class EwtInstallDialog extends LitElement {
       return;
     }
 
+    // CRITICAL: Ensure port is at 115200 baud for Improv (no stub loaded yet!)
+    // Close and reopen at correct baud rate if not already at 115200
+    if (!justInstalled) {
+      try {
+        await this._port.close();
+        this.logger.log("Port closed for baud rate check");
+        await sleep(100);
+        await this._port.open({ baudRate: 115200 });
+        this.logger.log("Port reopened at 115200 baud for Improv");
+      } catch (portErr: any) {
+        this.logger.log(`Port reopen failed: ${portErr.message}, continuing anyway`);
+      }
+    }
+
     this._improvChecked = true;
     const client = new ImprovSerial(this._port, this.logger);
     client.addEventListener("state-changed", () => {
@@ -1254,6 +1268,32 @@ export class EwtInstallDialog extends LitElement {
       this._info = await client.initialize(timeout);
       this._client = client;
       client.addEventListener("disconnect", this._handleDisconnect);
+      
+      // After successful Improv: prepare ESP for potential flash operations
+      // Close Improv client and reopen port to reset ESP into bootloader mode
+      if (!justInstalled) {
+        try {
+          // CRITICAL: Close Improv client first to release reader lock
+          await this._closeClientWithoutEvents(client);
+          this.logger.log("Improv client closed");
+          
+          await sleep(100);
+          
+          await this._port.close();
+          this.logger.log("Port closed after Improv test");
+          await sleep(100);
+          await this._port.open({ baudRate: 115200 });
+          this.logger.log("Port reopened for bootloader mode");
+          
+          // Reset ESP state so stub will be loaded fresh if needed
+          this._espStub = undefined;
+          this.esploader.IS_STUB = false;
+          this.esploader.chipFamily = null;
+          this.logger.log("ESP state reset - ready for flash operations");
+        } catch (resetErr: any) {
+          this.logger.log(`ESP reset failed: ${resetErr.message}`);
+        }
+      }
     } catch (err: any) {
       // Clear old value
       this._info = undefined;
@@ -1273,10 +1313,27 @@ export class EwtInstallDialog extends LitElement {
       } else {
         this._client = null; // not supported
         this.logger.error("Improv initialization failed.", err);
+        
+        // After failed Improv: prepare ESP for flash operations anyway
+        // Close and reopen port to reset ESP into bootloader mode
+        if (!justInstalled) {
+          try {
+            await this._port.close();
+            this.logger.log("Port closed after failed Improv test");
+            await sleep(100);
+            await this._port.open({ baudRate: 115200 });
+            this.logger.log("Port reopened for bootloader mode");
+            
+            // Reset ESP state so stub will be loaded fresh if needed
+            this._espStub = undefined;
+            this.esploader.IS_STUB = false;
+            this.esploader.chipFamily = null;
+            this.logger.log("ESP state reset - ready for flash operations");
+          } catch (resetErr: any) {
+            this.logger.log(`ESP reset failed: ${resetErr.message}`);
+          }
+        }
       }
-
-      // Close Improv client to release its reader, but DON'T touch esploader locks
-      // The stub will be created on first use (partition read or flash) and kept forever
     }
   }
 
@@ -1340,14 +1397,52 @@ export class EwtInstallDialog extends LitElement {
               this.esploader._writer = undefined;
               this.logger.log("ESP state reset for Improv test");
 
-              // Hard reset the ESP to boot into new firmware
-              // SKIP on Android - hardReset destroys the WebUSB connection
+              // Reset ESP to boot into new firmware
+              // SKIP on Android - WebUSB connection handling is different
               if (!this._isAndroid) {
                 try {
-                  await this.esploader.hardReset();
-                  this.logger.log("ESP hard reset complete");
+                  // Disconnect from bootloader stub (this also closes the port)
+                  await this.esploader.disconnect();
+                  this.logger.log("ESP disconnected from bootloader (port closed)");
+                  
+                  // Wait a bit before reopening
+                  await sleep(500);
+                  
+                  // Reopen port for application firmware
+                  await this._port.open({ baudRate: 115200 });
+                  this.logger.log("Port reopened at 115200 baud");
+                  
+                  // Wait for ESP to boot into application firmware
+                  this.logger.log("Waiting for ESP to boot into new firmware...");
+                  await sleep(3000);
+                  
+                  // Check if we're receiving any data
+                  this.logger.log("Checking for serial data...");
+                  const reader = this._port.readable!.getReader();
+                  const checkData = await Promise.race([
+                    reader.read().then((result) => {
+                      reader.releaseLock();
+                      if (result.value && result.value.length > 0) {
+                        this.logger.log(`Received ${result.value.length} bytes from ESP: ${Array.from(result.value).map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
+                        return true;
+                      }
+                      this.logger.log("No data received from ESP");
+                      return false;
+                    }),
+                    sleep(1000).then(() => {
+                      reader.releaseLock();
+                      this.logger.log("Timeout waiting for data from ESP");
+                      return false;
+                    })
+                  ]);
+                  
+                  if (checkData) {
+                    this.logger.log("ESP is sending data - proceeding with Improv test");
+                  } else {
+                    this.logger.log("No data from ESP - Improv may not be available");
+                  }
                 } catch (resetErr: any) {
-                  this.logger.log(`Hard reset failed: ${resetErr.message}`);
+                  this.logger.log(`Port reopen failed: ${resetErr.message}`);
                 }
 
                 // Test Improv with new firmware (Desktop only)
@@ -1409,14 +1504,52 @@ export class EwtInstallDialog extends LitElement {
             this.esploader._writer = undefined;
             this.logger.log("ESP state reset for Improv test");
 
-            // Hard reset the ESP to boot into new firmware
-            // SKIP on Android - hardReset destroys the WebUSB connection
+            // Reset ESP to boot into new firmware
+            // SKIP on Android - WebUSB connection handling is different
             if (!this._isAndroid) {
               try {
-                await this.esploader.hardReset();
-                this.logger.log("ESP hard reset complete");
+                // Disconnect from bootloader stub (this also closes the port)
+                await this.esploader.disconnect();
+                this.logger.log("ESP disconnected from bootloader (port closed)");
+                
+                // Wait a bit before reopening
+                await sleep(500);
+                
+                // Reopen port for application firmware
+                await this._port.open({ baudRate: 115200 });
+                this.logger.log("Port reopened at 115200 baud");
+                
+                // Wait for ESP to boot into application firmware
+                this.logger.log("Waiting for ESP to boot into new firmware...");
+                await sleep(3000);
+                
+                // Check if we're receiving any data
+                this.logger.log("Checking for serial data...");
+                const reader = this._port.readable!.getReader();
+                const checkData = await Promise.race([
+                  reader.read().then((result) => {
+                    reader.releaseLock();
+                    if (result.value && result.value.length > 0) {
+                      this.logger.log(`Received ${result.value.length} bytes from ESP: ${Array.from(result.value).map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
+                      return true;
+                    }
+                    this.logger.log("No data received from ESP");
+                    return false;
+                  }),
+                  sleep(1000).then(() => {
+                    reader.releaseLock();
+                    this.logger.log("Timeout waiting for data from ESP");
+                    return false;
+                  })
+                ]);
+                
+                if (checkData) {
+                  this.logger.log("ESP is sending data - proceeding with Improv test");
+                } else {
+                  this.logger.log("No data from ESP - Improv may not be available");
+                }
               } catch (resetErr: any) {
-                this.logger.log(`Hard reset failed: ${resetErr.message}`);
+                this.logger.log(`Port reopen failed: ${resetErr.message}`);
               }
 
               // Test Improv with new firmware (Desktop only)
