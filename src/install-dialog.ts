@@ -176,7 +176,9 @@ export class EwtInstallDialog extends LitElement {
     if (
       this._client === undefined &&
       this._state !== "INSTALL" &&
-      this._state !== "LOGS"
+      this._state !== "LOGS" &&
+      this._state !== "PARTITIONS" &&
+      this._state !== "LITTLEFS"
     ) {
       if (this._error) {
         [heading, content, hideActions] = this._renderError(this._error);
@@ -957,8 +959,13 @@ export class EwtInstallDialog extends LitElement {
         <ewt-button
           slot="primaryAction"
           label="Back"
-          @click=${() => {
+          @click=${async () => {
+            // Reset ESP state when returning to dashboard
+            this._espStub = undefined;
+            this.esploader.IS_STUB = false;
+            this.esploader.chipFamily = null;
             this._state = "DASHBOARD";
+            await this._initialize();
           }}
         ></ewt-button>
       `;
@@ -1004,8 +1011,13 @@ export class EwtInstallDialog extends LitElement {
         <ewt-button
           slot="primaryAction"
           label="Back"
-          @click=${() => {
+          @click=${async () => {
+            // Reset ESP state when returning to dashboard
+            this._espStub = undefined;
+            this.esploader.IS_STUB = false;
+            this.esploader.chipFamily = null;
             this._state = "DASHBOARD";
+            await this._initialize();
           }}
         ></ewt-button>
       `;
@@ -1070,8 +1082,12 @@ export class EwtInstallDialog extends LitElement {
       if (e.message === "Port selection cancelled") {
         this._error = "Port selection cancelled";
         this._state = "ERROR";
+      } else if (e.message && e.message.includes("Failed to connect")) {
+        // Connection error - show error state so user can retry
+        this._error = e.message;
+        this._state = "ERROR";
       } else {
-        // Don't throw exception, just show empty partition list
+        // Other errors (like parsing errors) - just show empty partition list
         this.logger.log("Returning to partition view with no partitions");
         this._partitions = [];
       }
