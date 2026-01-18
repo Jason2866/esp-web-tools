@@ -154,10 +154,6 @@ export const flash = async (
     return;
   }
 
-  logger.log(
-    `Using stub: IS_STUB=${espStub.IS_STUB}, chipFamily=${espStub.chipFamily}`,
-  );
-
   // Fetch firmware files
   const filePromises = build.parts.map(async (part) => {
     const url = new URL(
