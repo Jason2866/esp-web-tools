@@ -856,7 +856,7 @@ import{l as e,o as t,_ as i,n as o,B as n,i as r,a,t as d,e as l,b as s,R as c,x
         <div>
           <ewt-button
             label="Manage Filesystem"
-            @click=${async()=>{this._client&&(await this._closeClientWithoutEvents(this._client),this._client=void 0),this._improvChecked&&(this._espStub=void 0,this.esploader.IS_STUB=!1,this.esploader.chipFamily=null,this._improvChecked=!1,this.logger.log("ESP state reset - will re-initialize for filesystem access")),this._state="PARTITIONS",this._readPartitionTable()}}
+            @click=${async()=>{this._client&&(await this._closeClientWithoutEvents(this._client),this._client=void 0),this._espStub=void 0,this.esploader.IS_STUB=!1,this.esploader.chipFamily=null,this._improvChecked=!1,this.logger.log("ESP state reset - will re-initialize for filesystem access"),this._state="PARTITIONS",this._readPartitionTable()}}
           ></ewt-button>
         </div>
         ${this._isSameFirmware&&this._manifest.funding_url?m`
@@ -900,7 +900,7 @@ import{l as e,o as t,_ as i,n as o,B as n,i as r,a,t as d,e as l,b as s,R as c,x
         <div>
           <ewt-button
             label="Manage Filesystem"
-            @click=${async()=>{this._client&&(await this._closeClientWithoutEvents(this._client),this._client=void 0),this._improvChecked&&(this._espStub=void 0,this.esploader.IS_STUB=!1,this.esploader.chipFamily=null,this._improvChecked=!1,this.logger.log("ESP state reset - will re-initialize for filesystem access")),this._state="PARTITIONS",this._readPartitionTable()}}
+            @click=${async()=>{this._client&&(await this._closeClientWithoutEvents(this._client),this._client=void 0),this._espStub=void 0,this.esploader.IS_STUB=!1,this.esploader.chipFamily=null,this._improvChecked=!1,this.logger.log("ESP state reset - will re-initialize for filesystem access"),this._state="PARTITIONS",this._readPartitionTable()}}
           ></ewt-button>
         </div>
       </div>
@@ -1049,7 +1049,7 @@ import{l as e,o as t,_ as i,n as o,B as n,i as r,a,t as d,e as l,b as s,R as c,x
         <ewt-button
           slot="primaryAction"
           label="Back"
-          @click=${async()=>{this._initialize(!1,!0),this._state="DASHBOARD"}}
+          @click=${async()=>{this._initialize(),this._state="DASHBOARD"}}
         ></ewt-button>
       `);else e="Installing",t=this._renderProgress("Preparing installation"),i=!0;else{e="Confirm Installation";const i=o?"update to":"install";t=m`
         ${o?m`Your device is running
@@ -1072,7 +1072,7 @@ import{l as e,o as t,_ as i,n as o,B as n,i as r,a,t as d,e as l,b as s,R as c,x
       <ewt-button
         slot="primaryAction"
         label="Back"
-        @click=${async()=>{await this.shadowRoot.querySelector("ewt-console").disconnect(),this.logger.log("Closing port for reconnect after console...");try{await this._port.close(),this.logger.log("Port closed"),await ee(250),await this._port.open({baudRate:115200}),this.logger.log("Port reopened"),await ee(250),this.logger.log("Device ready as new connection"),this._espStub=void 0,this.esploader.IS_STUB=!1,this.esploader.chipFamily=null,this.esploader._reader=void 0,this.esploader._writer=void 0}catch(e){this.logger.error(`Reconnect failed: ${e.message}`)}this._state="DASHBOARD",this._initialize(!1,!0)}}
+        @click=${async()=>{await this.shadowRoot.querySelector("ewt-console").disconnect(),this.logger.log("Closing port for reconnect after console...");try{await this._port.close(),this.logger.log("Port closed"),await ee(250),await this._port.open({baudRate:115200}),this.logger.log("Port reopened"),await ee(250),this.logger.log("Device ready as new connection"),this._espStub=void 0,this.esploader.IS_STUB=!1,this.esploader.chipFamily=null,this.esploader._reader=void 0,this.esploader._writer=void 0}catch(e){this.logger.error(`Reconnect failed: ${e.message}`)}this._state="DASHBOARD",this._initialize()}}
       ></ewt-button>
       <ewt-button
         slot="secondaryAction"
