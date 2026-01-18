@@ -856,7 +856,7 @@ import{l as e,o as t,_ as i,n as o,B as n,i as r,a,t as d,e as l,b as s,R as c,x
         <div>
           <ewt-button
             label="Manage Filesystem"
-            @click=${async()=>{this._client&&(await this._closeClientWithoutEvents(this._client),this._client=void 0),this._espStub=void 0,this.esploader.IS_STUB=!1,this.esploader.chipFamily=null,this._improvChecked=!1,this.logger.log("ESP state reset - will re-initialize for filesystem access"),this._state="PARTITIONS",this._readPartitionTable()}}
+            @click=${async()=>{if(this._client&&(await this._closeClientWithoutEvents(this._client),this._client=void 0),this.esploader._reader)try{await this.esploader._reader.cancel(),this.esploader._reader.releaseLock(),this.esploader._reader=void 0,this.logger.log("Reader released for filesystem access")}catch(e){this.logger.log("Could not release reader:",e)}if(this.esploader._writer)try{this.esploader._writer.releaseLock(),this.esploader._writer=void 0,this.logger.log("Writer released for filesystem access")}catch(e){this.logger.log("Could not release writer:",e)}this._espStub=void 0,this.esploader.IS_STUB=!1,this.esploader.chipFamily=null,this._improvChecked=!1,this.logger.log("ESP state reset - will re-initialize for filesystem access"),this._state="PARTITIONS",this._readPartitionTable()}}
           ></ewt-button>
         </div>
         ${this._isSameFirmware&&this._manifest.funding_url?m`
@@ -900,7 +900,7 @@ import{l as e,o as t,_ as i,n as o,B as n,i as r,a,t as d,e as l,b as s,R as c,x
         <div>
           <ewt-button
             label="Manage Filesystem"
-            @click=${async()=>{this._client&&(await this._closeClientWithoutEvents(this._client),this._client=void 0),this._espStub=void 0,this.esploader.IS_STUB=!1,this.esploader.chipFamily=null,this._improvChecked=!1,this.logger.log("ESP state reset - will re-initialize for filesystem access"),this._state="PARTITIONS",this._readPartitionTable()}}
+            @click=${async()=>{if(this._client&&(await this._closeClientWithoutEvents(this._client),this._client=void 0),this.esploader._reader)try{await this.esploader._reader.cancel(),this.esploader._reader.releaseLock(),this.esploader._reader=void 0,this.logger.log("Reader released for filesystem access")}catch(e){this.logger.log("Could not release reader:",e)}if(this.esploader._writer)try{this.esploader._writer.releaseLock(),this.esploader._writer=void 0,this.logger.log("Writer released for filesystem access")}catch(e){this.logger.log("Could not release writer:",e)}this._espStub=void 0,this.esploader.IS_STUB=!1,this.esploader.chipFamily=null,this._improvChecked=!1,this.logger.log("ESP state reset - will re-initialize for filesystem access"),this._state="PARTITIONS",this._readPartitionTable()}}
           ></ewt-button>
         </div>
       </div>
