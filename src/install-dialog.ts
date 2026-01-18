@@ -113,8 +113,21 @@ export class EwtInstallDialog extends LitElement {
     // Initialize if not already done
     if (!this.esploader.chipFamily) {
       this.logger.log("Initializing ESP loader...");
-      await this.esploader.initialize();
-      this.logger.log(`Found ${getChipFamilyName(this.esploader)}`);
+
+      try {
+        await this.esploader.initialize();
+        this.logger.log(`Found ${getChipFamilyName(this.esploader)}`);
+      } catch (err: any) {
+        this.logger.error(`Connection failed: ${err.message}`);
+        throw new Error(
+          `Failed to connect to ESP. ${err.message || "Unknown error"}.\n\n` +
+            `Please try:\n` +
+            `1. Press and hold the BOOT button on your ESP device\n` +
+            `2. Click OK to retry\n` +
+            `3. Release the BOOT button when flashing starts\n\n` +
+            `If that doesn't work, try unplugging and reconnecting your device.`,
+        );
+      }
     }
 
     // Run stub - chip properties are now automatically inherited from parent
@@ -1349,7 +1362,14 @@ export class EwtInstallDialog extends LitElement {
     this._client = undefined;
 
     // Ensure stub is initialized before flash
-    await this._ensureStub();
+    try {
+      await this._ensureStub();
+    } catch (err: any) {
+      // Connection failed - show error to user
+      this._state = "ERROR";
+      this._error = err.message;
+      return;
+    }
 
     // Use the stub for flash
     const loaderToUse = this._espStub!;
