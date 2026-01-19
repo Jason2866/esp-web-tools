@@ -950,8 +950,8 @@ export class EwtInstallDialog extends LitElement {
           }
 
           this._state = "DASHBOARD";
-          this._improvChecked = false; // Force Improv re-test after console (firmware may have changed)
-          await this._initialize(); // Re-test Improv after console
+          // Don't reset _improvChecked - console only reads, doesn't change firmware
+          await this._initialize();
         }}
       ></ewt-button>
       <ewt-button
@@ -1288,6 +1288,7 @@ export class EwtInstallDialog extends LitElement {
 
     // Set busy flag during initialization
     this._busy = true;
+    this.requestUpdate(); // Force UI update to disable buttons immediately
 
     // DON'T release locks here!
     // The stub will be created on first use and kept for all operations
