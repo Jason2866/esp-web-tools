@@ -281,7 +281,7 @@ export class EwtInstallDialog extends LitElement {
         await sleep(100);
         await this.esploader.setDTRWebUSB(false);
         await this.esploader.setRTSWebUSB(false);
-        await sleep(1000);
+        await sleep(200);
         this.logger.log("Device reset to bootloader (WebUSB/Android)");
       } else {
         // Desktop (Web Serial) - use Web Serial methods
@@ -290,7 +290,7 @@ export class EwtInstallDialog extends LitElement {
         await sleep(100);
         await this.esploader.setDTR(false);
         await this.esploader.setRTS(false);
-        await sleep(1000);
+        await sleep(200);
         this.logger.log("Device reset to bootloader (Web Serial/Desktop)");
       }
     } catch (err) {
@@ -1437,7 +1437,7 @@ export class EwtInstallDialog extends LitElement {
         // Reset ESP to FIRMWARE mode (needed if we were in bootloader mode)
         await this._resetDeviceAndReleaseLocks();
         this.logger.log("ESP reset to firmware mode for Improv test");
-        await sleep(500); // Wait for firmware to start
+        await sleep(100); // Wait for firmware to start
       } catch (e) {
         this.logger.log(`Reset to firmware failed, continuing anyway`);
       }
@@ -1473,7 +1473,7 @@ export class EwtInstallDialog extends LitElement {
           await this._resetToBootloaderAndReleaseLocks();
 
           // Wait for ESP to enter bootloader mode
-          await sleep(500);
+          await sleep(100);
 
           // Reset ESP state
           this._espStub = undefined;
@@ -1523,7 +1523,7 @@ export class EwtInstallDialog extends LitElement {
             await this._resetToBootloaderAndReleaseLocks();
 
             // Wait for ESP to enter bootloader mode
-            await sleep(500);
+            await sleep(100);
 
             // Reset ESP state
             this._espStub = undefined;
@@ -1620,81 +1620,14 @@ export class EwtInstallDialog extends LitElement {
               // SKIP on Android - WebUSB connection handling is different
               if (!this._isAndroid) {
                 try {
-                  // Disconnect from bootloader stub (this also closes the port)
-                  await this.esploader.disconnect();
+                  // Reset device and release locks to ensure clean state for new firmware
                   this.logger.log(
-                    "ESP disconnected from bootloader (port closed)",
+                    "Performing hardware reset to start new firmware...",
                   );
-
-                  // Wait a bit before reopening
-                  await sleep(500);
-
-                  // Reopen port for application firmware
-                  await this._port.open({ baudRate: 115200 });
-                  this.logger.log("Port reopened at 115200 baud");
-
-                  // Wait for ESP to boot into application firmware
-                  this.logger.log(
-                    "Waiting for ESP to boot into new firmware...",
-                  );
-                  await sleep(3000);
-
-                  // Check if we're receiving any data
-                  this.logger.log("Checking for serial data...");
-                  const reader = this._port.readable!.getReader();
-                  let released = false;
-                  const release = () => {
-                    if (!released) {
-                      released = true;
-                      reader.releaseLock();
-                    }
-                  };
-                  const checkData = await Promise.race([
-                    reader.read().then((result) => {
-                      release();
-                      if (result.value && result.value.length > 0) {
-                        this.logger.log(
-                          `Received ${result.value.length} bytes from ESP: ${Array.from(
-                            result.value,
-                          )
-                            .map((b) => b.toString(16).padStart(2, "0"))
-                            .join(" ")}`,
-                        );
-                        return true;
-                      }
-                      this.logger.log("No data received from ESP");
-                      return false;
-                    }),
-                    sleep(1000).then(async () => {
-                      try {
-                        await reader.cancel();
-                      } catch {}
-                      release();
-                      this.logger.log("Timeout waiting for data from ESP");
-                      return false;
-                    }),
-                  ]);
-
-                  if (checkData) {
-                    this.logger.log(
-                      "ESP is sending data - proceeding with Improv test",
-                    );
-                  } else {
-                    this.logger.log(
-                      "No data from ESP - Improv may not be available",
-                    );
-                  }
+                  await this._resetDeviceAndReleaseLocks();
                 } catch (resetErr: any) {
-                  this.logger.log(
-                    `Port reopen failed: ${resetErr.message}, continuing anyway`,
-                  );
+                  this.logger.log(`Hard reset failed: ${resetErr.message}`);
                 }
-
-                // Reset device and release locks to ensure clean state for new firmware
-                this.logger.log(
-                  "Performing hardware reset to start new firmware...",
-                );
-                await this._resetDeviceAndReleaseLocks();
 
                 // Test Improv with new firmware (Desktop only)
                 await this._initialize(true);
@@ -1759,70 +1692,13 @@ export class EwtInstallDialog extends LitElement {
             // SKIP on Android - WebUSB connection handling is different
             if (!this._isAndroid) {
               try {
-                // Disconnect from bootloader stub (this also closes the port)
-                await this.esploader.disconnect();
+                // Reset device and release locks to ensure clean state for new firmware
                 this.logger.log(
-                  "ESP disconnected from bootloader (port closed)",
+                  "Performing hardware reset to start new firmware...",
                 );
-
-                // Wait a bit before reopening
-                await sleep(500);
-
-                // Reopen port for application firmware
-                await this._port.open({ baudRate: 115200 });
-                this.logger.log("Port reopened at 115200 baud");
-
-                // Wait for ESP to boot into application firmware
-                this.logger.log("Waiting for ESP to boot into new firmware...");
-                await sleep(3000);
-
-                // Check if we're receiving any data
-                this.logger.log("Checking for serial data...");
-                const reader = this._port.readable!.getReader();
-                let released = false;
-                const release = () => {
-                  if (!released) {
-                    released = true;
-                    reader.releaseLock();
-                  }
-                };
-                const checkData = await Promise.race([
-                  reader.read().then((result) => {
-                    release();
-                    if (result.value && result.value.length > 0) {
-                      this.logger.log(
-                        `Received ${result.value.length} bytes from ESP: ${Array.from(
-                          result.value,
-                        )
-                          .map((b) => b.toString(16).padStart(2, "0"))
-                          .join(" ")}`,
-                      );
-                      return true;
-                    }
-                    this.logger.log("No data received from ESP");
-                    return false;
-                  }),
-                  sleep(1000).then(async () => {
-                    try {
-                      await reader.cancel();
-                    } catch {}
-                    release();
-                    this.logger.log("Timeout waiting for data from ESP");
-                    return false;
-                  }),
-                ]);
-
-                if (checkData) {
-                  this.logger.log(
-                    "ESP is sending data - proceeding with Improv test",
-                  );
-                } else {
-                  this.logger.log(
-                    "No data from ESP - Improv may not be available",
-                  );
-                }
+                await this._resetDeviceAndReleaseLocks();
               } catch (resetErr: any) {
-                this.logger.log(`Port reopen failed: ${resetErr.message}`);
+                this.logger.log(`Hard reset failed: ${resetErr.message}`);
               }
 
               // Test Improv with new firmware (Desktop only)
