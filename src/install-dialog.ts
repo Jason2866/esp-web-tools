@@ -202,10 +202,7 @@ export class EwtInstallDialog extends LitElement {
   private async _releaseReaderWriter() {
     if (this.esploader._reader) {
       try {
-        // Only cancel if reader is still active (not already released)
-        if (this.esploader._reader.locked !== false) {
-          await this.esploader._reader.cancel();
-        }
+        await this.esploader._reader.cancel();
         this.esploader._reader.releaseLock();
         this.esploader._reader = undefined;
         this.logger.log("Reader released");
