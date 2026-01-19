@@ -1468,7 +1468,7 @@ export class EwtInstallDialog extends LitElement {
           // CRITICAL: Close Improv client first to release reader lock
           await this._closeClientWithoutEvents(client);
           this.logger.log("Improv client closed");
-          await sleep(100);
+
           // Reset ESP to BOOTLOADER mode for flash operations
           await this._resetToBootloaderAndReleaseLocks();
 
