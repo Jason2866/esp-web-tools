@@ -483,6 +483,23 @@ export class EwtInstallDialog extends LitElement {
               // Also set `null` back to undefined.
               this._client = undefined;
 
+              // CRITICAL: Set baudrate back to 115200 for firmware communication
+              // The ESP stub might be at higher baudrate (e.g., 460800) for flashing
+              // But firmware console always runs at 115200
+              if (this._espStub && this._espStub._currentBaudRate !== 115200) {
+                this.logger.log(
+                  `Resetting baudrate from ${this._espStub._currentBaudRate} to 115200 for console...`,
+                );
+                try {
+                  await this._espStub.setBaudrate(115200);
+                  this.logger.log("Baudrate set to 115200 for console");
+                } catch (baudErr: any) {
+                  this.logger.log(
+                    `Failed to set baudrate to 115200: ${baudErr.message}`,
+                  );
+                }
+              }
+
               // Release esploader reader/writer if locked
               if (this.esploader._reader) {
                 try {
@@ -611,6 +628,23 @@ export class EwtInstallDialog extends LitElement {
             @click=${async () => {
               // Also set `null` back to undefined.
               this._client = undefined;
+
+              // CRITICAL: Set baudrate back to 115200 for firmware communication
+              // The ESP stub might be at higher baudrate (e.g., 460800) for flashing
+              // But firmware console always runs at 115200
+              if (this._espStub && this._espStub._currentBaudRate !== 115200) {
+                this.logger.log(
+                  `Resetting baudrate from ${this._espStub._currentBaudRate} to 115200 for console...`,
+                );
+                try {
+                  await this._espStub.setBaudrate(115200);
+                  this.logger.log("Baudrate set to 115200 for console");
+                } catch (baudErr: any) {
+                  this.logger.log(
+                    `Failed to set baudrate to 115200: ${baudErr.message}`,
+                  );
+                }
+              }
 
               // Release esploader reader/writer if locked
               if (this.esploader._reader) {
