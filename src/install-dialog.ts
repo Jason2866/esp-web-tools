@@ -107,6 +107,25 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log(
         `Existing stub: IS_STUB=${this._espStub.IS_STUB}, chipFamily=${getChipFamilyName(this._espStub)}`,
       );
+
+      // Ensure baudrate is set even if stub already exists
+      if (this.baudRate && this.baudRate > 115200) {
+        const currentBaud = this._espStub._currentBaudRate || 115200;
+        if (currentBaud !== this.baudRate) {
+          this.logger.log(
+            `Adjusting baudrate from ${currentBaud} to ${this.baudRate}...`,
+          );
+          try {
+            await this._espStub.setBaudrate(this.baudRate);
+            this.logger.log(`Baudrate set to ${this.baudRate}`);
+          } catch (baudErr: any) {
+            this.logger.log(
+              `Failed to set baudrate: ${baudErr.message}, continuing with current`,
+            );
+          }
+        }
+      }
+
       return this._espStub;
     }
 
@@ -177,16 +196,22 @@ export class EwtInstallDialog extends LitElement {
   }
 
   // Reset device and release locks - used when returning to dashboard or recovering from errors
+  // Reset device to FIRMWARE mode (normal execution)
   private async _resetDeviceAndReleaseLocks() {
     // Release esploader reader/writer if locked
     if (this.esploader._reader) {
       try {
-        await this.esploader._reader.cancel();
+        // Only cancel if reader is still active (not already released)
+        if (this.esploader._reader.locked !== false) {
+          await this.esploader._reader.cancel();
+        }
         this.esploader._reader.releaseLock();
         this.esploader._reader = undefined;
         this.logger.log("Reader released");
       } catch (err) {
-        this.logger.log("Could not release reader:", err);
+        // Reader might already be released - just clear the reference
+        this.esploader._reader = undefined;
+        this.logger.log("Reader already released or error:", err);
       }
     }
     if (this.esploader._writer) {
@@ -195,12 +220,59 @@ export class EwtInstallDialog extends LitElement {
         this.esploader._writer = undefined;
         this.logger.log("Writer released");
       } catch (err) {
-        this.logger.log("Could not release writer:", err);
+        // Writer might already be released - just clear the reference
+        this.esploader._writer = undefined;
+        this.logger.log("Writer already released or error:", err);
       }
     }
 
-    // Hardware reset to fix any connection issues
+    // Hardware reset to FIRMWARE mode (bootloader=false) and to fix connection issues
     // Use appropriate method based on platform (Desktop vs Android)
+    try {
+      await this.esploader.hardReset(false);
+      this.logger.log("Device reset to firmware mode");
+    } catch (err) {
+      this.logger.log("Could not reset device:", err);
+    }
+
+    // Reset ESP state
+    this._espStub = undefined;
+    this.esploader.IS_STUB = false;
+    this.esploader.chipFamily = null;
+  }
+
+  // Reset device to BOOTLOADER mode (for flashing) using DTR/RTS sequence
+  private async _resetToBootloaderAndReleaseLocks() {
+    // Release esploader reader/writer if locked
+    if (this.esploader._reader) {
+      try {
+        // Only cancel if reader is still active (not already released)
+        if (this.esploader._reader.locked !== false) {
+          await this.esploader._reader.cancel();
+        }
+        this.esploader._reader.releaseLock();
+        this.esploader._reader = undefined;
+        this.logger.log("Reader released");
+      } catch (err) {
+        // Reader might already be released - just clear the reference
+        this.esploader._reader = undefined;
+        this.logger.log("Reader already released or error:", err);
+      }
+    }
+    if (this.esploader._writer) {
+      try {
+        this.esploader._writer.releaseLock();
+        this.esploader._writer = undefined;
+        this.logger.log("Writer released");
+      } catch (err) {
+        // Writer might already be released - just clear the reference
+        this.esploader._writer = undefined;
+        this.logger.log("Writer already released or error:", err);
+      }
+    }
+
+    // Special DTR/RTS sequence to enter BOOTLOADER mode
+    // This is the bootloader entry sequence, NOT a simple reset!
     try {
       if (this._isAndroid) {
         // Android (WebUSB) - use WebUSB-specific methods
@@ -210,7 +282,7 @@ export class EwtInstallDialog extends LitElement {
         await this.esploader.setDTRWebUSB(false);
         await this.esploader.setRTSWebUSB(false);
         await sleep(1000);
-        this.logger.log("Device reset (WebUSB/Android)");
+        this.logger.log("Device reset to bootloader (WebUSB/Android)");
       } else {
         // Desktop (Web Serial) - use Web Serial methods
         await this.esploader.setDTR(false);
@@ -219,10 +291,10 @@ export class EwtInstallDialog extends LitElement {
         await this.esploader.setDTR(false);
         await this.esploader.setRTS(false);
         await sleep(1000);
-        this.logger.log("Device reset (Web Serial/Desktop)");
+        this.logger.log("Device reset to bootloader (Web Serial/Desktop)");
       }
     } catch (err) {
-      this.logger.log("Could not reset device:", err);
+      this.logger.log("Could not reset device to bootloader:", err);
     }
 
     // Reset ESP state
@@ -960,18 +1032,9 @@ export class EwtInstallDialog extends LitElement {
           await this.shadowRoot!.querySelector("ewt-console")!.disconnect();
 
           // Complete re-init like new connection (but without Improv)
-          this.logger.log("Closing port for reconnect after console...");
+          this.logger.log("Reset and Release locks...");
           try {
-            await this._port.close();
-            this.logger.log("Port closed");
-
-            await sleep(250);
-
-            await this._port.open({ baudRate: 115200 });
-            this.logger.log("Port reopened");
-
-            await sleep(250);
-            this.logger.log("Device ready as new connection");
+            await this._resetDeviceAndReleaseLocks();
 
             // Reset ESP state completely
             this._espStub = undefined;
@@ -1367,19 +1430,16 @@ export class EwtInstallDialog extends LitElement {
       return;
     }
 
-    // CRITICAL: Ensure port is at 115200 baud for Improv (no stub loaded yet!)
-    // Close and reopen at correct baud rate if not already at 115200
+    // Port is at 115200 baud for Improv (no stub loaded yet!)
+    // If not just installed, reset ESP to firmware mode to ensure firmware is running
     if (!justInstalled) {
       try {
-        await this._port.close();
-        this.logger.log("Port closed for baud rate check");
-        await sleep(100);
-        await this._port.open({ baudRate: 115200 });
-        this.logger.log("Port reopened at 115200 baud for Improv");
-      } catch (portErr: any) {
-        this.logger.log(
-          `Port reopen failed: ${portErr.message}, continuing anyway`,
-        );
+        // Reset ESP to FIRMWARE mode (needed if we were in bootloader mode)
+        await this._resetDeviceAndReleaseLocks();
+        this.logger.log("ESP reset to firmware mode for Improv test");
+        await sleep(500); // Wait for firmware to start
+      } catch (e) {
+        this.logger.log(`Reset to firmware failed, continuing anyway`);
       }
     }
 
@@ -1408,20 +1468,29 @@ export class EwtInstallDialog extends LitElement {
           // CRITICAL: Close Improv client first to release reader lock
           await this._closeClientWithoutEvents(client);
           this.logger.log("Improv client closed");
-
           await sleep(100);
+          // Reset ESP to BOOTLOADER mode for flash operations
+          await this._resetToBootloaderAndReleaseLocks();
 
-          await this._port.close();
-          this.logger.log("Port closed after Improv test");
-          await sleep(100);
-          await this._port.open({ baudRate: 115200 });
-          this.logger.log("Port reopened for bootloader mode");
+          // Wait for ESP to enter bootloader mode
+          await sleep(500);
 
-          // Reset ESP state so stub will be loaded fresh if needed
+          // Reset ESP state
           this._espStub = undefined;
           this.esploader.IS_STUB = false;
           this.esploader.chipFamily = null;
-          this.logger.log("ESP state reset - ready for stub operations");
+          // Ensure stub is initialized
+          try {
+            await this._ensureStub();
+          } catch (err: any) {
+            // Stub load failed - show error to user
+            this._state = "ERROR";
+            this._error = err.message;
+            return;
+          }
+          this.logger.log(
+            "ESP reseted, stub loaded - ready for flash operations",
+          );
         } catch (resetErr: any) {
           this.logger.log(`ESP reset failed: ${resetErr.message}`);
         }
@@ -1447,20 +1516,31 @@ export class EwtInstallDialog extends LitElement {
         this.logger.error("Improv initialization failed.", err);
 
         // After failed Improv: prepare ESP for flash operations anyway
-        // Close and reopen port to reset ESP into bootloader mode
+        // Reset ESP into bootloader mode and load stub
         if (!justInstalled) {
           try {
-            await this._port.close();
-            this.logger.log("Port closed after failed Improv test");
-            await sleep(100);
-            await this._port.open({ baudRate: 115200 });
-            this.logger.log("Port reopened for bootloader mode");
+            // Reset ESP to BOOTLOADER mode for flash operations
+            await this._resetToBootloaderAndReleaseLocks();
 
-            // Reset ESP state so stub will be loaded fresh if needed
+            // Wait for ESP to enter bootloader mode
+            await sleep(500);
+
+            // Reset ESP state
             this._espStub = undefined;
             this.esploader.IS_STUB = false;
             this.esploader.chipFamily = null;
-            this.logger.log("ESP state reset - ready for stub operations");
+            // Ensure stub is initialized
+            try {
+              await this._ensureStub();
+            } catch (err: any) {
+              // Stub load failed - show error to user
+              this._state = "ERROR";
+              this._error = err.message;
+              return;
+            }
+            this.logger.log(
+              "ESP reseted, stub loaded - ready for flash operations",
+            );
           } catch (resetErr: any) {
             this.logger.log(`ESP reset failed: ${resetErr.message}`);
           }
