@@ -136,11 +136,27 @@ export class EwtInstallDialog extends LitElement {
     if (!this.esploader.chipFamily) {
       this.logger.log("Initializing ESP loader...");
 
-      try {
-        await this.esploader.initialize();
-        this.logger.log(`Found ${getChipFamilyName(this.esploader)}`);
-      } catch (err: any) {
-        this.logger.error(`Connection failed to stub: ${err.message}`);
+      // Try twice before giving up
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          if (attempt > 1) {
+            this.logger.log(`Retry attempt ${attempt}/2...`);
+            await sleep(500); // Wait before retry
+          }
+          await this.esploader.initialize();
+          this.logger.log(`Found ${getChipFamilyName(this.esploader)}`);
+          break; // Success!
+        } catch (err: any) {
+          this.logger.error(
+            `Connection failed to stub (attempt ${attempt}/2): ${err.message}`,
+          );
+          if (attempt === 2) {
+            // Both attempts failed - show error to user
+            this._state = "ERROR";
+            this._error = `Failed to connect to ESP after 2 attempts: ${err.message}`;
+            throw err;
+          }
+        }
       }
     }
 
@@ -956,14 +972,22 @@ export class EwtInstallDialog extends LitElement {
         @click=${async () => {
           await this.shadowRoot!.querySelector("ewt-console")!.disconnect();
 
-          // Complete re-init like new connection (but without Improv)
-          this.logger.log("Reset and Release locks...");
+          // After console: ESP is in firmware mode
+          // Need to reset to bootloader and reload stub for flash/filesystem operations
+          this.logger.log("Preparing ESP for flash operations...");
           try {
-            await this._resetDeviceAndReleaseLocks();
-          } catch (reconnectErr: any) {
-            this.logger.error(
-              `Reset and Release locks failed: ${reconnectErr.message}`,
-            );
+            // Reset to BOOTLOADER mode and load stub
+            await this._resetToBootloaderAndReleaseLocks();
+
+            // Wait for bootloader to start
+            await sleep(100);
+
+            // Load stub and restore baudrate
+            await this._ensureStub();
+
+            this.logger.log("ESP ready for flash operations");
+          } catch (err: any) {
+            this.logger.error(`Failed to prepare ESP: ${err.message}`);
           }
 
           this._state = "DASHBOARD";
