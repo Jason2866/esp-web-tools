@@ -198,10 +198,8 @@ export class EwtInstallDialog extends LitElement {
     return this.esploader.port;
   }
 
-  // Reset device and release locks - used when returning to dashboard or recovering from errors
-  // Reset device to FIRMWARE mode (normal execution)
-  private async _resetDeviceAndReleaseLocks() {
-    // Release esploader reader/writer if locked
+  // Helper to release reader/writer locks (used by multiple methods)
+  private async _releaseReaderWriter() {
     if (this.esploader._reader) {
       try {
         // Only cancel if reader is still active (not already released)
@@ -228,6 +226,13 @@ export class EwtInstallDialog extends LitElement {
         this.logger.log("Writer already released or error:", err);
       }
     }
+  }
+
+  // Reset device and release locks - used when returning to dashboard or recovering from errors
+  // Reset device to FIRMWARE mode (normal execution)
+  private async _resetDeviceAndReleaseLocks() {
+    // Release esploader reader/writer if locked
+    await this._releaseReaderWriter();
 
     // Hardware reset to FIRMWARE mode (bootloader=false) and to fix connection issues
     // Use appropriate method based on platform (Desktop vs Android)
@@ -247,32 +252,7 @@ export class EwtInstallDialog extends LitElement {
   // Reset device to BOOTLOADER mode (for flashing) using DTR/RTS sequence
   private async _resetToBootloaderAndReleaseLocks() {
     // Release esploader reader/writer if locked
-    if (this.esploader._reader) {
-      try {
-        // Only cancel if reader is still active (not already released)
-        if (this.esploader._reader.locked !== false) {
-          await this.esploader._reader.cancel();
-        }
-        this.esploader._reader.releaseLock();
-        this.esploader._reader = undefined;
-        this.logger.log("Reader released");
-      } catch (err) {
-        // Reader might already be released - just clear the reference
-        this.esploader._reader = undefined;
-        this.logger.log("Reader already released or error:", err);
-      }
-    }
-    if (this.esploader._writer) {
-      try {
-        this.esploader._writer.releaseLock();
-        this.esploader._writer = undefined;
-        this.logger.log("Writer released");
-      } catch (err) {
-        // Writer might already be released - just clear the reference
-        this.esploader._writer = undefined;
-        this.logger.log("Writer already released or error:", err);
-      }
-    }
+    await this._releaseReaderWriter();
 
     // Special DTR/RTS sequence to enter BOOTLOADER mode
     // This is the bootloader entry sequence, NOT a simple reset!
@@ -536,25 +516,7 @@ export class EwtInstallDialog extends LitElement {
               }
 
               // Release esploader reader/writer if locked
-              if (this.esploader._reader) {
-                try {
-                  await this.esploader._reader.cancel();
-                  this.esploader._reader.releaseLock();
-                  this.esploader._reader = undefined;
-                  this.logger.log("Reader released for filesystem access");
-                } catch (err) {
-                  this.logger.log("Could not release reader:", err);
-                }
-              }
-              if (this.esploader._writer) {
-                try {
-                  this.esploader._writer.releaseLock();
-                  this.esploader._writer = undefined;
-                  this.logger.log("Writer released for filesystem access");
-                } catch (err) {
-                  this.logger.log("Could not release writer:", err);
-                }
-              }
+              await this._releaseReaderWriter();
 
               // Reset ESP state to put it back into bootloader mode
               this._espStub = undefined;
@@ -647,25 +609,7 @@ export class EwtInstallDialog extends LitElement {
               }
 
               // Release esploader reader/writer if locked
-              if (this.esploader._reader) {
-                try {
-                  await this.esploader._reader.cancel();
-                  this.esploader._reader.releaseLock();
-                  this.esploader._reader = undefined;
-                  this.logger.log("Reader released for console");
-                } catch (err) {
-                  this.logger.log("Could not release reader:", err);
-                }
-              }
-              if (this.esploader._writer) {
-                try {
-                  this.esploader._writer.releaseLock();
-                  this.esploader._writer = undefined;
-                  this.logger.log("Writer released for console");
-                } catch (err) {
-                  this.logger.log("Could not release writer:", err);
-                }
-              }
+              await this._releaseReaderWriter();
 
               this._state = "LOGS";
             }}
@@ -683,25 +627,7 @@ export class EwtInstallDialog extends LitElement {
               }
 
               // Release esploader reader/writer if locked
-              if (this.esploader._reader) {
-                try {
-                  await this.esploader._reader.cancel();
-                  this.esploader._reader.releaseLock();
-                  this.esploader._reader = undefined;
-                  this.logger.log("Reader released for filesystem access");
-                } catch (err) {
-                  this.logger.log("Could not release reader:", err);
-                }
-              }
-              if (this.esploader._writer) {
-                try {
-                  this.esploader._writer.releaseLock();
-                  this.esploader._writer = undefined;
-                  this.logger.log("Writer released for filesystem access");
-                } catch (err) {
-                  this.logger.log("Could not release writer:", err);
-                }
-              }
+              await this._releaseReaderWriter();
 
               // Reset ESP state to put it back into bootloader mode
               this._espStub = undefined;
