@@ -200,16 +200,27 @@ export class EwtInstallDialog extends LitElement {
     }
 
     // Hardware reset to fix any connection issues
+    // Use appropriate method based on platform (Desktop vs Android)
     try {
-      await this._port.setSignals({
-        dataTerminalReady: false,
-        requestToSend: true,
-      });
-      await this._port.setSignals({
-        dataTerminalReady: false,
-        requestToSend: false,
-      });
-      await sleep(1000);
+      if (this._isAndroid) {
+        // Android (WebUSB) - use WebUSB-specific methods
+        await this.esploader.setDTRWebUSB(false);
+        await this.esploader.setRTSWebUSB(true);
+        await sleep(100);
+        await this.esploader.setDTRWebUSB(false);
+        await this.esploader.setRTSWebUSB(false);
+        await sleep(1000);
+        this.logger.log("Device reset (WebUSB/Android)");
+      } else {
+        // Desktop (Web Serial) - use Web Serial methods
+        await this.esploader.setDTR(false);
+        await this.esploader.setRTS(true);
+        await sleep(100);
+        await this.esploader.setDTR(false);
+        await this.esploader.setRTS(false);
+        await sleep(1000);
+        this.logger.log("Device reset (Web Serial/Desktop)");
+      }
     } catch (err) {
       this.logger.log("Could not reset device:", err);
     }
