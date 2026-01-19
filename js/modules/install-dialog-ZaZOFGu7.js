@@ -1049,7 +1049,7 @@ import{l as e,o as t,_ as i,n as o,B as r,i as n,a,t as d,e as l,b as s,R as c,x
         <ewt-button
           slot="primaryAction"
           label="Back"
-          @click=${async()=>{this._initialize(),this._state="DASHBOARD"}}
+          @click=${async()=>{await this._initialize(),this._state="DASHBOARD"}}
         ></ewt-button>
       `);else e="Installing",t=this._renderProgress("Preparing installation"),i=!0;else{e="Confirm Installation";const i=o?"update to":"install";t=m`
         ${o?m`Your device is running
@@ -1072,7 +1072,7 @@ import{l as e,o as t,_ as i,n as o,B as r,i as n,a,t as d,e as l,b as s,R as c,x
       <ewt-button
         slot="primaryAction"
         label="Back"
-        @click=${async()=>{await this.shadowRoot.querySelector("ewt-console").disconnect(),this.logger.log("Reset and Release locks...");try{await this._resetDeviceAndReleaseLocks(),this._espStub=void 0,this.esploader.IS_STUB=!1,this.esploader.chipFamily=null,this.esploader._reader=void 0,this.esploader._writer=void 0}catch(e){this.logger.error(`Reconnect failed: ${e.message}`)}this._state="DASHBOARD",this._initialize()}}
+        @click=${async()=>{await this.shadowRoot.querySelector("ewt-console").disconnect(),this.logger.log("Reset and Release locks...");try{await this._resetDeviceAndReleaseLocks()}catch(e){this.logger.error(`Reset and Release locks failed: ${e.message}`)}this._state="DASHBOARD",await this._initialize()}}
       ></ewt-button>
       <ewt-button
         slot="secondaryAction"
