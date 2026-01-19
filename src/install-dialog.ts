@@ -1142,10 +1142,12 @@ export class EwtInstallDialog extends LitElement {
       this.logger.error(`Failed to read partition table: ${e.message || e}`);
 
       if (e.message === "Port selection cancelled") {
+        await this._resetDeviceAndReleaseLocks();
         this._error = "Port selection cancelled";
         this._state = "ERROR";
       } else if (e.message && e.message.includes("Failed to connect")) {
         // Connection error - show error state so user can retry
+        await this._resetDeviceAndReleaseLocks();
         this._error = e.message;
         this._state = "ERROR";
       } else {
@@ -1419,7 +1421,7 @@ export class EwtInstallDialog extends LitElement {
           this._espStub = undefined;
           this.esploader.IS_STUB = false;
           this.esploader.chipFamily = null;
-          this.logger.log("ESP state reset - ready for flash operations");
+          this.logger.log("ESP state reset - ready for stub operations");
         } catch (resetErr: any) {
           this.logger.log(`ESP reset failed: ${resetErr.message}`);
         }
@@ -1458,7 +1460,7 @@ export class EwtInstallDialog extends LitElement {
             this._espStub = undefined;
             this.esploader.IS_STUB = false;
             this.esploader.chipFamily = null;
-            this.logger.log("ESP state reset - ready for flash operations");
+            this.logger.log("ESP state reset - ready for stub operations");
           } catch (resetErr: any) {
             this.logger.log(`ESP reset failed: ${resetErr.message}`);
           }
@@ -1560,9 +1562,16 @@ export class EwtInstallDialog extends LitElement {
                   // Check if we're receiving any data
                   this.logger.log("Checking for serial data...");
                   const reader = this._port.readable!.getReader();
+                  let released = false;
+                  const release = () => {
+                    if (!released) {
+                      released = true;
+                      reader.releaseLock();
+                    }
+                  };
                   const checkData = await Promise.race([
                     reader.read().then((result) => {
-                      reader.releaseLock();
+                      release();
                       if (result.value && result.value.length > 0) {
                         this.logger.log(
                           `Received ${result.value.length} bytes from ESP: ${Array.from(
@@ -1576,8 +1585,11 @@ export class EwtInstallDialog extends LitElement {
                       this.logger.log("No data received from ESP");
                       return false;
                     }),
-                    sleep(1000).then(() => {
-                      reader.releaseLock();
+                    sleep(1000).then(async () => {
+                      try {
+                        await reader.cancel();
+                      } catch {}
+                      release();
                       this.logger.log("Timeout waiting for data from ESP");
                       return false;
                     }),
@@ -1687,9 +1699,16 @@ export class EwtInstallDialog extends LitElement {
                 // Check if we're receiving any data
                 this.logger.log("Checking for serial data...");
                 const reader = this._port.readable!.getReader();
+                let released = false;
+                const release = () => {
+                  if (!released) {
+                    released = true;
+                    reader.releaseLock();
+                  }
+                };
                 const checkData = await Promise.race([
                   reader.read().then((result) => {
-                    reader.releaseLock();
+                    release();
                     if (result.value && result.value.length > 0) {
                       this.logger.log(
                         `Received ${result.value.length} bytes from ESP: ${Array.from(
@@ -1703,8 +1722,11 @@ export class EwtInstallDialog extends LitElement {
                     this.logger.log("No data received from ESP");
                     return false;
                   }),
-                  sleep(1000).then(() => {
-                    reader.releaseLock();
+                  sleep(1000).then(async () => {
+                    try {
+                      await reader.cancel();
+                    } catch {}
+                    release();
                     this.logger.log("Timeout waiting for data from ESP");
                     return false;
                   }),
