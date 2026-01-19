@@ -178,6 +178,9 @@ export class EwtInstallDialog extends LitElement {
         await espStub.setBaudrate(this.baudRate);
         this.logger.log(`Baudrate set to ${this.baudRate}`);
       } catch (baudErr: any) {
+        this.logger.error(
+          `[DEBUG] setBaudrate() threw error: ${baudErr.message}`,
+        );
         this.logger.log(
           `Failed to set baudrate: ${baudErr.message}, continuing with default`,
         );
