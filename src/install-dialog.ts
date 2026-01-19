@@ -540,6 +540,7 @@ export class EwtInstallDialog extends LitElement {
         <div>
           <ewt-button
             label="Logs & Console"
+            ?disabled=${this._busy}
             @click=${async () => {
               // Also set `null` back to undefined.
               this._client = undefined;
@@ -572,6 +573,7 @@ export class EwtInstallDialog extends LitElement {
         <div>
           <ewt-button
             label="Manage Filesystem"
+            ?disabled=${this._busy}
             @click=${async () => {
               // Close Improv client if active (it locks the reader)
               if (this._client) {
@@ -914,6 +916,7 @@ export class EwtInstallDialog extends LitElement {
           slot="primaryAction"
           label="Back"
           @click=${async () => {
+            this._improvChecked = false; // Force Improv re-test
             await this._initialize(); // Re-test Improv after failed flash
             this._state = "DASHBOARD";
           }}
@@ -947,6 +950,7 @@ export class EwtInstallDialog extends LitElement {
           }
 
           this._state = "DASHBOARD";
+          this._improvChecked = false; // Force Improv re-test after console (firmware may have changed)
           await this._initialize(); // Re-test Improv after console
         }}
       ></ewt-button>
@@ -993,6 +997,7 @@ export class EwtInstallDialog extends LitElement {
           @click=${async () => {
             await this._resetDeviceAndReleaseLocks();
             this._state = "DASHBOARD";
+            // Don't reset _improvChecked - status is still valid after console operations
             await this._initialize();
           }}
         ></ewt-button>
@@ -1042,6 +1047,7 @@ export class EwtInstallDialog extends LitElement {
           @click=${async () => {
             await this._resetDeviceAndReleaseLocks();
             this._state = "DASHBOARD";
+            // Don't reset _improvChecked - status is still valid after filesystem operations
             await this._initialize();
           }}
         ></ewt-button>
@@ -1280,6 +1286,9 @@ export class EwtInstallDialog extends LitElement {
       return;
     }
 
+    // Set busy flag during initialization
+    this._busy = true;
+
     // DON'T release locks here!
     // The stub will be created on first use and kept for all operations
 
@@ -1293,6 +1302,7 @@ export class EwtInstallDialog extends LitElement {
       } catch (err: any) {
         this._state = "ERROR";
         this._error = "Failed to download manifest";
+        this._busy = false;
         return;
       }
     }
@@ -1302,6 +1312,7 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log("Skipping Improv on Android (WebUSB) - not supported");
       this._client = null;
       this._improvChecked = true;
+      this._busy = false;
       return;
     }
 
@@ -1310,23 +1321,27 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log("Skipping Improv test (not needed for this operation)");
       this._client = null;
       this._improvChecked = true;
+      this._busy = false;
       return;
     }
 
     if (this._manifest.new_install_improv_wait_time === 0) {
       this._client = null;
+      this._busy = false;
       return;
     }
 
     // Skip Improv if we already checked and it's not supported
     if (this._improvChecked && this._client === null) {
       this.logger.log("Improv already checked - not supported, skipping");
+      this._busy = false;
       return;
     }
 
     // Skip Improv if we already have a working client
     if (this._client) {
       this.logger.log("Improv client already active, skipping initialization");
+      this._busy = false;
       return;
     }
 
@@ -1385,15 +1400,24 @@ export class EwtInstallDialog extends LitElement {
             // Stub load failed - show error to user
             this._state = "ERROR";
             this._error = err.message;
+            this._busy = false;
             return;
           }
           this.logger.log(
             "ESP reseted, stub loaded - ready for flash operations",
           );
+
+          // DON'T reset baudrate or test Improv here!
+          // Improv was already tested at the beginning of _initialize()
+          // If it was supported, we already have _client
+          // If not supported, _client is null and we don't need to test again
         } catch (resetErr: any) {
           this.logger.log(`ESP reset failed: ${resetErr.message}`);
         }
       }
+
+      // Clear busy flag when Improv successful and stub loaded
+      this._busy = false;
     } catch (err: any) {
       // Clear old value
       this._info = undefined;
@@ -1434,16 +1458,24 @@ export class EwtInstallDialog extends LitElement {
               // Stub load failed - show error to user
               this._state = "ERROR";
               this._error = err.message;
+              this._busy = false;
               return;
             }
             this.logger.log(
               "ESP reseted, stub loaded - ready for flash operations",
             );
+
+            // DON'T reset baudrate or test Improv here!
+            // Improv was already tested (and failed) at the beginning of _initialize()
+            // We already know it's not supported (_client is null)
           } catch (resetErr: any) {
             this.logger.log(`ESP reset failed: ${resetErr.message}`);
           }
         }
       }
+
+      // Clear busy flag when Improv failed but stub loaded
+      this._busy = false;
     }
   }
 
