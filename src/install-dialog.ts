@@ -225,41 +225,29 @@ export class EwtInstallDialog extends LitElement {
     this.esploader.chipFamily = null;
   }
 
-  // Reset device to BOOTLOADER mode (for flashing) using DTR/RTS sequence
+  // Reset device to BOOTLOADER mode (for flashing)
+  // Uses ESPLoader's reconnectToBootloader() to properly close/reopen port
   private async _resetToBootloaderAndReleaseLocks() {
-    // Release esploader reader/writer if locked
-    await this._releaseReaderWriter();
-
-    // Special DTR/RTS sequence to enter BOOTLOADER mode
-    // This is the bootloader entry sequence, NOT a simple reset!
+    // Use ESPLoader's reconnectToBootloader() - it handles:
+    // - Closing port completely (releases all locks)
+    // - Reopening port at 115200 baud
+    // - Restarting readLoop()
+    // - Reset strategies to enter bootloader
+    // - Chip detection
     try {
-      if (this._isAndroid) {
-        // Android (WebUSB) - use WebUSB-specific methods
-        await this.esploader.setDTRWebUSB(false);
-        await this.esploader.setRTSWebUSB(true);
-        await sleep(100);
-        await this.esploader.setDTRWebUSB(false);
-        await this.esploader.setRTSWebUSB(false);
-        await sleep(200);
-        this.logger.log("Device reset to bootloader (WebUSB/Android)");
-      } else {
-        // Desktop (Web Serial) - use Web Serial methods
-        await this.esploader.setDTR(false);
-        await this.esploader.setRTS(true);
-        await sleep(100);
-        await this.esploader.setDTR(false);
-        await this.esploader.setRTS(false);
-        await sleep(200);
-        this.logger.log("Device reset to bootloader (Web Serial/Desktop)");
-      }
-    } catch (err) {
-      this.logger.log("Could not reset device to bootloader:", err);
+      this.logger.log("Resetting ESP to bootloader mode...");
+      await this.esploader.reconnectToBootloader();
+      this.logger.log(
+        `ESP in bootloader mode: ${getChipFamilyName(this.esploader)}`,
+      );
+    } catch (err: any) {
+      this.logger.error(`Failed to reset ESP to bootloader: ${err.message}`);
+      throw err;
     }
 
-    // Reset ESP state
+    // Reset stub state (chipFamily is preserved by reconnectToBootloader)
     this._espStub = undefined;
     this.esploader.IS_STUB = false;
-    this.esploader.chipFamily = null;
   }
 
   protected render() {
@@ -491,18 +479,7 @@ export class EwtInstallDialog extends LitElement {
                 this._client = undefined;
               }
 
-              // Release esploader reader/writer if locked
-              await this._releaseReaderWriter();
-
-              // Reset ESP state to put it back into bootloader mode
-              this._espStub = undefined;
-              this.esploader.IS_STUB = false;
-              this.esploader.chipFamily = null;
-              this._improvChecked = false; // Clear flag so Improv will be re-tested
-              this.logger.log(
-                "ESP state reset - will re-initialize for filesystem access",
-              );
-
+              // Keep stub and reader/writer - they will be reused
               this._state = "PARTITIONS";
               this._readPartitionTable();
             }}
@@ -602,18 +579,7 @@ export class EwtInstallDialog extends LitElement {
                 this._client = undefined;
               }
 
-              // Release esploader reader/writer if locked
-              await this._releaseReaderWriter();
-
-              // Reset ESP state to put it back into bootloader mode
-              this._espStub = undefined;
-              this.esploader.IS_STUB = false;
-              this.esploader.chipFamily = null;
-              this._improvChecked = false; // Clear flag so Improv will be re-tested
-              this.logger.log(
-                "ESP state reset - will re-initialize for filesystem access",
-              );
-
+              // Keep stub and reader/writer - they will be reused
               this._state = "PARTITIONS";
               this._readPartitionTable();
             }}
@@ -1409,10 +1375,9 @@ export class EwtInstallDialog extends LitElement {
           // Wait for ESP to enter bootloader mode
           await sleep(100);
 
-          // Reset ESP state
+          // Reset ESP state (chipFamily preserved from reset if successful)
           this._espStub = undefined;
           this.esploader.IS_STUB = false;
-          this.esploader.chipFamily = null;
           // Ensure stub is initialized
           try {
             await this._ensureStub();
@@ -1459,10 +1424,9 @@ export class EwtInstallDialog extends LitElement {
             // Wait for ESP to enter bootloader mode
             await sleep(100);
 
-            // Reset ESP state
+            // Reset ESP state (chipFamily preserved from reset if successful)
             this._espStub = undefined;
             this.esploader.IS_STUB = false;
-            this.esploader.chipFamily = null;
             // Ensure stub is initialized
             try {
               await this._ensureStub();
