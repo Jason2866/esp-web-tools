@@ -119,14 +119,25 @@ export class EwtInstallDialog extends LitElement {
         this.logger.log(`Found ${getChipFamilyName(this.esploader)}`);
       } catch (err: any) {
         this.logger.error(`Connection failed: ${err.message}`);
-        throw new Error(
-          `Failed to connect to ESP. ${err.message || "Unknown error"}.\n\n` +
-            `Please try:\n` +
-            `1. Press and hold the BOOT button on your ESP device\n` +
-            `2. Click OK to retry\n` +
-            `3. Release the BOOT button when flashing starts\n\n` +
-            `If that doesn't work, try unplugging and reconnecting your device.`,
-        );
+        
+        // Try to reset device and release locks, then retry once
+        this.logger.log("Attempting to reset device and retry connection...");
+        await this._resetDeviceAndReleaseLocks();
+        
+        try {
+          await this.esploader.initialize();
+          this.logger.log(`Found ${getChipFamilyName(this.esploader)} after reset`);
+        } catch (retryErr: any) {
+          this.logger.error(`Retry failed: ${retryErr.message}`);
+          throw new Error(
+            `Failed to connect to ESP. ${retryErr.message || "Unknown error"}.\n\n` +
+              `Please try:\n` +
+              `1. Press and hold the BOOT button on your ESP device\n` +
+              `2. Click OK to retry\n` +
+              `3. Release the BOOT button when flashing starts\n\n` +
+              `If that doesn't work, try unplugging and reconnecting your device.`,
+          );
+        }
       }
     }
 
@@ -161,6 +172,50 @@ export class EwtInstallDialog extends LitElement {
   // Helper to get port from esploader
   private get _port(): SerialPort {
     return this.esploader.port;
+  }
+
+  // Reset device and release locks - used when returning to dashboard or recovering from errors
+  private async _resetDeviceAndReleaseLocks() {
+    // Release esploader reader/writer if locked
+    if (this.esploader._reader) {
+      try {
+        await this.esploader._reader.cancel();
+        this.esploader._reader.releaseLock();
+        this.esploader._reader = undefined;
+        this.logger.log("Reader released");
+      } catch (err) {
+        this.logger.log("Could not release reader:", err);
+      }
+    }
+    if (this.esploader._writer) {
+      try {
+        this.esploader._writer.releaseLock();
+        this.esploader._writer = undefined;
+        this.logger.log("Writer released");
+      } catch (err) {
+        this.logger.log("Could not release writer:", err);
+      }
+    }
+
+    // Hardware reset to fix any connection issues
+    try {
+      await this._port.setSignals({
+        dataTerminalReady: false,
+        requestToSend: true,
+      });
+      await this._port.setSignals({
+        dataTerminalReady: false,
+        requestToSend: false,
+      });
+      await sleep(1000);
+    } catch (err) {
+      this.logger.log("Could not reset device:", err);
+    }
+
+    // Reset ESP state
+    this._espStub = undefined;
+    this.esploader.IS_STUB = false;
+    this.esploader.chipFamily = null;
   }
 
   protected render() {
@@ -960,46 +1015,7 @@ export class EwtInstallDialog extends LitElement {
           slot="primaryAction"
           label="Back"
           @click=${async () => {
-            // Release esploader reader/writer if locked
-            if (this.esploader._reader) {
-              try {
-                await this.esploader._reader.cancel();
-                this.esploader._reader.releaseLock();
-                this.esploader._reader = undefined;
-                this.logger.log("Reader released");
-              } catch (err) {
-                this.logger.log("Could not release reader:", err);
-              }
-            }
-            if (this.esploader._writer) {
-              try {
-                this.esploader._writer.releaseLock();
-                this.esploader._writer = undefined;
-                this.logger.log("Writer released");
-              } catch (err) {
-                this.logger.log("Could not release writer:", err);
-              }
-            }
-
-            // Hardware reset to fix any connection issues
-            try {
-              await this._port.setSignals({
-                dataTerminalReady: false,
-                requestToSend: true,
-              });
-              await this._port.setSignals({
-                dataTerminalReady: false,
-                requestToSend: false,
-              });
-              await sleep(1000);
-            } catch (err) {
-              this.logger.log("Could not reset device:", err);
-            }
-
-            // Reset ESP state when returning to dashboard
-            this._espStub = undefined;
-            this.esploader.IS_STUB = false;
-            this.esploader.chipFamily = null;
+            await this._resetDeviceAndReleaseLocks();
             this._state = "DASHBOARD";
             await this._initialize();
           }}
@@ -1048,46 +1064,7 @@ export class EwtInstallDialog extends LitElement {
           slot="primaryAction"
           label="Back"
           @click=${async () => {
-            // Release esploader reader/writer if locked
-            if (this.esploader._reader) {
-              try {
-                await this.esploader._reader.cancel();
-                this.esploader._reader.releaseLock();
-                this.esploader._reader = undefined;
-                this.logger.log("Reader released");
-              } catch (err) {
-                this.logger.log("Could not release reader:", err);
-              }
-            }
-            if (this.esploader._writer) {
-              try {
-                this.esploader._writer.releaseLock();
-                this.esploader._writer = undefined;
-                this.logger.log("Writer released");
-              } catch (err) {
-                this.logger.log("Could not release writer:", err);
-              }
-            }
-
-            // Hardware reset to fix any connection issues
-            try {
-              await this._port.setSignals({
-                dataTerminalReady: false,
-                requestToSend: true,
-              });
-              await this._port.setSignals({
-                dataTerminalReady: false,
-                requestToSend: false,
-              });
-              await sleep(1000);
-            } catch (err) {
-              this.logger.log("Could not reset device:", err);
-            }
-
-            // Reset ESP state when returning to dashboard
-            this._espStub = undefined;
-            this.esploader.IS_STUB = false;
-            this.esploader.chipFamily = null;
+            await this._resetDeviceAndReleaseLocks();
             this._state = "DASHBOARD";
             await this._initialize();
           }}
