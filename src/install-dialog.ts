@@ -78,7 +78,7 @@ export class EwtInstallDialog extends LitElement {
 
   @state() private _error?: string;
 
-  @state() private _busy = false;
+  @state() private _busy = true; // Start as busy until initialization completes
 
   // undefined = not loaded
   // null = not available
@@ -95,6 +95,9 @@ export class EwtInstallDialog extends LitElement {
   // Track if Improv was already checked (to avoid repeated attempts)
   private _improvChecked = false;
 
+  // Track if Improv is supported (separate from active client)
+  private _improvSupported = false;
+
   // Check if running on Android with WebUSB
   private get _isAndroid(): boolean {
     const port = this.esploader?.port as any;
@@ -107,14 +110,54 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log(
         `Existing stub: IS_STUB=${this._espStub.IS_STUB}, chipFamily=${getChipFamilyName(this._espStub)}`,
       );
+
+      // Ensure baudrate is set even if stub already exists
+      if (this.baudRate && this.baudRate > 115200) {
+        const currentBaud = this._espStub._currentBaudRate || 115200;
+        if (currentBaud !== this.baudRate) {
+          this.logger.log(
+            `Adjusting baudrate from ${currentBaud} to ${this.baudRate}...`,
+          );
+          try {
+            await this._espStub.setBaudrate(this.baudRate);
+            this.logger.log(`Baudrate set to ${this.baudRate}`);
+          } catch (baudErr: any) {
+            this.logger.log(
+              `Failed to set baudrate: ${baudErr.message}, continuing with current`,
+            );
+          }
+        }
+      }
+
       return this._espStub;
     }
 
     // Initialize if not already done
     if (!this.esploader.chipFamily) {
       this.logger.log("Initializing ESP loader...");
-      await this.esploader.initialize();
-      this.logger.log(`Found ${getChipFamilyName(this.esploader)}`);
+
+      // Try twice before giving up
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          if (attempt > 1) {
+            this.logger.log(`Retry attempt ${attempt}/2...`);
+            await sleep(500); // Wait before retry
+          }
+          await this.esploader.initialize();
+          this.logger.log(`Found ${getChipFamilyName(this.esploader)}`);
+          break; // Success!
+        } catch (err: any) {
+          this.logger.error(
+            `Connection failed to stub (attempt ${attempt}/2): ${err.message}`,
+          );
+          if (attempt === 2) {
+            // Both attempts failed - show error to user
+            this._state = "ERROR";
+            this._error = `Failed to connect to ESP after 2 attempts: ${err.message}`;
+            throw err;
+          }
+        }
+      }
     }
 
     // Run stub - chip properties are now automatically inherited from parent
@@ -133,6 +176,9 @@ export class EwtInstallDialog extends LitElement {
         await espStub.setBaudrate(this.baudRate);
         this.logger.log(`Baudrate set to ${this.baudRate}`);
       } catch (baudErr: any) {
+        this.logger.error(
+          `[DEBUG] setBaudrate() threw error: ${baudErr.message}`,
+        );
         this.logger.log(
           `Failed to set baudrate: ${baudErr.message}, continuing with default`,
         );
@@ -150,6 +196,79 @@ export class EwtInstallDialog extends LitElement {
     return this.esploader.port;
   }
 
+  // Helper to release reader/writer locks (used by multiple methods)
+  private async _releaseReaderWriter() {
+    if (this.esploader._reader) {
+      try {
+        await this.esploader._reader.cancel();
+        this.esploader._reader.releaseLock();
+        this.esploader._reader = undefined;
+        this.logger.log("Reader released");
+      } catch (err) {
+        // Reader might already be released - just clear the reference
+        this.esploader._reader = undefined;
+        this.logger.log("Reader already released or error:", err);
+      }
+    }
+    if (this.esploader._writer) {
+      try {
+        this.esploader._writer.releaseLock();
+        this.esploader._writer = undefined;
+        this.logger.log("Writer released");
+      } catch (err) {
+        // Writer might already be released - just clear the reference
+        this.esploader._writer = undefined;
+        this.logger.log("Writer already released or error:", err);
+      }
+    }
+  }
+
+  // Reset device and release locks - used when returning to dashboard or recovering from errors
+  // Reset device to FIRMWARE mode (normal execution)
+  private async _resetDeviceAndReleaseLocks() {
+    // Release esploader reader/writer if locked
+    await this._releaseReaderWriter();
+
+    // Hardware reset to FIRMWARE mode (bootloader=false) and to fix connection issues
+    // Use appropriate method based on platform (Desktop vs Android)
+    try {
+      await this.esploader.hardReset(false);
+      this.logger.log("Device reset to firmware mode");
+    } catch (err) {
+      this.logger.log("Could not reset device:", err);
+    }
+
+    // Reset ESP state
+    this._espStub = undefined;
+    this.esploader.IS_STUB = false;
+    this.esploader.chipFamily = null;
+  }
+
+  // Reset device to BOOTLOADER mode (for flashing)
+  // Uses ESPLoader's reconnectToBootloader() to properly close/reopen port
+  private async _resetToBootloaderAndReleaseLocks() {
+    // Use ESPLoader's reconnectToBootloader() - it handles:
+    // - Closing port completely (releases all locks)
+    // - Reopening port at 115200 baud
+    // - Restarting readLoop()
+    // - Reset strategies to enter bootloader
+    // - Chip detection
+    try {
+      this.logger.log("Resetting ESP to bootloader mode...");
+      await this.esploader.reconnectToBootloader();
+      this.logger.log(
+        `ESP in bootloader mode: ${getChipFamilyName(this.esploader)}`,
+      );
+    } catch (err: any) {
+      this.logger.error(`Failed to reset ESP to bootloader: ${err.message}`);
+      throw err;
+    }
+
+    // Reset stub state (chipFamily is preserved by reconnectToBootloader)
+    this._espStub = undefined;
+    this.esploader.IS_STUB = false;
+  }
+
   protected render() {
     if (!this.esploader) {
       return html``;
@@ -162,8 +281,11 @@ export class EwtInstallDialog extends LitElement {
     // During installation phase we temporarily remove the client
     if (
       this._client === undefined &&
+      !this._improvChecked && // Only show "Connecting" if we haven't checked yet
       this._state !== "INSTALL" &&
-      this._state !== "LOGS"
+      this._state !== "LOGS" &&
+      this._state !== "PARTITIONS" &&
+      this._state !== "LITTLEFS"
     ) {
       if (this._error) {
         [heading, content, hideActions] = this._renderError(this._error);
@@ -178,9 +300,10 @@ export class EwtInstallDialog extends LitElement {
     } else if (this._state === "ERROR") {
       [heading, content, hideActions] = this._renderError(this._error!);
     } else if (this._state === "DASHBOARD") {
-      [heading, content, hideActions, allowClosing] = this._client
-        ? this._renderDashboard()
-        : this._renderDashboardNoImprov();
+      [heading, content, hideActions, allowClosing] =
+        this._improvSupported && this._info
+          ? this._renderDashboard()
+          : this._renderDashboardNoImprov();
     } else if (this._state === "PROVISION") {
       [heading, content, hideActions] = this._renderProvision();
     } else if (this._state === "LOGS") {
@@ -254,6 +377,7 @@ export class EwtInstallDialog extends LitElement {
           ? html`
               <div>
                 <ewt-button
+                  ?disabled=${this._busy}
                   text-left
                   .label=${!this._isSameFirmware
                     ? `Install ${this._manifest.name}`
@@ -271,12 +395,12 @@ export class EwtInstallDialog extends LitElement {
               </div>
             `
           : ""}
-        ${this._client!.nextUrl === undefined
+        ${!this._client || this._client.nextUrl === undefined
           ? ""
           : html`
               <div>
                 <a
-                  href=${this._client!.nextUrl}
+                  href=${this._client.nextUrl}
                   class="has-button"
                   target="_blank"
                 >
@@ -284,8 +408,9 @@ export class EwtInstallDialog extends LitElement {
                 </a>
               </div>
             `}
-        ${!this._manifest.home_assistant_domain ||
-        this._client!.state !== ImprovSerialCurrentState.PROVISIONED
+        ${!this._client ||
+        !this._manifest.home_assistant_domain ||
+        this._client.state !== ImprovSerialCurrentState.PROVISIONED
           ? ""
           : html`
               <div>
@@ -298,23 +423,30 @@ export class EwtInstallDialog extends LitElement {
                 </a>
               </div>
             `}
+        ${this._client
+          ? html`
+              <div>
+                <ewt-button
+                  ?disabled=${this._busy}
+                  .label=${this._client.state === ImprovSerialCurrentState.READY
+                    ? "Connect to Wi-Fi"
+                    : "Change Wi-Fi"}
+                  @click=${() => {
+                    this._state = "PROVISION";
+                    if (
+                      this._client!.state ===
+                      ImprovSerialCurrentState.PROVISIONED
+                    ) {
+                      this._provisionForce = true;
+                    }
+                  }}
+                ></ewt-button>
+              </div>
+            `
+          : ""}
         <div>
           <ewt-button
-            .label=${this._client!.state === ImprovSerialCurrentState.READY
-              ? "Connect to Wi-Fi"
-              : "Change Wi-Fi"}
-            @click=${() => {
-              this._state = "PROVISION";
-              if (
-                this._client!.state === ImprovSerialCurrentState.PROVISIONED
-              ) {
-                this._provisionForce = true;
-              }
-            }}
-          ></ewt-button>
-        </div>
-        <div>
-          <ewt-button
+            ?disabled=${this._busy}
             label="Logs & Console"
             @click=${async () => {
               const client = this._client;
@@ -324,6 +456,23 @@ export class EwtInstallDialog extends LitElement {
               }
               // Also set `null` back to undefined.
               this._client = undefined;
+
+              // CRITICAL: Set baudrate back to 115200 for firmware communication
+              // The ESP stub might be at higher baudrate (e.g., 460800) for flashing
+              // But firmware console always runs at 115200
+              if (this._espStub && this._espStub._currentBaudRate !== 115200) {
+                this.logger.log(
+                  `Resetting baudrate from ${this._espStub._currentBaudRate} to 115200 for console...`,
+                );
+                try {
+                  await this._espStub.setBaudrate(115200);
+                  this.logger.log("Baudrate set to 115200 for console");
+                } catch (baudErr: any) {
+                  this.logger.log(
+                    `Failed to set baudrate to 115200: ${baudErr.message}`,
+                  );
+                }
+              }
 
               // Release esploader reader/writer if locked
               if (this.esploader._reader) {
@@ -352,6 +501,7 @@ export class EwtInstallDialog extends LitElement {
         </div>
         <div>
           <ewt-button
+            ?disabled=${this._busy}
             label="Manage Filesystem"
             @click=${async () => {
               // Close Improv client if active (it locks the reader)
@@ -360,18 +510,7 @@ export class EwtInstallDialog extends LitElement {
                 this._client = undefined;
               }
 
-              // If we just checked Improv (whether it worked or not), we need to reset
-              // ESP state to put it back into bootloader mode
-              if (this._improvChecked) {
-                this._espStub = undefined;
-                this.esploader.IS_STUB = false;
-                this.esploader.chipFamily = null;
-                this._improvChecked = false; // Clear flag so we don't reset again
-                this.logger.log(
-                  "ESP state reset - will re-initialize for filesystem access",
-                );
-              }
-
+              // Keep stub and reader/writer - they will be reused
               this._state = "PARTITIONS";
               this._readPartitionTable();
             }}
@@ -394,6 +533,7 @@ export class EwtInstallDialog extends LitElement {
           ? html`
               <div>
                 <ewt-button
+                  ?disabled=${this._busy}
                   class="danger"
                   label="Erase User Data"
                   @click=${() => this._startInstall(true)}
@@ -416,6 +556,7 @@ export class EwtInstallDialog extends LitElement {
       <div class="dashboard-buttons">
         <div>
           <ewt-button
+            ?disabled=${this._busy}
             text-left
             .label=${`Install ${this._manifest.name}`}
             @click=${() => {
@@ -432,30 +573,30 @@ export class EwtInstallDialog extends LitElement {
         <div>
           <ewt-button
             label="Logs & Console"
+            ?disabled=${this._busy}
             @click=${async () => {
               // Also set `null` back to undefined.
               this._client = undefined;
 
+              // CRITICAL: Set baudrate back to 115200 for firmware communication
+              // The ESP stub might be at higher baudrate (e.g., 460800) for flashing
+              // But firmware console always runs at 115200
+              if (this._espStub && this._espStub._currentBaudRate !== 115200) {
+                this.logger.log(
+                  `Resetting baudrate from ${this._espStub._currentBaudRate} to 115200 for console...`,
+                );
+                try {
+                  await this._espStub.setBaudrate(115200);
+                  this.logger.log("Baudrate set to 115200 for console");
+                } catch (baudErr: any) {
+                  this.logger.log(
+                    `Failed to set baudrate to 115200: ${baudErr.message}`,
+                  );
+                }
+              }
+
               // Release esploader reader/writer if locked
-              if (this.esploader._reader) {
-                try {
-                  await this.esploader._reader.cancel();
-                  this.esploader._reader.releaseLock();
-                  this.esploader._reader = undefined;
-                  this.logger.log("Reader released for console");
-                } catch (err) {
-                  this.logger.log("Could not release reader:", err);
-                }
-              }
-              if (this.esploader._writer) {
-                try {
-                  this.esploader._writer.releaseLock();
-                  this.esploader._writer = undefined;
-                  this.logger.log("Writer released for console");
-                } catch (err) {
-                  this.logger.log("Could not release writer:", err);
-                }
-              }
+              await this._releaseReaderWriter();
 
               this._state = "LOGS";
             }}
@@ -465,6 +606,7 @@ export class EwtInstallDialog extends LitElement {
         <div>
           <ewt-button
             label="Manage Filesystem"
+            ?disabled=${this._busy}
             @click=${async () => {
               // Close Improv client if active (it locks the reader)
               if (this._client) {
@@ -472,18 +614,7 @@ export class EwtInstallDialog extends LitElement {
                 this._client = undefined;
               }
 
-              // If we just checked Improv (whether it worked or not), we need to reset
-              // ESP state to put it back into bootloader mode
-              if (this._improvChecked) {
-                this._espStub = undefined;
-                this.esploader.IS_STUB = false;
-                this.esploader.chipFamily = null;
-                this._improvChecked = false; // Clear flag so we don't reset again
-                this.logger.log(
-                  "ESP state reset - will re-initialize for filesystem access",
-                );
-              }
-
+              // Keep stub and reader/writer - they will be reused
               this._state = "PARTITIONS";
               this._readPartitionTable();
             }}
@@ -818,7 +949,8 @@ export class EwtInstallDialog extends LitElement {
           slot="primaryAction"
           label="Back"
           @click=${async () => {
-            this._initialize(false, true); // skipImprov = true
+            this._improvChecked = false; // Force Improv re-test
+            await this._initialize(); // Re-test Improv after failed flash
             this._state = "DASHBOARD";
           }}
         ></ewt-button>
@@ -840,32 +972,27 @@ export class EwtInstallDialog extends LitElement {
         @click=${async () => {
           await this.shadowRoot!.querySelector("ewt-console")!.disconnect();
 
-          // Complete re-init like new connection (but without Improv)
-          this.logger.log("Closing port for reconnect after console...");
+          // After console: ESP is in firmware mode
+          // Need to reset to bootloader and reload stub for flash/filesystem operations
+          this.logger.log("Preparing ESP for flash operations...");
           try {
-            await this._port.close();
-            this.logger.log("Port closed");
+            // Reset to BOOTLOADER mode and load stub
+            await this._resetToBootloaderAndReleaseLocks();
 
-            await sleep(250);
+            // Wait for bootloader to start
+            await sleep(100);
 
-            await this._port.open({ baudRate: 115200 });
-            this.logger.log("Port reopened");
+            // Load stub and restore baudrate
+            await this._ensureStub();
 
-            await sleep(250);
-            this.logger.log("Device ready as new connection");
-
-            // Reset ESP state completely
-            this._espStub = undefined;
-            this.esploader.IS_STUB = false;
-            this.esploader.chipFamily = null;
-            this.esploader._reader = undefined;
-            this.esploader._writer = undefined;
-          } catch (reconnectErr: any) {
-            this.logger.error(`Reconnect failed: ${reconnectErr.message}`);
+            this.logger.log("ESP ready for flash operations");
+          } catch (err: any) {
+            this.logger.error(`Failed to prepare ESP: ${err.message}`);
           }
 
           this._state = "DASHBOARD";
-          this._initialize(false, true); // skipImprov = true (from console)
+          // Don't reset _improvChecked - console only reads, doesn't change firmware
+          await this._initialize();
         }}
       ></ewt-button>
       <ewt-button
@@ -908,8 +1035,11 @@ export class EwtInstallDialog extends LitElement {
         <ewt-button
           slot="primaryAction"
           label="Back"
-          @click=${() => {
+          @click=${async () => {
+            await this._resetDeviceAndReleaseLocks();
             this._state = "DASHBOARD";
+            // Don't reset _improvChecked - status is still valid after console operations
+            await this._initialize();
           }}
         ></ewt-button>
       `;
@@ -955,8 +1085,11 @@ export class EwtInstallDialog extends LitElement {
         <ewt-button
           slot="primaryAction"
           label="Back"
-          @click=${() => {
+          @click=${async () => {
+            // DON'T reset device or release locks - keep stub for Console/Install
             this._state = "DASHBOARD";
+            // Don't reset _improvChecked - status is still valid after filesystem operations
+            await this._initialize();
           }}
         ></ewt-button>
       `;
@@ -1009,7 +1142,7 @@ export class EwtInstallDialog extends LitElement {
       const partitions = parsePartitionTable(data);
 
       if (partitions.length === 0) {
-        this.logger.error("No valid partition table found");
+        this.logger.log("No valid partition table found");
         this._partitions = [];
       } else {
         this.logger.log(`Found ${partitions.length} partition(s)`);
@@ -1019,12 +1152,19 @@ export class EwtInstallDialog extends LitElement {
       this.logger.error(`Failed to read partition table: ${e.message || e}`);
 
       if (e.message === "Port selection cancelled") {
+        await this._resetDeviceAndReleaseLocks();
         this._error = "Port selection cancelled";
+        this._state = "ERROR";
+      } else if (e.message && e.message.includes("Failed to connect")) {
+        // Connection error - show error state so user can retry
+        await this._resetDeviceAndReleaseLocks();
+        this._error = e.message;
+        this._state = "ERROR";
       } else {
-        this._error = `Failed to read partition table: ${e.message || e}. Try resetting your device.`;
+        // Other errors (like parsing errors) - just show empty partition list
+        this.logger.log("Returning to partition view with no partitions");
+        this._partitions = [];
       }
-
-      this._state = "ERROR";
     } finally {
       // DON'T release reader/writer locks here!
       // Keep them so the stub remains usable for:
@@ -1187,6 +1327,10 @@ export class EwtInstallDialog extends LitElement {
       return;
     }
 
+    // Set busy flag during initialization
+    this._busy = true;
+    this.requestUpdate(); // Force UI update to disable buttons immediately
+
     // DON'T release locks here!
     // The stub will be created on first use and kept for all operations
 
@@ -1200,6 +1344,7 @@ export class EwtInstallDialog extends LitElement {
       } catch (err: any) {
         this._state = "ERROR";
         this._error = "Failed to download manifest";
+        this._busy = false;
         return;
       }
     }
@@ -1209,6 +1354,8 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log("Skipping Improv on Android (WebUSB) - not supported");
       this._client = null;
       this._improvChecked = true;
+      this._improvSupported = false;
+      this._busy = false;
       return;
     }
 
@@ -1217,24 +1364,53 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log("Skipping Improv test (not needed for this operation)");
       this._client = null;
       this._improvChecked = true;
+      this._busy = false;
       return;
     }
 
     if (this._manifest.new_install_improv_wait_time === 0) {
       this._client = null;
+      this._improvSupported = false;
+      this._busy = false;
       return;
     }
 
-    // Skip Improv if we already checked and it's not supported
-    if (this._improvChecked && this._client === null) {
-      this.logger.log("Improv already checked - not supported, skipping");
+    // Skip Improv if we already checked (avoid repeated attempts)
+    if (this._improvChecked) {
+      this.logger.log(
+        `Improv already checked - ${this._improvSupported ? "supported" : "not supported"}, skipping re-test`,
+      );
+      // Ensure _client state is valid for UI rendering
+      if (!this._improvSupported) {
+        // Not supported - ensure it's explicitly null for UI
+        this._client = null;
+      }
+      // If supported: keep _client as-is (could be active client or undefined if closed)
+      // The UI will check _improvSupported and _info instead of just _client
+      this._busy = false;
+      this.requestUpdate(); // Force UI update
       return;
     }
 
     // Skip Improv if we already have a working client
     if (this._client) {
       this.logger.log("Improv client already active, skipping initialization");
+      this._improvSupported = true; // If we have a client, Improv is supported
+      this._busy = false;
       return;
+    }
+
+    // Port is at 115200 baud for Improv (no stub loaded yet!)
+    // If not just installed, reset ESP to firmware mode to ensure firmware is running
+    if (!justInstalled) {
+      try {
+        // Reset ESP to FIRMWARE mode (needed if we were in bootloader mode)
+        await this._resetDeviceAndReleaseLocks();
+        this.logger.log("ESP reset to firmware mode for Improv test");
+        await sleep(100); // Wait for firmware to start
+      } catch (e) {
+        this.logger.log(`Reset to firmware failed, continuing anyway`);
+      }
     }
 
     this._improvChecked = true;
@@ -1253,7 +1429,51 @@ export class EwtInstallDialog extends LitElement {
           : 10000;
       this._info = await client.initialize(timeout);
       this._client = client;
+      this._improvSupported = true; // Mark Improv as supported
       client.addEventListener("disconnect", this._handleDisconnect);
+
+      // After successful Improv: prepare ESP for potential flash operations
+      // Close Improv client and reopen port to reset ESP into bootloader mode
+      if (!justInstalled) {
+        try {
+          // CRITICAL: Close Improv client first to release reader lock
+          await this._closeClientWithoutEvents(client);
+          this.logger.log("Improv client closed");
+
+          // Reset ESP to BOOTLOADER mode for flash operations
+          await this._resetToBootloaderAndReleaseLocks();
+
+          // Wait for ESP to enter bootloader mode
+          await sleep(100);
+
+          // Reset ESP state (chipFamily preserved from reset if successful)
+          this._espStub = undefined;
+          this.esploader.IS_STUB = false;
+          // Ensure stub is initialized
+          try {
+            await this._ensureStub();
+          } catch (err: any) {
+            // Stub load failed - show error to user
+            this._state = "ERROR";
+            this._error = err.message;
+            this._busy = false;
+            return;
+          }
+          this.logger.log(
+            "ESP reseted, stub loaded - ready for flash operations",
+          );
+
+          // DON'T reset baudrate or test Improv here!
+          // Improv was already tested at the beginning of _initialize()
+          // If it was supported, we already have _client
+          // If not supported, _client is null and we don't need to test again
+        } catch (resetErr: any) {
+          this.logger.log(`ESP reset failed: ${resetErr.message}`);
+        }
+      }
+
+      // Clear busy flag when Improv successful and stub loaded
+      this._busy = false;
     } catch (err: any) {
       // Clear old value
       this._info = undefined;
@@ -1272,11 +1492,47 @@ export class EwtInstallDialog extends LitElement {
           "Serial port is not ready. Close any other application using it and try again.";
       } else {
         this._client = null; // not supported
+        this._improvSupported = false; // Mark Improv as not supported
         this.logger.error("Improv initialization failed.", err);
+
+        // After failed Improv: prepare ESP for flash operations anyway
+        // Reset ESP into bootloader mode and load stub
+        if (!justInstalled) {
+          try {
+            // Reset ESP to BOOTLOADER mode for flash operations
+            await this._resetToBootloaderAndReleaseLocks();
+
+            // Wait for ESP to enter bootloader mode
+            await sleep(100);
+
+            // Reset ESP state (chipFamily preserved from reset if successful)
+            this._espStub = undefined;
+            this.esploader.IS_STUB = false;
+            // Ensure stub is initialized
+            try {
+              await this._ensureStub();
+            } catch (err: any) {
+              // Stub load failed - show error to user
+              this._state = "ERROR";
+              this._error = err.message;
+              this._busy = false;
+              return;
+            }
+            this.logger.log(
+              "ESP reseted, stub loaded - ready for flash operations",
+            );
+
+            // DON'T reset baudrate or test Improv here!
+            // Improv was already tested (and failed) at the beginning of _initialize()
+            // We already know it's not supported (_client is null)
+          } catch (resetErr: any) {
+            this.logger.log(`ESP reset failed: ${resetErr.message}`);
+          }
+        }
       }
 
-      // Close Improv client to release its reader, but DON'T touch esploader locks
-      // The stub will be created on first use (partition read or flash) and kept forever
+      // Clear busy flag when Improv failed but stub loaded
+      this._busy = false;
     }
   }
 
@@ -1296,7 +1552,14 @@ export class EwtInstallDialog extends LitElement {
     this._client = undefined;
 
     // Ensure stub is initialized before flash
-    await this._ensureStub();
+    try {
+      await this._ensureStub();
+    } catch (err: any) {
+      // Connection failed - show error to user
+      this._state = "ERROR";
+      this._error = err.message;
+      return;
+    }
 
     // Use the stub for flash
     const loaderToUse = this._espStub!;
@@ -1340,12 +1603,15 @@ export class EwtInstallDialog extends LitElement {
               this.esploader._writer = undefined;
               this.logger.log("ESP state reset for Improv test");
 
-              // Hard reset the ESP to boot into new firmware
-              // SKIP on Android - hardReset destroys the WebUSB connection
+              // Reset ESP to boot into new firmware
+              // SKIP on Android - WebUSB connection handling is different
               if (!this._isAndroid) {
                 try {
-                  await this.esploader.hardReset();
-                  this.logger.log("ESP hard reset complete");
+                  // Reset device and release locks to ensure clean state for new firmware
+                  this.logger.log(
+                    "Performing hardware reset to start new firmware...",
+                  );
+                  await this._resetDeviceAndReleaseLocks();
                 } catch (resetErr: any) {
                   this.logger.log(`Hard reset failed: ${resetErr.message}`);
                 }
@@ -1409,12 +1675,15 @@ export class EwtInstallDialog extends LitElement {
             this.esploader._writer = undefined;
             this.logger.log("ESP state reset for Improv test");
 
-            // Hard reset the ESP to boot into new firmware
-            // SKIP on Android - hardReset destroys the WebUSB connection
+            // Reset ESP to boot into new firmware
+            // SKIP on Android - WebUSB connection handling is different
             if (!this._isAndroid) {
               try {
-                await this.esploader.hardReset();
-                this.logger.log("ESP hard reset complete");
+                // Reset device and release locks to ensure clean state for new firmware
+                this.logger.log(
+                  "Performing hardware reset to start new firmware...",
+                );
+                await this._resetDeviceAndReleaseLocks();
               } catch (resetErr: any) {
                 this.logger.log(`Hard reset failed: ${resetErr.message}`);
               }
