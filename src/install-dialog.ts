@@ -1582,8 +1582,16 @@ export class EwtInstallDialog extends LitElement {
                     );
                   }
                 } catch (resetErr: any) {
-                  this.logger.log(`Port reopen failed: ${resetErr.message}`);
+                  this.logger.log(
+                    `Port reopen failed: ${resetErr.message}, continuing anyway`,
+                  );
                 }
+
+                // Reset device and release locks to ensure clean state for new firmware
+                this.logger.log(
+                  "Performing hardware reset to start new firmware...",
+                );
+                await this._resetDeviceAndReleaseLocks();
 
                 // Test Improv with new firmware (Desktop only)
                 await this._initialize(true);
