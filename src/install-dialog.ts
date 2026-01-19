@@ -78,7 +78,7 @@ export class EwtInstallDialog extends LitElement {
 
   @state() private _error?: string;
 
-  @state() private _busy = false;
+  @state() private _busy = true; // Start as busy until initialization completes
 
   // undefined = not loaded
   // null = not available
@@ -94,6 +94,9 @@ export class EwtInstallDialog extends LitElement {
 
   // Track if Improv was already checked (to avoid repeated attempts)
   private _improvChecked = false;
+
+  // Track if Improv is supported (separate from active client)
+  private _improvSupported = false;
 
   // Check if running on Android with WebUSB
   private get _isAndroid(): boolean {
@@ -262,6 +265,7 @@ export class EwtInstallDialog extends LitElement {
     // During installation phase we temporarily remove the client
     if (
       this._client === undefined &&
+      !this._improvChecked && // Only show "Connecting" if we haven't checked yet
       this._state !== "INSTALL" &&
       this._state !== "LOGS" &&
       this._state !== "PARTITIONS" &&
@@ -280,9 +284,10 @@ export class EwtInstallDialog extends LitElement {
     } else if (this._state === "ERROR") {
       [heading, content, hideActions] = this._renderError(this._error!);
     } else if (this._state === "DASHBOARD") {
-      [heading, content, hideActions, allowClosing] = this._client
-        ? this._renderDashboard()
-        : this._renderDashboardNoImprov();
+      [heading, content, hideActions, allowClosing] =
+        this._improvSupported && this._info
+          ? this._renderDashboard()
+          : this._renderDashboardNoImprov();
     } else if (this._state === "PROVISION") {
       [heading, content, hideActions] = this._renderProvision();
     } else if (this._state === "LOGS") {
@@ -356,6 +361,7 @@ export class EwtInstallDialog extends LitElement {
           ? html`
               <div>
                 <ewt-button
+                  ?disabled=${this._busy}
                   text-left
                   .label=${!this._isSameFirmware
                     ? `Install ${this._manifest.name}`
@@ -373,12 +379,12 @@ export class EwtInstallDialog extends LitElement {
               </div>
             `
           : ""}
-        ${this._client!.nextUrl === undefined
+        ${!this._client || this._client.nextUrl === undefined
           ? ""
           : html`
               <div>
                 <a
-                  href=${this._client!.nextUrl}
+                  href=${this._client.nextUrl}
                   class="has-button"
                   target="_blank"
                 >
@@ -386,8 +392,9 @@ export class EwtInstallDialog extends LitElement {
                 </a>
               </div>
             `}
-        ${!this._manifest.home_assistant_domain ||
-        this._client!.state !== ImprovSerialCurrentState.PROVISIONED
+        ${!this._client ||
+        !this._manifest.home_assistant_domain ||
+        this._client.state !== ImprovSerialCurrentState.PROVISIONED
           ? ""
           : html`
               <div>
@@ -400,23 +407,30 @@ export class EwtInstallDialog extends LitElement {
                 </a>
               </div>
             `}
+        ${this._client
+          ? html`
+              <div>
+                <ewt-button
+                  ?disabled=${this._busy}
+                  .label=${this._client.state === ImprovSerialCurrentState.READY
+                    ? "Connect to Wi-Fi"
+                    : "Change Wi-Fi"}
+                  @click=${() => {
+                    this._state = "PROVISION";
+                    if (
+                      this._client!.state ===
+                      ImprovSerialCurrentState.PROVISIONED
+                    ) {
+                      this._provisionForce = true;
+                    }
+                  }}
+                ></ewt-button>
+              </div>
+            `
+          : ""}
         <div>
           <ewt-button
-            .label=${this._client!.state === ImprovSerialCurrentState.READY
-              ? "Connect to Wi-Fi"
-              : "Change Wi-Fi"}
-            @click=${() => {
-              this._state = "PROVISION";
-              if (
-                this._client!.state === ImprovSerialCurrentState.PROVISIONED
-              ) {
-                this._provisionForce = true;
-              }
-            }}
-          ></ewt-button>
-        </div>
-        <div>
-          <ewt-button
+            ?disabled=${this._busy}
             label="Logs & Console"
             @click=${async () => {
               const client = this._client;
@@ -471,6 +485,7 @@ export class EwtInstallDialog extends LitElement {
         </div>
         <div>
           <ewt-button
+            ?disabled=${this._busy}
             label="Manage Filesystem"
             @click=${async () => {
               // Close Improv client if active (it locks the reader)
@@ -502,6 +517,7 @@ export class EwtInstallDialog extends LitElement {
           ? html`
               <div>
                 <ewt-button
+                  ?disabled=${this._busy}
                   class="danger"
                   label="Erase User Data"
                   @click=${() => this._startInstall(true)}
@@ -524,6 +540,7 @@ export class EwtInstallDialog extends LitElement {
       <div class="dashboard-buttons">
         <div>
           <ewt-button
+            ?disabled=${this._busy}
             text-left
             .label=${`Install ${this._manifest.name}`}
             @click=${() => {
@@ -1045,7 +1062,7 @@ export class EwtInstallDialog extends LitElement {
           slot="primaryAction"
           label="Back"
           @click=${async () => {
-            await this._resetDeviceAndReleaseLocks();
+            // DON'T reset device or release locks - keep stub for Console/Install
             this._state = "DASHBOARD";
             // Don't reset _improvChecked - status is still valid after filesystem operations
             await this._initialize();
@@ -1313,6 +1330,7 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log("Skipping Improv on Android (WebUSB) - not supported");
       this._client = null;
       this._improvChecked = true;
+      this._improvSupported = false;
       this._busy = false;
       return;
     }
@@ -1328,20 +1346,32 @@ export class EwtInstallDialog extends LitElement {
 
     if (this._manifest.new_install_improv_wait_time === 0) {
       this._client = null;
+      this._improvSupported = false;
       this._busy = false;
       return;
     }
 
-    // Skip Improv if we already checked and it's not supported
-    if (this._improvChecked && this._client === null) {
-      this.logger.log("Improv already checked - not supported, skipping");
+    // Skip Improv if we already checked (avoid repeated attempts)
+    if (this._improvChecked) {
+      this.logger.log(
+        `Improv already checked - ${this._improvSupported ? "supported" : "not supported"}, skipping re-test`,
+      );
+      // Ensure _client state is valid for UI rendering
+      if (!this._improvSupported) {
+        // Not supported - ensure it's explicitly null for UI
+        this._client = null;
+      }
+      // If supported: keep _client as-is (could be active client or undefined if closed)
+      // The UI will check _improvSupported and _info instead of just _client
       this._busy = false;
+      this.requestUpdate(); // Force UI update
       return;
     }
 
     // Skip Improv if we already have a working client
     if (this._client) {
       this.logger.log("Improv client already active, skipping initialization");
+      this._improvSupported = true; // If we have a client, Improv is supported
       this._busy = false;
       return;
     }
@@ -1375,6 +1405,7 @@ export class EwtInstallDialog extends LitElement {
           : 10000;
       this._info = await client.initialize(timeout);
       this._client = client;
+      this._improvSupported = true; // Mark Improv as supported
       client.addEventListener("disconnect", this._handleDisconnect);
 
       // After successful Improv: prepare ESP for potential flash operations
@@ -1437,6 +1468,7 @@ export class EwtInstallDialog extends LitElement {
           "Serial port is not ready. Close any other application using it and try again.";
       } else {
         this._client = null; // not supported
+        this._improvSupported = false; // Mark Improv as not supported
         this.logger.error("Improv initialization failed.", err);
 
         // After failed Improv: prepare ESP for flash operations anyway
