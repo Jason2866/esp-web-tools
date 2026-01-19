@@ -137,28 +137,7 @@ export class EwtInstallDialog extends LitElement {
         await this.esploader.initialize();
         this.logger.log(`Found ${getChipFamilyName(this.esploader)}`);
       } catch (err: any) {
-        this.logger.error(`Connection failed: ${err.message}`);
-
-        // Try to reset device and release locks, then retry once
-        this.logger.log("Attempting to reset device and retry connection...");
-        await this._resetDeviceAndReleaseLocks();
-
-        try {
-          await this.esploader.initialize();
-          this.logger.log(
-            `Found ${getChipFamilyName(this.esploader)} after reset`,
-          );
-        } catch (retryErr: any) {
-          this.logger.error(`Retry failed: ${retryErr.message}`);
-          throw new Error(
-            `Failed to connect to ESP. ${retryErr.message || "Unknown error"}.\n\n` +
-              `Please try:\n` +
-              `1. Press and hold the BOOT button on your ESP device\n` +
-              `2. Click OK to retry\n` +
-              `3. Release the BOOT button when flashing starts\n\n` +
-              `If that doesn't work, try unplugging and reconnecting your device.`,
-          );
-        }
+        this.logger.error(`Connection failed to stub: ${err.message}`);
       }
     }
 
