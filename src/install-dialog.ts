@@ -1046,7 +1046,7 @@ export class EwtInstallDialog extends LitElement {
           slot="primaryAction"
           label="Back"
           @click=${async () => {
-            this._initialize(); // Re-test Improv after failed flash
+            await this._initialize(); // Re-test Improv after failed flash
             this._state = "DASHBOARD";
           }}
         ></ewt-button>
@@ -1072,19 +1072,14 @@ export class EwtInstallDialog extends LitElement {
           this.logger.log("Reset and Release locks...");
           try {
             await this._resetDeviceAndReleaseLocks();
-
-            // Reset ESP state completely
-            this._espStub = undefined;
-            this.esploader.IS_STUB = false;
-            this.esploader.chipFamily = null;
-            this.esploader._reader = undefined;
-            this.esploader._writer = undefined;
           } catch (reconnectErr: any) {
-            this.logger.error(`Reconnect failed: ${reconnectErr.message}`);
+            this.logger.error(
+              `Reset and Release locks failed: ${reconnectErr.message}`,
+            );
           }
 
           this._state = "DASHBOARD";
-          this._initialize(); // Re-test Improv after console
+          await this._initialize(); // Re-test Improv after console
         }}
       ></ewt-button>
       <ewt-button
