@@ -227,6 +227,23 @@ export class EwtInstallDialog extends LitElement {
     }
   }
 
+  // Helper to reset baudrate to 115200 for console
+  // CRITICAL: The ESP stub might be at higher baudrate (e.g., 460800) for flashing
+  // But firmware console always runs at 115200
+  private async _resetBaudrateForConsole() {
+    if (this._espStub && this._espStub._currentBaudRate !== 115200) {
+      this.logger.log(
+        `Resetting baudrate from ${this._espStub._currentBaudRate} to 115200 for console...`,
+      );
+      try {
+        await this._espStub.setBaudrate(115200);
+        this.logger.log("Baudrate set to 115200 for console");
+      } catch (baudErr: any) {
+        this.logger.log(`Failed to set baudrate to 115200: ${baudErr.message}`);
+      }
+    }
+  }
+
   // Reset device and release locks - used when returning to dashboard or recovering from errors
   // Reset device to FIRMWARE mode (normal execution)
   private async _resetDeviceAndReleaseLocks() {
@@ -461,43 +478,8 @@ export class EwtInstallDialog extends LitElement {
               // Also set `null` back to undefined.
               this._client = undefined;
 
-              // CRITICAL: Set baudrate back to 115200 for firmware communication
-              // The ESP stub might be at higher baudrate (e.g., 460800) for flashing
-              // But firmware console always runs at 115200
-              if (this._espStub && this._espStub._currentBaudRate !== 115200) {
-                this.logger.log(
-                  `Resetting baudrate from ${this._espStub._currentBaudRate} to 115200 for console...`,
-                );
-                try {
-                  await this._espStub.setBaudrate(115200);
-                  this.logger.log("Baudrate set to 115200 for console");
-                } catch (baudErr: any) {
-                  this.logger.log(
-                    `Failed to set baudrate to 115200: ${baudErr.message}`,
-                  );
-                }
-              }
-
-              // Release esploader reader/writer if locked
-              if (this.esploader._reader) {
-                try {
-                  await this.esploader._reader.cancel();
-                  this.esploader._reader.releaseLock();
-                  this.esploader._reader = undefined;
-                  this.logger.log("Reader released for console");
-                } catch (err) {
-                  this.logger.log("Could not release reader:", err);
-                }
-              }
-              if (this.esploader._writer) {
-                try {
-                  this.esploader._writer.releaseLock();
-                  this.esploader._writer = undefined;
-                  this.logger.log("Writer released for console");
-                } catch (err) {
-                  this.logger.log("Could not release writer:", err);
-                }
-              }
+              await this._resetBaudrateForConsole();
+              await this._releaseReaderWriter();
 
               this._state = "LOGS";
             }}
@@ -582,24 +564,7 @@ export class EwtInstallDialog extends LitElement {
               // Also set `null` back to undefined.
               this._client = undefined;
 
-              // CRITICAL: Set baudrate back to 115200 for firmware communication
-              // The ESP stub might be at higher baudrate (e.g., 460800) for flashing
-              // But firmware console always runs at 115200
-              if (this._espStub && this._espStub._currentBaudRate !== 115200) {
-                this.logger.log(
-                  `Resetting baudrate from ${this._espStub._currentBaudRate} to 115200 for console...`,
-                );
-                try {
-                  await this._espStub.setBaudrate(115200);
-                  this.logger.log("Baudrate set to 115200 for console");
-                } catch (baudErr: any) {
-                  this.logger.log(
-                    `Failed to set baudrate to 115200: ${baudErr.message}`,
-                  );
-                }
-              }
-
-              // Release esploader reader/writer if locked
+              await this._resetBaudrateForConsole();
               await this._releaseReaderWriter();
 
               this._state = "LOGS";
