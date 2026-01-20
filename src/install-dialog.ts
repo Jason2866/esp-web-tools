@@ -199,26 +199,30 @@ export class EwtInstallDialog extends LitElement {
   // Helper to release reader/writer locks (used by multiple methods)
   private async _releaseReaderWriter() {
     if (this.esploader._reader) {
+      const reader = this.esploader._reader;
       try {
-        await this.esploader._reader.cancel();
-        this.esploader._reader.releaseLock();
-        this.esploader._reader = undefined;
-        this.logger.log("Reader released");
+        await reader.cancel();
       } catch (err) {
-        // Reader might already be released - just clear the reference
+        this.logger.log("Reader cancel failed:", err);
+      } finally {
+        try {
+          reader.releaseLock();
+          this.logger.log("Reader released");
+        } catch (err) {
+          this.logger.log("Reader releaseLock failed:", err);
+        }
         this.esploader._reader = undefined;
-        this.logger.log("Reader already released or error:", err);
       }
     }
     if (this.esploader._writer) {
+      const writer = this.esploader._writer;
       try {
-        this.esploader._writer.releaseLock();
-        this.esploader._writer = undefined;
+        writer.releaseLock();
         this.logger.log("Writer released");
       } catch (err) {
-        // Writer might already be released - just clear the reference
+        this.logger.log("Writer releaseLock failed:", err);
+      } finally {
         this.esploader._writer = undefined;
-        this.logger.log("Writer already released or error:", err);
       }
     }
   }
