@@ -244,6 +244,25 @@ export class EwtInstallDialog extends LitElement {
     }
   }
 
+  // Helper to prepare ESP for flash operations after Improv check
+  // Resets to bootloader mode and loads stub
+  private async _prepareForFlashOperations() {
+    // Reset ESP to BOOTLOADER mode for flash operations
+    await this._resetToBootloaderAndReleaseLocks();
+
+    // Wait for ESP to enter bootloader mode
+    await sleep(100);
+
+    // Reset ESP state (chipFamily preserved from reset if successful)
+    this._espStub = undefined;
+    this.esploader.IS_STUB = false;
+
+    // Ensure stub is initialized
+    await this._ensureStub();
+
+    this.logger.log("ESP reseted, stub loaded - ready for flash operations");
+  }
+
   // Reset device and release locks - used when returning to dashboard or recovering from errors
   // Reset device to FIRMWARE mode (normal execution)
   private async _resetDeviceAndReleaseLocks() {
@@ -1409,35 +1428,20 @@ export class EwtInstallDialog extends LitElement {
           await this._closeClientWithoutEvents(client);
           this.logger.log("Improv client closed");
 
-          // Reset ESP to BOOTLOADER mode for flash operations
-          await this._resetToBootloaderAndReleaseLocks();
-
-          // Wait for ESP to enter bootloader mode
-          await sleep(100);
-
-          // Reset ESP state (chipFamily preserved from reset if successful)
-          this._espStub = undefined;
-          this.esploader.IS_STUB = false;
-          // Ensure stub is initialized
-          try {
-            await this._ensureStub();
-          } catch (err: any) {
-            // Stub load failed - show error to user
+          await this._prepareForFlashOperations();
+        } catch (err: any) {
+          if (
+            err.message &&
+            (err.message.includes("Failed to connect") ||
+              err.message === "Port selection cancelled")
+          ) {
+            // Connection error - show error to user
             this._state = "ERROR";
             this._error = err.message;
             this._busy = false;
             return;
           }
-          this.logger.log(
-            "ESP reseted, stub loaded - ready for flash operations",
-          );
-
-          // DON'T reset baudrate or test Improv here!
-          // Improv was already tested at the beginning of _initialize()
-          // If it was supported, we already have _client
-          // If not supported, _client is null and we don't need to test again
-        } catch (resetErr: any) {
-          this.logger.log(`ESP reset failed: ${resetErr.message}`);
+          this.logger.log(`ESP reset failed: ${err.message}`);
         }
       }
 
@@ -1468,34 +1472,20 @@ export class EwtInstallDialog extends LitElement {
         // Reset ESP into bootloader mode and load stub
         if (!justInstalled) {
           try {
-            // Reset ESP to BOOTLOADER mode for flash operations
-            await this._resetToBootloaderAndReleaseLocks();
-
-            // Wait for ESP to enter bootloader mode
-            await sleep(100);
-
-            // Reset ESP state (chipFamily preserved from reset if successful)
-            this._espStub = undefined;
-            this.esploader.IS_STUB = false;
-            // Ensure stub is initialized
-            try {
-              await this._ensureStub();
-            } catch (err: any) {
-              // Stub load failed - show error to user
+            await this._prepareForFlashOperations();
+          } catch (err: any) {
+            if (
+              err.message &&
+              (err.message.includes("Failed to connect") ||
+                err.message === "Port selection cancelled")
+            ) {
+              // Connection error - show error to user
               this._state = "ERROR";
               this._error = err.message;
               this._busy = false;
               return;
             }
-            this.logger.log(
-              "ESP reseted, stub loaded - ready for flash operations",
-            );
-
-            // DON'T reset baudrate or test Improv here!
-            // Improv was already tested (and failed) at the beginning of _initialize()
-            // We already know it's not supported (_client is null)
-          } catch (resetErr: any) {
-            this.logger.log(`ESP reset failed: ${resetErr.message}`);
+            this.logger.log(`ESP reset failed: ${err.message}`);
           }
         }
       }
