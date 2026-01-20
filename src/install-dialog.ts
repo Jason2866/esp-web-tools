@@ -98,12 +98,6 @@ export class EwtInstallDialog extends LitElement {
   // Track if Improv is supported (separate from active client)
   private _improvSupported = false;
 
-  // Check if running on Android with WebUSB
-  private get _isAndroid(): boolean {
-    const port = this.esploader?.port as any;
-    return port?.isWebUSB === true;
-  }
-
   // Ensure stub is initialized (called before any operation that needs it)
   private async _ensureStub(): Promise<any> {
     if (this._espStub && this._espStub.IS_STUB) {
@@ -281,34 +275,26 @@ export class EwtInstallDialog extends LitElement {
     this.logger.log("ESP state reset for Improv test");
 
     // Reconnect with 115200 baud and reset ESP to boot into new firmware
-    // SKIP on Android - WebUSB connection handling is different
-    if (!this._isAndroid) {
+    try {
+      // CRITICAL: After flashing at higher baudrate, reconnect at 115200
+      // reconnectToBootloader() closes port and reopens at 115200 baud
+      this.logger.log("Reconnecting at 115200 baud for firmware reset...");
       try {
-        // CRITICAL: After flashing at higher baudrate, reconnect at 115200
-        // reconnectToBootloader() closes port and reopens at 115200 baud
-        this.logger.log("Reconnecting at 115200 baud for firmware reset...");
-        try {
-          await this.esploader.reconnectToBootloader();
-          this.logger.log("Port reconnected at 115200 baud");
-        } catch (reconnectErr: any) {
-          this.logger.log(`Reconnect failed: ${reconnectErr.message}`);
-        }
-
-        // Reset device and release locks to ensure clean state for new firmware
-        this.logger.log("Performing hardware reset to start new firmware...");
-        await this._resetDeviceAndReleaseLocks();
-      } catch (resetErr: any) {
-        this.logger.log(`Hard reset failed: ${resetErr.message}`);
+        await this.esploader.reconnectToBootloader();
+        this.logger.log("Port reconnected at 115200 baud");
+      } catch (reconnectErr: any) {
+        this.logger.log(`Reconnect failed: ${reconnectErr.message}`);
       }
 
-      // Test Improv with new firmware (Desktop only)
-      await this._initialize(true);
-    } else {
-      this.logger.log("Skipping hard reset on Android (WebUSB)");
-      // On Android, skip Improv completely
-      this._client = null;
-      this._improvChecked = true;
+      // Reset device and release locks to ensure clean state for new firmware
+      this.logger.log("Performing hardware reset to start new firmware...");
+      await this._resetDeviceAndReleaseLocks();
+    } catch (resetErr: any) {
+      this.logger.log(`Hard reset failed: ${resetErr.message}`);
     }
+
+    // Test Improv with new firmware
+    await this._initialize(true);
 
     this.requestUpdate();
   }
@@ -1436,16 +1422,6 @@ export class EwtInstallDialog extends LitElement {
         this._busy = false;
         return;
       }
-    }
-
-    // ALWAYS skip Improv on Android - it causes connection issues
-    if (this._isAndroid) {
-      this.logger.log("Skipping Improv on Android (WebUSB) - not supported");
-      this._client = null;
-      this._improvChecked = true;
-      this._improvSupported = false;
-      this._busy = false;
-      return;
     }
 
     // Skip Improv if requested (e.g., when returning from console or filesystem manager)
