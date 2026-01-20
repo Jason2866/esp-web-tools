@@ -269,21 +269,7 @@ export class EwtInstallDialog extends LitElement {
     // Release locks and reset ESP state for Improv test
     await sleep(100);
 
-    const reader = this.esploader._reader;
-    const writer = this.esploader._writer;
-
-    if (reader) {
-      await reader.cancel();
-      reader.releaseLock();
-      this.esploader._reader = undefined;
-      this.logger.log("Reader released after flash");
-    }
-
-    if (writer) {
-      writer.releaseLock();
-      this.esploader._writer = undefined;
-      this.logger.log("Writer released after flash");
-    }
+    await this._releaseReaderWriter();
 
     // Reset ESP state for Improv test
     this._espStub = undefined;
