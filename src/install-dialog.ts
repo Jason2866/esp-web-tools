@@ -263,6 +263,60 @@ export class EwtInstallDialog extends LitElement {
     this.logger.log("ESP reseted, stub loaded - ready for flash operations");
   }
 
+  // Helper to handle post-flash cleanup and Improv re-initialization
+  // Called when flash operation completes successfully
+  private async _handleFlashComplete() {
+    // Release locks and reset ESP state for Improv test
+    await sleep(100);
+
+    const reader = this.esploader._reader;
+    const writer = this.esploader._writer;
+
+    if (reader) {
+      await reader.cancel();
+      reader.releaseLock();
+      this.esploader._reader = undefined;
+      this.logger.log("Reader released after flash");
+    }
+
+    if (writer) {
+      writer.releaseLock();
+      this.esploader._writer = undefined;
+      this.logger.log("Writer released after flash");
+    }
+
+    // Reset ESP state for Improv test
+    this._espStub = undefined;
+    this.esploader.IS_STUB = false;
+    this.esploader.chipFamily = null;
+    this._improvChecked = false;
+    this.esploader._reader = undefined;
+    this.esploader._writer = undefined;
+    this.logger.log("ESP state reset for Improv test");
+
+    // Reset ESP to boot into new firmware
+    // SKIP on Android - WebUSB connection handling is different
+    if (!this._isAndroid) {
+      try {
+        // Reset device and release locks to ensure clean state for new firmware
+        this.logger.log("Performing hardware reset to start new firmware...");
+        await this._resetDeviceAndReleaseLocks();
+      } catch (resetErr: any) {
+        this.logger.log(`Hard reset failed: ${resetErr.message}`);
+      }
+
+      // Test Improv with new firmware (Desktop only)
+      await this._initialize(true);
+    } else {
+      this.logger.log("Skipping hard reset on Android (WebUSB)");
+      // On Android, skip Improv completely
+      this._client = null;
+      this._improvChecked = true;
+    }
+
+    this.requestUpdate();
+  }
+
   // Reset device and release locks - used when returning to dashboard or recovering from errors
   // Reset device to FIRMWARE mode (normal execution)
   private async _resetDeviceAndReleaseLocks() {
@@ -1535,57 +1589,7 @@ export class EwtInstallDialog extends LitElement {
           this._installState = state;
 
           if (state.state === FlashStateType.FINISHED) {
-            // Release locks and reset ESP state for Improv test
-            sleep(100).then(async () => {
-              const reader = this.esploader._reader;
-              const writer = this.esploader._writer;
-
-              if (reader) {
-                await reader.cancel();
-                reader.releaseLock();
-                this.esploader._reader = undefined;
-                this.logger.log("Reader released after flash");
-              }
-
-              if (writer) {
-                writer.releaseLock();
-                this.esploader._writer = undefined;
-                this.logger.log("Writer released after flash");
-              }
-
-              // Reset ESP state for Improv test
-              this._espStub = undefined;
-              this.esploader.IS_STUB = false;
-              this.esploader.chipFamily = null;
-              this._improvChecked = false;
-              this.esploader._reader = undefined;
-              this.esploader._writer = undefined;
-              this.logger.log("ESP state reset for Improv test");
-
-              // Reset ESP to boot into new firmware
-              // SKIP on Android - WebUSB connection handling is different
-              if (!this._isAndroid) {
-                try {
-                  // Reset device and release locks to ensure clean state for new firmware
-                  this.logger.log(
-                    "Performing hardware reset to start new firmware...",
-                  );
-                  await this._resetDeviceAndReleaseLocks();
-                } catch (resetErr: any) {
-                  this.logger.log(`Hard reset failed: ${resetErr.message}`);
-                }
-
-                // Test Improv with new firmware (Desktop only)
-                await this._initialize(true);
-              } else {
-                this.logger.log("Skipping hard reset on Android (WebUSB)");
-                // On Android, skip Improv completely
-                this._client = null;
-                this._improvChecked = true;
-              }
-
-              this.requestUpdate();
-            });
+            this._handleFlashComplete();
           }
         },
         loaderToUse,
@@ -1607,57 +1611,7 @@ export class EwtInstallDialog extends LitElement {
         this._installState = state;
 
         if (state.state === FlashStateType.FINISHED) {
-          // Release locks and reset ESP state for Improv test
-          sleep(100).then(async () => {
-            const reader = this.esploader._reader;
-            const writer = this.esploader._writer;
-
-            if (reader) {
-              await reader.cancel();
-              reader.releaseLock();
-              this.esploader._reader = undefined;
-              this.logger.log("Reader released after flash");
-            }
-
-            if (writer) {
-              writer.releaseLock();
-              this.esploader._writer = undefined;
-              this.logger.log("Writer released after flash");
-            }
-
-            // Reset ESP state for Improv test
-            this._espStub = undefined;
-            this.esploader.IS_STUB = false;
-            this.esploader.chipFamily = null;
-            this._improvChecked = false;
-            this.esploader._reader = undefined;
-            this.esploader._writer = undefined;
-            this.logger.log("ESP state reset for Improv test");
-
-            // Reset ESP to boot into new firmware
-            // SKIP on Android - WebUSB connection handling is different
-            if (!this._isAndroid) {
-              try {
-                // Reset device and release locks to ensure clean state for new firmware
-                this.logger.log(
-                  "Performing hardware reset to start new firmware...",
-                );
-                await this._resetDeviceAndReleaseLocks();
-              } catch (resetErr: any) {
-                this.logger.log(`Hard reset failed: ${resetErr.message}`);
-              }
-
-              // Test Improv with new firmware (Desktop only)
-              await this._initialize(true);
-            } else {
-              this.logger.log("Skipping hard reset on Android (WebUSB)");
-              // On Android, skip Improv completely
-              this._client = null;
-              this._improvChecked = true;
-            }
-
-            this.requestUpdate();
-          });
+          this._handleFlashComplete();
         }
       },
       loaderToUse,
