@@ -200,7 +200,7 @@ export class EwtInstallDialog extends LitElement {
   private _isUSBJTAG_S2(): boolean {
     const portInfo = this._port.getInfo();
     // Espressif VID: 0x303A, ESP32-S2 USB_JTAG_SERIAL_PID: 0x0002
-    return portInfo.usbVendorId === 0x303A && portInfo.usbProductId === 0x0002;
+    return portInfo.usbVendorId === 0x303a && portInfo.usbProductId === 0x0002;
   }
 
   // Helper to release reader/writer locks (used by multiple methods)
