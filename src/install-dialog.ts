@@ -294,10 +294,20 @@ export class EwtInstallDialog extends LitElement {
     this.esploader._writer = undefined;
     this.logger.log("ESP state reset for Improv test");
 
-    // Reset ESP to boot into new firmware
+    // Reconnect with 115200 baud and reset ESP to boot into new firmware
     // SKIP on Android - WebUSB connection handling is different
     if (!this._isAndroid) {
       try {
+        // CRITICAL: After flashing at higher baudrate, reconnect at 115200
+        // reconnectToBootloader() closes port and reopens at 115200 baud
+        this.logger.log("Reconnecting at 115200 baud for firmware reset...");
+        try {
+          await this.esploader.reconnectToBootloader();
+          this.logger.log("Port reconnected at 115200 baud");
+        } catch (reconnectErr: any) {
+          this.logger.log(`Reconnect failed: ${reconnectErr.message}`);
+        }
+
         // Reset device and release locks to ensure clean state for new firmware
         this.logger.log("Performing hardware reset to start new firmware...");
         await this._resetDeviceAndReleaseLocks();
