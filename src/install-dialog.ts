@@ -190,6 +190,12 @@ export class EwtInstallDialog extends LitElement {
     return this.esploader.port;
   }
 
+  // Helper to check if this is ESP32-S2 USB/JTAG mode
+  private _isUSBJTAG_S2(): boolean {
+    const portInfo = this._port.getInfo();
+    return portInfo.usbProductId === 0x0002; // S2 USB_JTAG_SERIAL_PID
+  }
+
   // Helper to release reader/writer locks (used by multiple methods)
   private async _releaseReaderWriter() {
     if (this.esploader._reader) {
@@ -261,10 +267,7 @@ export class EwtInstallDialog extends LitElement {
   // Called when flash operation completes successfully
   private async _handleFlashComplete() {
     // Check if this is ESP32-S2/S3 USB/JTAG mode
-    const portInfo = this._port.getInfo();
-    const isUSBJTAG_S2 = portInfo.usbProductId === 0x0002; // S2 USB_JTAG_SERIAL_PID
-
-    if (isUSBJTAG_S2) {
+    if (this._isUSBJTAG_S2()) {
       // For USB/JTAG S2: NO baudrate change, NO Improv test, NO reconnect
       // Just mark as complete and show success
       this.logger.log("ESP32-S2 USB/JTAG - skipping post-flash Improv test");
@@ -1025,10 +1028,7 @@ export class EwtInstallDialog extends LitElement {
       const supportsImprov = this._client !== null;
 
       // Check if this is ESP32-S2/S3 USB/JTAG mode
-      const portInfo = this._port.getInfo();
-      const isUSBJTAG_S2 = portInfo.usbProductId === 0x0002; // S2 USB_JTAG_SERIAL_PID
-
-      if (isUSBJTAG_S2) {
+      if (this._isUSBJTAG_S2()) {
         // For USB/JTAG S2: Show success message without Next button
         content = html`
           <ewt-page-message
@@ -1514,10 +1514,7 @@ export class EwtInstallDialog extends LitElement {
 
     // CRITICAL: Check if ESP32-S2 connected via USB/JTAG (PID 0x0002)
     // No auto reset possible out of boot mode - skip test and load stub directly
-    const portInfo = this._port.getInfo();
-    const isUSBJTAG_S2 = portInfo.usbProductId === 0x0002; // S2 USB_JTAG_SERIAL_PID
-
-    if (isUSBJTAG_S2 && !justInstalled) {
+    if (this._isUSBJTAG_S2() && !justInstalled) {
       this.logger.log(
         "ESP32-S2 USB/JTAG detected - skipping Improv, loading stub directly",
       );
