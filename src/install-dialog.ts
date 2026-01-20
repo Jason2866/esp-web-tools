@@ -567,6 +567,9 @@ export class EwtInstallDialog extends LitElement {
                       this.logger.log(
                         `Improv initialization failed: ${improvErr.message}`,
                       );
+                      this._error = `Improv initialization failed: ${improvErr.message}`;
+                      this._state = "ERROR";
+                      return;
                     }
 
                     this._state = "PROVISION";
