@@ -199,28 +199,118 @@ export class EwtInstallDialog extends LitElement {
   // Helper to release reader/writer locks (used by multiple methods)
   private async _releaseReaderWriter() {
     if (this.esploader._reader) {
+      const reader = this.esploader._reader;
       try {
-        await this.esploader._reader.cancel();
-        this.esploader._reader.releaseLock();
-        this.esploader._reader = undefined;
-        this.logger.log("Reader released");
+        await reader.cancel();
       } catch (err) {
-        // Reader might already be released - just clear the reference
+        this.logger.log("Reader cancel failed:", err);
+      } finally {
+        try {
+          reader.releaseLock();
+          this.logger.log("Reader released");
+        } catch (err) {
+          this.logger.log("Reader releaseLock failed:", err);
+        }
         this.esploader._reader = undefined;
-        this.logger.log("Reader already released or error:", err);
       }
     }
     if (this.esploader._writer) {
+      const writer = this.esploader._writer;
       try {
-        this.esploader._writer.releaseLock();
-        this.esploader._writer = undefined;
+        writer.releaseLock();
         this.logger.log("Writer released");
       } catch (err) {
-        // Writer might already be released - just clear the reference
+        this.logger.log("Writer releaseLock failed:", err);
+      } finally {
         this.esploader._writer = undefined;
-        this.logger.log("Writer already released or error:", err);
       }
     }
+  }
+
+  // Helper to reset baudrate to 115200 for console
+  // CRITICAL: The ESP stub might be at higher baudrate (e.g., 460800) for flashing
+  // But firmware console always runs at 115200
+  private async _resetBaudrateForConsole() {
+    if (this._espStub && this._espStub._currentBaudRate !== 115200) {
+      this.logger.log(
+        `Resetting baudrate from ${this._espStub._currentBaudRate} to 115200 for console...`,
+      );
+      try {
+        await this._espStub.setBaudrate(115200);
+        this.logger.log("Baudrate set to 115200 for console");
+      } catch (baudErr: any) {
+        this.logger.log(`Failed to set baudrate to 115200: ${baudErr.message}`);
+      }
+    }
+  }
+
+  // Helper to prepare ESP for flash operations after Improv check
+  // Resets to bootloader mode and loads stub
+  private async _prepareForFlashOperations() {
+    // Reset ESP to BOOTLOADER mode for flash operations
+    await this._resetToBootloaderAndReleaseLocks();
+
+    // Wait for ESP to enter bootloader mode
+    await sleep(100);
+
+    // Reset ESP state (chipFamily preserved from reset if successful)
+    this._espStub = undefined;
+    this.esploader.IS_STUB = false;
+
+    // Ensure stub is initialized
+    await this._ensureStub();
+
+    this.logger.log("ESP reseted, stub loaded - ready for flash operations");
+  }
+
+  // Helper to handle post-flash cleanup and Improv re-initialization
+  // Called when flash operation completes successfully
+  private async _handleFlashComplete() {
+    // Release locks and reset ESP state for Improv test
+    await sleep(100);
+
+    await this._releaseReaderWriter();
+
+    // Reset ESP state for Improv test
+    this._espStub = undefined;
+    this.esploader.IS_STUB = false;
+    this.esploader.chipFamily = null;
+    this._improvChecked = false;
+    this.esploader._reader = undefined;
+    this.esploader._writer = undefined;
+    this.logger.log("ESP state reset for Improv test");
+
+    // Reconnect with 115200 baud and reset ESP to boot into new firmware
+    // SKIP on Android - WebUSB connection handling is different
+    if (!this._isAndroid) {
+      try {
+        // CRITICAL: After flashing at higher baudrate, reconnect at 115200
+        // reconnectToBootloader() closes port and reopens at 115200 baud
+        this.logger.log("Reconnecting at 115200 baud for firmware reset...");
+        try {
+          await this.esploader.reconnectToBootloader();
+          this.logger.log("Port reconnected at 115200 baud");
+        } catch (reconnectErr: any) {
+          this.logger.log(`Reconnect failed: ${reconnectErr.message}`);
+        }
+
+        // Reset device and release locks to ensure clean state for new firmware
+        this.logger.log("Performing hardware reset to start new firmware...");
+        await this._resetDeviceAndReleaseLocks();
+      } catch (resetErr: any) {
+        this.logger.log(`Hard reset failed: ${resetErr.message}`);
+      }
+
+      // Test Improv with new firmware (Desktop only)
+      await this._initialize(true);
+    } else {
+      this.logger.log("Skipping hard reset on Android (WebUSB)");
+      // On Android, skip Improv completely
+      this._client = null;
+      this._improvChecked = true;
+    }
+
+    this.requestUpdate();
   }
 
   // Reset device and release locks - used when returning to dashboard or recovering from errors
@@ -431,14 +521,59 @@ export class EwtInstallDialog extends LitElement {
                   .label=${this._client.state === ImprovSerialCurrentState.READY
                     ? "Connect to Wi-Fi"
                     : "Change Wi-Fi"}
-                  @click=${() => {
-                    this._state = "PROVISION";
-                    if (
-                      this._client!.state ===
-                      ImprovSerialCurrentState.PROVISIONED
-                    ) {
-                      this._provisionForce = true;
+                  @click=${async () => {
+                    // Close Improv client if active
+                    if (this._client) {
+                      await this._closeClientWithoutEvents(this._client);
+                      this._client = undefined;
                     }
+
+                    // Ensure ESP is in firmware mode at 115200 baud
+                    await this._resetBaudrateForConsole();
+                    await this._releaseReaderWriter();
+
+                    try {
+                      await this._resetDeviceAndReleaseLocks();
+                      this.logger.log(
+                        "ESP reset to firmware mode for Wi-Fi setup",
+                      );
+                      await sleep(100);
+                    } catch (resetErr: any) {
+                      this.logger.log(`Reset failed: ${resetErr.message}`);
+                    }
+
+                    // Re-create Improv client (firmware is now running at 115200 baud)
+                    this.logger.log(
+                      "Re-initializing Improv Serial for Wi-Fi setup",
+                    );
+                    const client = new ImprovSerial(this._port, this.logger);
+                    client.addEventListener("state-changed", () => {
+                      this.requestUpdate();
+                    });
+                    client.addEventListener("error-changed", () =>
+                      this.requestUpdate(),
+                    );
+                    try {
+                      this._info = await client.initialize(1000);
+                      this._client = client;
+                      client.addEventListener(
+                        "disconnect",
+                        this._handleDisconnect,
+                      );
+                      this.logger.log(
+                        "Improv client ready for Wi-Fi provisioning",
+                      );
+                    } catch (improvErr: any) {
+                      this.logger.log(
+                        `Improv initialization failed: ${improvErr.message}`,
+                      );
+                      this._error = `Improv initialization failed: ${improvErr.message}`;
+                      this._state = "ERROR";
+                      return;
+                    }
+
+                    this._state = "PROVISION";
+                    this._provisionForce = true;
                   }}
                 ></ewt-button>
               </div>
@@ -457,43 +592,9 @@ export class EwtInstallDialog extends LitElement {
               // Also set `null` back to undefined.
               this._client = undefined;
 
-              // CRITICAL: Set baudrate back to 115200 for firmware communication
-              // The ESP stub might be at higher baudrate (e.g., 460800) for flashing
-              // But firmware console always runs at 115200
-              if (this._espStub && this._espStub._currentBaudRate !== 115200) {
-                this.logger.log(
-                  `Resetting baudrate from ${this._espStub._currentBaudRate} to 115200 for console...`,
-                );
-                try {
-                  await this._espStub.setBaudrate(115200);
-                  this.logger.log("Baudrate set to 115200 for console");
-                } catch (baudErr: any) {
-                  this.logger.log(
-                    `Failed to set baudrate to 115200: ${baudErr.message}`,
-                  );
-                }
-              }
-
-              // Release esploader reader/writer if locked
-              if (this.esploader._reader) {
-                try {
-                  await this.esploader._reader.cancel();
-                  this.esploader._reader.releaseLock();
-                  this.esploader._reader = undefined;
-                  this.logger.log("Reader released for console");
-                } catch (err) {
-                  this.logger.log("Could not release reader:", err);
-                }
-              }
-              if (this.esploader._writer) {
-                try {
-                  this.esploader._writer.releaseLock();
-                  this.esploader._writer = undefined;
-                  this.logger.log("Writer released for console");
-                } catch (err) {
-                  this.logger.log("Could not release writer:", err);
-                }
-              }
+              await this._resetBaudrateForConsole();
+              await this._releaseReaderWriter();
+              await this._resetDeviceAndReleaseLocks();
 
               this._state = "LOGS";
             }}
@@ -578,25 +679,9 @@ export class EwtInstallDialog extends LitElement {
               // Also set `null` back to undefined.
               this._client = undefined;
 
-              // CRITICAL: Set baudrate back to 115200 for firmware communication
-              // The ESP stub might be at higher baudrate (e.g., 460800) for flashing
-              // But firmware console always runs at 115200
-              if (this._espStub && this._espStub._currentBaudRate !== 115200) {
-                this.logger.log(
-                  `Resetting baudrate from ${this._espStub._currentBaudRate} to 115200 for console...`,
-                );
-                try {
-                  await this._espStub.setBaudrate(115200);
-                  this.logger.log("Baudrate set to 115200 for console");
-                } catch (baudErr: any) {
-                  this.logger.log(
-                    `Failed to set baudrate to 115200: ${baudErr.message}`,
-                  );
-                }
-              }
-
-              // Release esploader reader/writer if locked
+              await this._resetBaudrateForConsole();
               await this._releaseReaderWriter();
+              await this._resetDeviceAndReleaseLocks();
 
               this._state = "LOGS";
             }}
@@ -965,7 +1050,11 @@ export class EwtInstallDialog extends LitElement {
     let hideActions = false;
 
     content = html`
-      <ewt-console .port=${this._port} .logger=${this.logger}></ewt-console>
+      <ewt-console
+        .port=${this._port}
+        .logger=${this.logger}
+        .onReset=${async () => await this._resetDeviceAndReleaseLocks()}
+      ></ewt-console>
       <ewt-button
         slot="primaryAction"
         label="Back"
@@ -1440,35 +1529,20 @@ export class EwtInstallDialog extends LitElement {
           await this._closeClientWithoutEvents(client);
           this.logger.log("Improv client closed");
 
-          // Reset ESP to BOOTLOADER mode for flash operations
-          await this._resetToBootloaderAndReleaseLocks();
-
-          // Wait for ESP to enter bootloader mode
-          await sleep(100);
-
-          // Reset ESP state (chipFamily preserved from reset if successful)
-          this._espStub = undefined;
-          this.esploader.IS_STUB = false;
-          // Ensure stub is initialized
-          try {
-            await this._ensureStub();
-          } catch (err: any) {
-            // Stub load failed - show error to user
+          await this._prepareForFlashOperations();
+        } catch (err: any) {
+          if (
+            err.message &&
+            (err.message.includes("Failed to connect") ||
+              err.message === "Port selection cancelled")
+          ) {
+            // Connection error - show error to user
             this._state = "ERROR";
             this._error = err.message;
             this._busy = false;
             return;
           }
-          this.logger.log(
-            "ESP reseted, stub loaded - ready for flash operations",
-          );
-
-          // DON'T reset baudrate or test Improv here!
-          // Improv was already tested at the beginning of _initialize()
-          // If it was supported, we already have _client
-          // If not supported, _client is null and we don't need to test again
-        } catch (resetErr: any) {
-          this.logger.log(`ESP reset failed: ${resetErr.message}`);
+          this.logger.log(`ESP reset failed: ${err.message}`);
         }
       }
 
@@ -1499,34 +1573,20 @@ export class EwtInstallDialog extends LitElement {
         // Reset ESP into bootloader mode and load stub
         if (!justInstalled) {
           try {
-            // Reset ESP to BOOTLOADER mode for flash operations
-            await this._resetToBootloaderAndReleaseLocks();
-
-            // Wait for ESP to enter bootloader mode
-            await sleep(100);
-
-            // Reset ESP state (chipFamily preserved from reset if successful)
-            this._espStub = undefined;
-            this.esploader.IS_STUB = false;
-            // Ensure stub is initialized
-            try {
-              await this._ensureStub();
-            } catch (err: any) {
-              // Stub load failed - show error to user
+            await this._prepareForFlashOperations();
+          } catch (err: any) {
+            if (
+              err.message &&
+              (err.message.includes("Failed to connect") ||
+                err.message === "Port selection cancelled")
+            ) {
+              // Connection error - show error to user
               this._state = "ERROR";
               this._error = err.message;
               this._busy = false;
               return;
             }
-            this.logger.log(
-              "ESP reseted, stub loaded - ready for flash operations",
-            );
-
-            // DON'T reset baudrate or test Improv here!
-            // Improv was already tested (and failed) at the beginning of _initialize()
-            // We already know it's not supported (_client is null)
-          } catch (resetErr: any) {
-            this.logger.log(`ESP reset failed: ${resetErr.message}`);
+            this.logger.log(`ESP reset failed: ${err.message}`);
           }
         }
       }
@@ -1576,57 +1636,7 @@ export class EwtInstallDialog extends LitElement {
           this._installState = state;
 
           if (state.state === FlashStateType.FINISHED) {
-            // Release locks and reset ESP state for Improv test
-            sleep(100).then(async () => {
-              const reader = this.esploader._reader;
-              const writer = this.esploader._writer;
-
-              if (reader) {
-                await reader.cancel();
-                reader.releaseLock();
-                this.esploader._reader = undefined;
-                this.logger.log("Reader released after flash");
-              }
-
-              if (writer) {
-                writer.releaseLock();
-                this.esploader._writer = undefined;
-                this.logger.log("Writer released after flash");
-              }
-
-              // Reset ESP state for Improv test
-              this._espStub = undefined;
-              this.esploader.IS_STUB = false;
-              this.esploader.chipFamily = null;
-              this._improvChecked = false;
-              this.esploader._reader = undefined;
-              this.esploader._writer = undefined;
-              this.logger.log("ESP state reset for Improv test");
-
-              // Reset ESP to boot into new firmware
-              // SKIP on Android - WebUSB connection handling is different
-              if (!this._isAndroid) {
-                try {
-                  // Reset device and release locks to ensure clean state for new firmware
-                  this.logger.log(
-                    "Performing hardware reset to start new firmware...",
-                  );
-                  await this._resetDeviceAndReleaseLocks();
-                } catch (resetErr: any) {
-                  this.logger.log(`Hard reset failed: ${resetErr.message}`);
-                }
-
-                // Test Improv with new firmware (Desktop only)
-                await this._initialize(true);
-              } else {
-                this.logger.log("Skipping hard reset on Android (WebUSB)");
-                // On Android, skip Improv completely
-                this._client = null;
-                this._improvChecked = true;
-              }
-
-              this.requestUpdate();
-            });
+            this._handleFlashComplete();
           }
         },
         loaderToUse,
@@ -1648,57 +1658,7 @@ export class EwtInstallDialog extends LitElement {
         this._installState = state;
 
         if (state.state === FlashStateType.FINISHED) {
-          // Release locks and reset ESP state for Improv test
-          sleep(100).then(async () => {
-            const reader = this.esploader._reader;
-            const writer = this.esploader._writer;
-
-            if (reader) {
-              await reader.cancel();
-              reader.releaseLock();
-              this.esploader._reader = undefined;
-              this.logger.log("Reader released after flash");
-            }
-
-            if (writer) {
-              writer.releaseLock();
-              this.esploader._writer = undefined;
-              this.logger.log("Writer released after flash");
-            }
-
-            // Reset ESP state for Improv test
-            this._espStub = undefined;
-            this.esploader.IS_STUB = false;
-            this.esploader.chipFamily = null;
-            this._improvChecked = false;
-            this.esploader._reader = undefined;
-            this.esploader._writer = undefined;
-            this.logger.log("ESP state reset for Improv test");
-
-            // Reset ESP to boot into new firmware
-            // SKIP on Android - WebUSB connection handling is different
-            if (!this._isAndroid) {
-              try {
-                // Reset device and release locks to ensure clean state for new firmware
-                this.logger.log(
-                  "Performing hardware reset to start new firmware...",
-                );
-                await this._resetDeviceAndReleaseLocks();
-              } catch (resetErr: any) {
-                this.logger.log(`Hard reset failed: ${resetErr.message}`);
-              }
-
-              // Test Improv with new firmware (Desktop only)
-              await this._initialize(true);
-            } else {
-              this.logger.log("Skipping hard reset on Android (WebUSB)");
-              // On Android, skip Improv completely
-              this._client = null;
-              this._improvChecked = true;
-            }
-
-            this.requestUpdate();
-          });
+          this._handleFlashComplete();
         }
       },
       loaderToUse,

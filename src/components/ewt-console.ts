@@ -7,6 +7,7 @@ export class EwtConsole extends HTMLElement {
   public port!: SerialPort;
   public logger!: Logger;
   public allowInput = true;
+  public onReset?: () => Promise<void>;
 
   private _console?: ColoredConsole;
   private _cancelConnection?: () => Promise<void>;
@@ -145,14 +146,9 @@ export class EwtConsole extends HTMLElement {
 
   public async reset() {
     this.logger.debug("Triggering reset.");
-    await this.port.setSignals({
-      dataTerminalReady: false,
-      requestToSend: true,
-    });
-    await this.port.setSignals({
-      dataTerminalReady: false,
-      requestToSend: false,
-    });
+    if (this.onReset) {
+      await this.onReset();
+    }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 }
