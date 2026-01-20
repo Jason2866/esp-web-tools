@@ -196,6 +196,12 @@ export class EwtInstallDialog extends LitElement {
     return this.esploader.port;
   }
 
+  // Helper to check if this is ESP32-S2 USB/JTAG mode
+  private _isUSBJTAG_S2(): boolean {
+    const portInfo = this._port.getInfo();
+    return portInfo.usbProductId === 0x0002; // S2 USB_JTAG_SERIAL_PID
+  }
+
   // Helper to release reader/writer locks (used by multiple methods)
   private async _releaseReaderWriter() {
     if (this.esploader._reader) {
@@ -266,6 +272,31 @@ export class EwtInstallDialog extends LitElement {
   // Helper to handle post-flash cleanup and Improv re-initialization
   // Called when flash operation completes successfully
   private async _handleFlashComplete() {
+    // Check if this is ESP32-S2/S3 USB/JTAG mode
+    if (this._isUSBJTAG_S2()) {
+      // For USB/JTAG S2: NO baudrate change, NO Improv test, NO reconnect
+      // Just mark as complete and show success
+      this.logger.log("ESP32-S2 USB/JTAG - skipping post-flash Improv test");
+
+      // Release locks and reset ESP state
+      await sleep(100);
+      await this._releaseReaderWriter();
+
+      this._espStub = undefined;
+      this.esploader.IS_STUB = false;
+      this.esploader.chipFamily = null;
+      this._improvChecked = true; // Mark as checked (but not supported)
+      this._client = null;
+      this._improvSupported = false;
+      this.esploader._reader = undefined;
+      this.esploader._writer = undefined;
+
+      this.logger.log("Flash complete - ready for next operation");
+      this.requestUpdate();
+      return;
+    }
+
+    // Normal flow for non-USB/JTAG devices
     // Release locks and reset ESP state for Improv test
     await sleep(100);
 
@@ -1009,20 +1040,36 @@ export class EwtInstallDialog extends LitElement {
     } else if (this._installState.state === FlashStateType.FINISHED) {
       heading = undefined;
       const supportsImprov = this._client !== null;
-      content = html`
-        <ewt-page-message
-          .icon=${OK_ICON}
-          label="Installation complete!"
-        ></ewt-page-message>
-        <ewt-button
-          slot="primaryAction"
-          label="Next"
-          @click=${() => {
-            this._state =
-              supportsImprov && this._installErase ? "PROVISION" : "DASHBOARD";
-          }}
-        ></ewt-button>
-      `;
+
+      // Check if this is ESP32-S2/S3 USB/JTAG mode
+      if (this._isUSBJTAG_S2()) {
+        // For USB/JTAG S2: Show success message without Next button
+        content = html`
+          <ewt-page-message
+            .icon=${OK_ICON}
+            label="Installation complete!"
+          ></ewt-page-message>
+        `;
+        hideActions = true; // No actions - user must close dialog manually
+      } else {
+        // Normal flow with Next button
+        content = html`
+          <ewt-page-message
+            .icon=${OK_ICON}
+            label="Installation complete!"
+          ></ewt-page-message>
+          <ewt-button
+            slot="primaryAction"
+            label="Next"
+            @click=${() => {
+              this._state =
+                supportsImprov && this._installErase
+                  ? "PROVISION"
+                  : "DASHBOARD";
+            }}
+          ></ewt-button>
+        `;
+      }
     } else if (this._installState.state === FlashStateType.ERROR) {
       heading = "Installation failed";
       content = html`
@@ -1489,6 +1536,46 @@ export class EwtInstallDialog extends LitElement {
       return;
     }
 
+    // CRITICAL: Check if ESP32-S2 connected via USB/JTAG (PID 0x0002)
+    // No auto reset possible out of boot mode - skip test and load stub directly
+    if (this._isUSBJTAG_S2() && !justInstalled) {
+      this.logger.log(
+        "ESP32-S2 USB/JTAG detected - skipping Improv, loading stub directly",
+      );
+      this._improvChecked = true;
+      this._client = null;
+      this._improvSupported = false;
+
+      try {
+        // DON'T reset chipFamily - keep it if already detected
+        // Only reset stub state if needed
+        if (!this._espStub || !this._espStub.IS_STUB) {
+          this._espStub = undefined;
+          this.esploader.IS_STUB = false;
+          // Keep chipFamily if already detected
+
+          // Load stub directly
+          await this._ensureStub();
+          this.logger.log(
+            "Stub loaded successfully for ESP32-S2 USB/JTAG device",
+          );
+        } else {
+          this.logger.log("Stub already loaded for ESP32-S2 USB/JTAG device");
+        }
+
+        // Set state to DASHBOARD so UI can render
+        this._state = "DASHBOARD";
+      } catch (stubErr: any) {
+        this.logger.error(`Failed to load stub: ${stubErr.message}`);
+        // Show error to user
+        this._state = "ERROR";
+        this._error = `Failed to connect: ${stubErr.message}`;
+      }
+
+      this._busy = false;
+      return;
+    }
+
     // Port is at 115200 baud for Improv (no stub loaded yet!)
     // If not just installed, reset ESP to firmware mode to ensure firmware is running
     if (!justInstalled) {
@@ -1496,9 +1583,11 @@ export class EwtInstallDialog extends LitElement {
         // Reset ESP to FIRMWARE mode (needed if we were in bootloader mode)
         await this._resetDeviceAndReleaseLocks();
         this.logger.log("ESP reset to firmware mode for Improv test");
-        await sleep(100); // Wait for firmware to start
+        // ESP32-S2/S3 with USB-OTG need longer after watchdog reset
+        // Port remains open after hardReset(), just reader/writer are released
+        await sleep(2000); // Wait for firmware to start (2 seconds for USB-OTG compatibility)
       } catch (e) {
-        this.logger.log(`Reset to firmware failed, continuing anyway`);
+        this.logger.log(`Reset to firmware failed, continuing anyway: ${e}`);
       }
     }
 
@@ -1645,7 +1734,11 @@ export class EwtInstallDialog extends LitElement {
         this._installErase,
         new Uint8Array(0),
         this.baudRate,
-      );
+      ).catch((flashErr: any) => {
+        this.logger.error(`Flash error: ${flashErr.message || flashErr}`);
+        this._state = "ERROR";
+        this._error = `Flash failed: ${flashErr.message || flashErr}`;
+      });
     }
   }
 
