@@ -591,6 +591,7 @@ export class EwtInstallDialog extends LitElement {
 
               await this._resetBaudrateForConsole();
               await this._releaseReaderWriter();
+              await this._resetDeviceAndReleaseLocks();
 
               this._state = "LOGS";
             }}
@@ -677,6 +678,7 @@ export class EwtInstallDialog extends LitElement {
 
               await this._resetBaudrateForConsole();
               await this._releaseReaderWriter();
+              await this._resetDeviceAndReleaseLocks();
 
               this._state = "LOGS";
             }}
