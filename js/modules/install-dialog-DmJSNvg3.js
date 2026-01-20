@@ -855,7 +855,7 @@ import{l as e,o as t,_ as i,n as o,B as n,i as r,a,t as d,e as l,b as s,R as c,x
           <ewt-button
             ?disabled=${this._busy}
             label="Logs & Console"
-            @click=${async()=>{const e=this._client;e&&(await this._closeClientWithoutEvents(e),await ee(100)),this._client=void 0,await this._resetBaudrateForConsole(),await this._releaseReaderWriter(),this._state="LOGS"}}
+            @click=${async()=>{const e=this._client;e&&(await this._closeClientWithoutEvents(e),await ee(100)),this._client=void 0,await this._resetBaudrateForConsole(),await this._releaseReaderWriter(),await this._resetDeviceAndReleaseLocks(),this._state="LOGS"}}
           ></ewt-button>
         </div>
         <div>
@@ -902,7 +902,7 @@ import{l as e,o as t,_ as i,n as o,B as n,i as r,a,t as d,e as l,b as s,R as c,x
           <ewt-button
             label="Logs & Console"
             ?disabled=${this._busy}
-            @click=${async()=>{this._client=void 0,await this._resetBaudrateForConsole(),await this._releaseReaderWriter(),this._state="LOGS"}}
+            @click=${async()=>{this._client=void 0,await this._resetBaudrateForConsole(),await this._releaseReaderWriter(),await this._resetDeviceAndReleaseLocks(),this._state="LOGS"}}
           ></ewt-button>
         </div>
 
