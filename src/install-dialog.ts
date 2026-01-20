@@ -1479,16 +1479,24 @@ export class EwtInstallDialog extends LitElement {
       this._improvSupported = false;
 
       try {
-        // Reset ESP state
-        this._espStub = undefined;
-        this.esploader.IS_STUB = false;
-        this.esploader.chipFamily = null;
+        // DON'T reset chipFamily - keep it if already detected
+        // Only reset stub state if needed
+        if (!this._espStub || !this._espStub.IS_STUB) {
+          this._espStub = undefined;
+          this.esploader.IS_STUB = false;
+          // Keep chipFamily if already detected
 
-        // Load stub directly
-        await this._ensureStub();
-        this.logger.log(
-          "Stub loaded successfully for ESP32-S2 USB/JTAG device",
-        );
+          // Load stub directly
+          await this._ensureStub();
+          this.logger.log(
+            "Stub loaded successfully for ESP32-S2 USB/JTAG device",
+          );
+        } else {
+          this.logger.log("Stub already loaded for ESP32-S2 USB/JTAG device");
+        }
+
+        // Set state to DASHBOARD so UI can render
+        this._state = "DASHBOARD";
       } catch (stubErr: any) {
         this.logger.error(`Failed to load stub: ${stubErr.message}`);
         // Show error to user
@@ -1658,7 +1666,11 @@ export class EwtInstallDialog extends LitElement {
         this._installErase,
         new Uint8Array(0),
         this.baudRate,
-      );
+      ).catch((flashErr: any) => {
+        this.logger.error(`Flash error: ${flashErr.message || flashErr}`);
+        this._state = "ERROR";
+        this._error = `Flash failed: ${flashErr.message || flashErr}`;
+      });
     }
   }
 
