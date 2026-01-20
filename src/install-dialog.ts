@@ -260,6 +260,34 @@ export class EwtInstallDialog extends LitElement {
   // Helper to handle post-flash cleanup and Improv re-initialization
   // Called when flash operation completes successfully
   private async _handleFlashComplete() {
+    // Check if this is ESP32-S2/S3 USB/JTAG mode
+    const portInfo = this._port.getInfo();
+    const isUSBJTAG_S2 = portInfo.usbProductId === 0x0002; // S2 USB_JTAG_SERIAL_PID
+
+    if (isUSBJTAG_S2) {
+      // For USB/JTAG S2: NO baudrate change, NO Improv test, NO reconnect
+      // Just mark as complete and show success
+      this.logger.log("ESP32-S2 USB/JTAG - skipping post-flash Improv test");
+
+      // Release locks and reset ESP state
+      await sleep(100);
+      await this._releaseReaderWriter();
+
+      this._espStub = undefined;
+      this.esploader.IS_STUB = false;
+      this.esploader.chipFamily = null;
+      this._improvChecked = true; // Mark as checked (but not supported)
+      this._client = null;
+      this._improvSupported = false;
+      this.esploader._reader = undefined;
+      this.esploader._writer = undefined;
+
+      this.logger.log("Flash complete - ready for next operation");
+      this.requestUpdate();
+      return;
+    }
+
+    // Normal flow for non-USB/JTAG devices
     // Release locks and reset ESP state for Improv test
     await sleep(100);
 
@@ -995,20 +1023,39 @@ export class EwtInstallDialog extends LitElement {
     } else if (this._installState.state === FlashStateType.FINISHED) {
       heading = undefined;
       const supportsImprov = this._client !== null;
-      content = html`
-        <ewt-page-message
-          .icon=${OK_ICON}
-          label="Installation complete!"
-        ></ewt-page-message>
-        <ewt-button
-          slot="primaryAction"
-          label="Next"
-          @click=${() => {
-            this._state =
-              supportsImprov && this._installErase ? "PROVISION" : "DASHBOARD";
-          }}
-        ></ewt-button>
-      `;
+
+      // Check if this is ESP32-S2/S3 USB/JTAG mode
+      const portInfo = this._port.getInfo();
+      const isUSBJTAG_S2 = portInfo.usbProductId === 0x0002; // S2 USB_JTAG_SERIAL_PID
+
+      if (isUSBJTAG_S2) {
+        // For USB/JTAG S2: Show success message without Next button
+        content = html`
+          <ewt-page-message
+            .icon=${OK_ICON}
+            label="Installation complete!"
+          ></ewt-page-message>
+        `;
+        hideActions = true; // No actions - user must close dialog manually
+      } else {
+        // Normal flow with Next button
+        content = html`
+          <ewt-page-message
+            .icon=${OK_ICON}
+            label="Installation complete!"
+          ></ewt-page-message>
+          <ewt-button
+            slot="primaryAction"
+            label="Next"
+            @click=${() => {
+              this._state =
+                supportsImprov && this._installErase
+                  ? "PROVISION"
+                  : "DASHBOARD";
+            }}
+          ></ewt-button>
+        `;
+      }
     } else if (this._installState.state === FlashStateType.ERROR) {
       heading = "Installation failed";
       content = html`
