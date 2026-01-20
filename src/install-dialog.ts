@@ -1047,7 +1047,11 @@ export class EwtInstallDialog extends LitElement {
     let hideActions = false;
 
     content = html`
-      <ewt-console .port=${this._port} .logger=${this.logger}></ewt-console>
+      <ewt-console
+        .port=${this._port}
+        .logger=${this.logger}
+        .onReset=${async () => await this._resetDeviceAndReleaseLocks()}
+      ></ewt-console>
       <ewt-button
         slot="primaryAction"
         label="Back"
