@@ -294,10 +294,20 @@ export class EwtInstallDialog extends LitElement {
     this.esploader._writer = undefined;
     this.logger.log("ESP state reset for Improv test");
 
-    // Reset ESP to boot into new firmware
+    // Reconnect with 115200 baud and reset ESP to boot into new firmware
     // SKIP on Android - WebUSB connection handling is different
     if (!this._isAndroid) {
       try {
+        // CRITICAL: After flashing at higher baudrate, reconnect at 115200
+        // reconnectToBootloader() closes port and reopens at 115200 baud
+        this.logger.log("Reconnecting at 115200 baud for firmware reset...");
+        try {
+          await this.esploader.reconnectToBootloader();
+          this.logger.log("Port reconnected at 115200 baud");
+        } catch (reconnectErr: any) {
+          this.logger.log(`Reconnect failed: ${reconnectErr.message}`);
+        }
+
         // Reset device and release locks to ensure clean state for new firmware
         this.logger.log("Performing hardware reset to start new firmware...");
         await this._resetDeviceAndReleaseLocks();
@@ -525,14 +535,56 @@ export class EwtInstallDialog extends LitElement {
                   .label=${this._client.state === ImprovSerialCurrentState.READY
                     ? "Connect to Wi-Fi"
                     : "Change Wi-Fi"}
-                  @click=${() => {
-                    this._state = "PROVISION";
-                    if (
-                      this._client!.state ===
-                      ImprovSerialCurrentState.PROVISIONED
-                    ) {
-                      this._provisionForce = true;
+                  @click=${async () => {
+                    // Close Improv client if active
+                    if (this._client) {
+                      await this._closeClientWithoutEvents(this._client);
+                      this._client = undefined;
                     }
+
+                    // Ensure ESP is in firmware mode at 115200 baud
+                    await this._resetBaudrateForConsole();
+                    await this._releaseReaderWriter();
+
+                    try {
+                      await this._resetDeviceAndReleaseLocks();
+                      this.logger.log(
+                        "ESP reset to firmware mode for Wi-Fi setup",
+                      );
+                      await sleep(100);
+                    } catch (resetErr: any) {
+                      this.logger.log(`Reset failed: ${resetErr.message}`);
+                    }
+
+                    // Re-create Improv client (firmware is now running at 115200 baud)
+                    this.logger.log(
+                      "Re-initializing Improv Serial for Wi-Fi setup",
+                    );
+                    const client = new ImprovSerial(this._port, this.logger);
+                    client.addEventListener("state-changed", () => {
+                      this.requestUpdate();
+                    });
+                    client.addEventListener("error-changed", () =>
+                      this.requestUpdate(),
+                    );
+                    try {
+                      this._info = await client.initialize(1000);
+                      this._client = client;
+                      client.addEventListener(
+                        "disconnect",
+                        this._handleDisconnect,
+                      );
+                      this.logger.log(
+                        "Improv client ready for Wi-Fi provisioning",
+                      );
+                    } catch (improvErr: any) {
+                      this.logger.log(
+                        `Improv initialization failed: ${improvErr.message}`,
+                      );
+                    }
+
+                    this._state = "PROVISION";
+                    this._provisionForce = true;
                   }}
                 ></ewt-button>
               </div>
