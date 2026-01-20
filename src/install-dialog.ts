@@ -199,7 +199,8 @@ export class EwtInstallDialog extends LitElement {
   // Helper to check if this is ESP32-S2 USB/JTAG mode
   private _isUSBJTAG_S2(): boolean {
     const portInfo = this._port.getInfo();
-    return portInfo.usbProductId === 0x0002; // S2 USB_JTAG_SERIAL_PID
+    // Espressif VID: 0x303A, ESP32-S2 USB_JTAG_SERIAL_PID: 0x0002
+    return portInfo.usbVendorId === 0x303A && portInfo.usbProductId === 0x0002;
   }
 
   // Helper to release reader/writer locks (used by multiple methods)
@@ -272,7 +273,7 @@ export class EwtInstallDialog extends LitElement {
   // Helper to handle post-flash cleanup and Improv re-initialization
   // Called when flash operation completes successfully
   private async _handleFlashComplete() {
-    // Check if this is ESP32-S2/S3 USB/JTAG mode
+    // Check if this is ESP32-S2 USB/JTAG mode
     if (this._isUSBJTAG_S2()) {
       // For USB/JTAG S2: NO baudrate change, NO Improv test, NO reconnect
       // Just mark as complete and show success
@@ -296,7 +297,7 @@ export class EwtInstallDialog extends LitElement {
       return;
     }
 
-    // Normal flow for non-USB/JTAG devices
+    // Normal flow for non-USB/JTAG device
     // Release locks and reset ESP state for Improv test
     await sleep(100);
 
@@ -1041,13 +1042,13 @@ export class EwtInstallDialog extends LitElement {
       heading = undefined;
       const supportsImprov = this._client !== null;
 
-      // Check if this is ESP32-S2/S3 USB/JTAG mode
+      // Check if this is ESP32-S2 USB/JTAG mode
       if (this._isUSBJTAG_S2()) {
         // For USB/JTAG S2: Show success message without Next button
         content = html`
           <ewt-page-message
             .icon=${OK_ICON}
-            label="Installation complete!"
+            label="Installation complete! Reset your device manually."
           ></ewt-page-message>
         `;
         hideActions = true; // No actions - user must close dialog manually
@@ -1583,7 +1584,7 @@ export class EwtInstallDialog extends LitElement {
         // Reset ESP to FIRMWARE mode (needed if we were in bootloader mode)
         await this._resetDeviceAndReleaseLocks();
         this.logger.log("ESP reset to firmware mode for Improv test");
-        // ESP32-S2/S3 with USB-OTG need longer after watchdog reset
+        // ESP32-S2 with USB-OTG need longer after watchdog reset
         // Port remains open after hardReset(), just reader/writer are released
         await sleep(2000); // Wait for firmware to start (2 seconds for USB-OTG compatibility)
       } catch (e) {
@@ -1760,7 +1761,11 @@ export class EwtInstallDialog extends LitElement {
       this._installErase,
       fileBuffer,
       this.baudRate,
-    );
+    ).catch((flashErr: any) => {
+      this.logger.error(`Flash error: ${flashErr.message || flashErr}`);
+      this._state = "ERROR";
+      this._error = `Flash failed: ${flashErr.message || flashErr}`;
+    });
   }
 
   private async _doProvision() {
