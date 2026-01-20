@@ -1465,6 +1465,41 @@ export class EwtInstallDialog extends LitElement {
       return;
     }
 
+    // CRITICAL: Check if ESP32-S2 connected via USB/JTAG (PID 0x0002)
+    // No auto reset possible out of boot mode - skip test and load stub directly
+    const portInfo = this._port.getInfo();
+    const isUSBJTAG_S2 = portInfo.usbProductId === 0x0002; // S2 USB_JTAG_SERIAL_PID
+
+    if (isUSBJTAG_S2 && !justInstalled) {
+      this.logger.log(
+        "ESP32-S2 USB/JTAG detected - skipping Improv, loading stub directly",
+      );
+      this._improvChecked = true;
+      this._client = null;
+      this._improvSupported = false;
+
+      try {
+        // Reset ESP state
+        this._espStub = undefined;
+        this.esploader.IS_STUB = false;
+        this.esploader.chipFamily = null;
+
+        // Load stub directly
+        await this._ensureStub();
+        this.logger.log(
+          "Stub loaded successfully for ESP32-S2 USB/JTAG device",
+        );
+      } catch (stubErr: any) {
+        this.logger.error(`Failed to load stub: ${stubErr.message}`);
+        // Show error to user
+        this._state = "ERROR";
+        this._error = `Failed to connect: ${stubErr.message}`;
+      }
+
+      this._busy = false;
+      return;
+    }
+
     // Port is at 115200 baud for Improv (no stub loaded yet!)
     // If not just installed, reset ESP to firmware mode to ensure firmware is running
     if (!justInstalled) {
@@ -1472,9 +1507,11 @@ export class EwtInstallDialog extends LitElement {
         // Reset ESP to FIRMWARE mode (needed if we were in bootloader mode)
         await this._resetDeviceAndReleaseLocks();
         this.logger.log("ESP reset to firmware mode for Improv test");
-        await sleep(100); // Wait for firmware to start
+        // ESP32-S2/S3 with USB-OTG need longer after watchdog reset
+        // Port remains open after hardReset(), just reader/writer are released
+        await sleep(2000); // Wait for firmware to start (2 seconds for USB-OTG compatibility)
       } catch (e) {
-        this.logger.log(`Reset to firmware failed, continuing anyway`);
+        this.logger.log(`Reset to firmware failed, continuing anyway: ${e}`);
       }
     }
 
