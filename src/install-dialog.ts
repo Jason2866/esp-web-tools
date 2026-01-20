@@ -260,7 +260,7 @@ export class EwtInstallDialog extends LitElement {
     // Ensure stub is initialized
     await this._ensureStub();
 
-    this.logger.log("ESP reseted, stub loaded - ready for flash operations");
+    this.logger.log("ESP reset, stub loaded - ready for flash operations");
   }
 
   // Helper to handle post-flash cleanup and Improv re-initialization
