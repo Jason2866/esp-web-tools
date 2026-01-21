@@ -1045,6 +1045,12 @@ import{l as e,o as t,_ as i,n as o,B as n,i as r,a,t as d,e as l,b as s,R as c,x
             .icon=${Yi}
             label="Installation complete!"
           ></ewt-page-message>
+          <p
+            style="text-align: center; margin: 16px 0; color: var(--mdc-theme-on-surface, #000);"
+          >
+            Please press the <strong>RESET</strong> button on your ESP32-S2<br />
+            to boot into firmware mode.
+          </p>
           <ewt-button
             slot="primaryAction"
             label="Close"
