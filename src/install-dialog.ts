@@ -1044,7 +1044,7 @@ export class EwtInstallDialog extends LitElement {
         content = html`
           <ewt-page-message
             .icon=${OK_ICON}
-            label="Installation complete! Reset your device manually."
+            label="Installation complete!"
           ></ewt-page-message>
           <ewt-button
             slot="primaryAction"
@@ -1738,7 +1738,11 @@ export class EwtInstallDialog extends LitElement {
       this._installErase,
       fileBuffer,
       this.baudRate,
-    );
+    ).catch((flashErr: any) => {
+      this.logger.error(`Flash error: ${flashErr.message || flashErr}`);
+      this._state = "ERROR";
+      this._error = `Flash failed: ${flashErr.message || flashErr}`;
+    });
   }
 
   private async _doProvision() {
