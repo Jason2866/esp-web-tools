@@ -1575,7 +1575,9 @@ export class EwtInstallDialog extends LitElement {
         this.logger.log("ESP reset to firmware mode for Improv test");
         // ESP32-S2 with USB-OTG need longer after watchdog reset
         // Port remains open after hardReset(), just reader/writer are released
-        await sleep(2000); // Wait for firmware to start (2 seconds for USB-OTG compatibility)
+        const isUSBOTG = this._isUSBJTAG_S2();
+        const delay = isUSBOTG ? 2000 : 200;
+        await sleep(delay); // Wait for firmware to start (2s for USB-OTG, 200ms for others)
       } catch (e) {
         this.logger.log(`Reset to firmware failed, continuing anyway: ${e}`);
       }
