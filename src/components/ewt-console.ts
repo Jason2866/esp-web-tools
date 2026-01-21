@@ -90,6 +90,20 @@ export class EwtConsole extends HTMLElement {
 
   private async _connect(abortSignal: AbortSignal) {
     this.logger.debug("Starting console read loop");
+
+    // Check if port.readable is available
+    if (!this.port.readable) {
+      this._console!.addLine("");
+      this._console!.addLine("");
+      this._console!.addLine(
+        `Terminal disconnected: Port readable stream not available`,
+      );
+      this.logger.error(
+        "Port readable stream not available - port may need to be reopened at correct baudrate",
+      );
+      return;
+    }
+
     try {
       await this.port
         .readable!.pipeThrough(
