@@ -7,6 +7,8 @@ export class InstallButton extends HTMLElement {
 
   public static isAllowed = window.isSecureContext;
 
+  public static observedAttributes = ["baud-rate"];
+
   private static style = `
   button {
     position: relative;
@@ -78,6 +80,12 @@ export class InstallButton extends HTMLElement {
   public renderRoot?: ShadowRoot;
 
   public overrides: EwtInstallDialog["overrides"];
+
+  attributeChangedCallback(name: string, oldValue: string, newValue: string) {
+    if (name === "baud-rate" && newValue !== oldValue) {
+      this.baudRate = newValue ? parseInt(newValue, 10) : undefined;
+    }
+  }
 
   public connectedCallback() {
     if (this.renderRoot) {
