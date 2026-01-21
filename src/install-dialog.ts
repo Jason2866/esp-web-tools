@@ -539,6 +539,7 @@ export class EwtInstallDialog extends LitElement {
                     ? "Connect to Wi-Fi"
                     : "Change Wi-Fi"}
                   @click=${async () => {
+                    this._busy = true;
                     // Close Improv client if active
                     if (this._client) {
                       try {
@@ -590,6 +591,7 @@ export class EwtInstallDialog extends LitElement {
                       );
                       this._error = `Improv initialization failed: ${improvErr.message}`;
                       this._state = "ERROR";
+                      this._busy = false;
                       return;
                     }
 
