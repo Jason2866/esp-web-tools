@@ -541,7 +541,11 @@ export class EwtInstallDialog extends LitElement {
                   @click=${async () => {
                     // Close Improv client if active
                     if (this._client) {
-                      await this._closeClientWithoutEvents(this._client);
+                      try {
+                        await this._closeClientWithoutEvents(this._client);
+                      } catch (e) {
+                        this.logger.log("Failed to close Improv client:", e);
+                      }
                       this._client = undefined;
                     }
 
@@ -624,7 +628,11 @@ export class EwtInstallDialog extends LitElement {
             @click=${async () => {
               // Close Improv client if active (it locks the reader)
               if (this._client) {
-                await this._closeClientWithoutEvents(this._client);
+                try {
+                  await this._closeClientWithoutEvents(this._client);
+                } catch (e) {
+                  this.logger.log("Failed to close Improv client:", e);
+                }
                 this._client = undefined;
               }
 
@@ -712,7 +720,11 @@ export class EwtInstallDialog extends LitElement {
             @click=${async () => {
               // Close Improv client if active (it locks the reader)
               if (this._client) {
-                await this._closeClientWithoutEvents(this._client);
+                try {
+                  await this._closeClientWithoutEvents(this._client);
+                } catch (e) {
+                  this.logger.log("Failed to close Improv client:", e);
+                }
                 this._client = undefined;
               }
 
