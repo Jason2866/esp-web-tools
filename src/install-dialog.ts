@@ -1717,7 +1717,13 @@ export class EwtInstallDialog extends LitElement {
           this._installState = state;
 
           if (state.state === FlashStateType.FINISHED) {
-            this._handleFlashComplete();
+            void this._handleFlashComplete().catch((err: any) => {
+              this.logger.error(
+                `Post-flash cleanup failed: ${err?.message || err}`,
+              );
+              this._state = "ERROR";
+              this._error = `Post-flash cleanup failed: ${err?.message || err}`;
+            });
           }
         },
         loaderToUse,
@@ -1743,7 +1749,13 @@ export class EwtInstallDialog extends LitElement {
         this._installState = state;
 
         if (state.state === FlashStateType.FINISHED) {
-          this._handleFlashComplete();
+          void this._handleFlashComplete().catch((err: any) => {
+            this.logger.error(
+              `Post-flash cleanup failed: ${err?.message || err}`,
+            );
+            this._state = "ERROR";
+            this._error = `Post-flash cleanup failed: ${err?.message || err}`;
+          });
         }
       },
       loaderToUse,
