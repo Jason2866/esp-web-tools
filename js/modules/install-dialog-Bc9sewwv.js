@@ -847,7 +847,7 @@ import{l as e,o as t,_ as i,n as o,B as n,i as r,a,t as d,e as l,b as s,R as c,x
                 <ewt-button
                   ?disabled=${this._busy}
                   .label=${this._client.state===zi.READY?"Connect to Wi-Fi":"Change Wi-Fi"}
-                  @click=${async()=>{if(this._busy=!0,this._client){try{await this._closeClientWithoutEvents(this._client)}catch(e){this.logger.log("Failed to close Improv client:",e)}this._client=void 0}await this._resetBaudrateForConsole(),await this._releaseReaderWriter();try{await this._resetDeviceAndReleaseLocks(),this.logger.log("ESP reset to firmware mode for Wi-Fi setup"),await ee(100)}catch(e){this.logger.log(`Reset failed: ${e.message}`)}this.logger.log("Re-initializing Improv Serial for Wi-Fi setup");const e=new Ni(this._port,this.logger);e.addEventListener("state-changed",()=>{this.requestUpdate()}),e.addEventListener("error-changed",()=>this.requestUpdate());try{this._info=await e.initialize(1e3),this._client=e,e.addEventListener("disconnect",this._handleDisconnect),this.logger.log("Improv client ready for Wi-Fi provisioning")}catch(e){return this.logger.log(`Improv initialization failed: ${e.message}`),this._error=`Improv initialization failed: ${e.message}`,this._state="ERROR",void(this._busy=!1)}this._state="PROVISION",this._provisionForce=!0}}
+                  @click=${async()=>{if(this._busy=!0,this._client){try{await this._closeClientWithoutEvents(this._client)}catch(e){this.logger.log("Failed to close Improv client:",e)}this._client=void 0}await this._resetBaudrateForConsole(),await this._releaseReaderWriter();try{await this._resetDeviceAndReleaseLocks(),this.logger.log("ESP reset to firmware mode for Wi-Fi setup"),await ee(100)}catch(e){this.logger.log(`Reset failed: ${e.message}`)}this.logger.log("Re-initializing Improv Serial for Wi-Fi setup");const e=new Ni(this._port,this.logger);e.addEventListener("state-changed",()=>{this.requestUpdate()}),e.addEventListener("error-changed",()=>this.requestUpdate());try{this._info=await e.initialize(1e3),this._client=e,e.addEventListener("disconnect",this._handleDisconnect),this.logger.log("Improv client ready for Wi-Fi provisioning")}catch(t){try{await this._closeClientWithoutEvents(e)}catch(e){this.logger.log("Failed to close Improv client after init error:",e)}return this.logger.log(`Improv initialization failed: ${t.message}`),this._error=`Improv initialization failed: ${t.message}`,this._state="ERROR",void(this._busy=!1)}this._state="PROVISION",this._provisionForce=!0}}
                 ></ewt-button>
               </div>
             `:""}
@@ -855,14 +855,14 @@ import{l as e,o as t,_ as i,n as o,B as n,i as r,a,t as d,e as l,b as s,R as c,x
           <ewt-button
             ?disabled=${this._busy}
             label="Logs & Console"
-            @click=${async()=>{const e=this._client;e&&(await this._closeClientWithoutEvents(e),await ee(100)),this._client=void 0,await this._resetBaudrateForConsole(),await this._releaseReaderWriter(),await this._resetDeviceAndReleaseLocks(),this._state="LOGS"}}
+            @click=${async()=>{const e=this._client;e&&(await this._closeClientWithoutEvents(e),await ee(100)),await this._resetBaudrateForConsole(),await this._releaseReaderWriter(),await this._resetDeviceAndReleaseLocks(),this._state="LOGS"}}
           ></ewt-button>
         </div>
         <div>
           <ewt-button
             ?disabled=${this._busy}
             label="Manage Filesystem"
-            @click=${async()=>{if(this._client){try{await this._closeClientWithoutEvents(this._client)}catch(e){this.logger.log("Failed to close Improv client:",e)}this._client=void 0}this._state="PARTITIONS",this._readPartitionTable()}}
+            @click=${async()=>{if(this._client)try{await this._closeClientWithoutEvents(this._client)}catch(e){this.logger.log("Failed to close Improv client:",e)}this._state="PARTITIONS",this._readPartitionTable()}}
           ></ewt-button>
         </div>
         ${this._isSameFirmware&&this._manifest.funding_url?m`
@@ -902,7 +902,7 @@ import{l as e,o as t,_ as i,n as o,B as n,i as r,a,t as d,e as l,b as s,R as c,x
           <ewt-button
             label="Logs & Console"
             ?disabled=${this._busy}
-            @click=${async()=>{this._client=void 0,await this._resetBaudrateForConsole(),await this._releaseReaderWriter(),await this._resetDeviceAndReleaseLocks(),this._state="LOGS"}}
+            @click=${async()=>{await this._resetBaudrateForConsole(),await this._releaseReaderWriter(),await this._resetDeviceAndReleaseLocks(),this._state="LOGS"}}
           ></ewt-button>
         </div>
 
@@ -910,7 +910,7 @@ import{l as e,o as t,_ as i,n as o,B as n,i as r,a,t as d,e as l,b as s,R as c,x
           <ewt-button
             label="Manage Filesystem"
             ?disabled=${this._busy}
-            @click=${async()=>{if(this._client){try{await this._closeClientWithoutEvents(this._client)}catch(e){this.logger.log("Failed to close Improv client:",e)}this._client=void 0}this._state="PARTITIONS",this._readPartitionTable()}}
+            @click=${async()=>{if(this._client)try{await this._closeClientWithoutEvents(this._client)}catch(e){this.logger.log("Failed to close Improv client:",e)}this._state="PARTITIONS",this._readPartitionTable()}}
           ></ewt-button>
         </div>
       </div>
