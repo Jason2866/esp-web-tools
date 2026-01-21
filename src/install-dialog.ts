@@ -1047,8 +1047,13 @@ export class EwtInstallDialog extends LitElement {
             .icon=${OK_ICON}
             label="Installation complete! Reset your device manually."
           ></ewt-page-message>
+          <ewt-button
+            slot="primaryAction"
+            label="Close"
+            dialogAction="close"
+          ></ewt-button>
         `;
-        hideActions = true; // No actions - user must close dialog manually
+        hideActions = false;
       } else {
         // Normal flow with Next button
         content = html`
