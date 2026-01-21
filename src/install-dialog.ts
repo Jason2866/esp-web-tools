@@ -586,6 +586,14 @@ export class EwtInstallDialog extends LitElement {
                         "Improv client ready for Wi-Fi provisioning",
                       );
                     } catch (improvErr: any) {
+                      try {
+                        await this._closeClientWithoutEvents(client);
+                      } catch (closeErr) {
+                        this.logger.log(
+                          "Failed to close Improv client after init error:",
+                          closeErr,
+                        );
+                      }
                       this.logger.log(
                         `Improv initialization failed: ${improvErr.message}`,
                       );
@@ -612,8 +620,7 @@ export class EwtInstallDialog extends LitElement {
                 await this._closeClientWithoutEvents(client);
                 await sleep(100);
               }
-              // Also set `null` back to undefined.
-              this._client = undefined;
+              // Keep client object for dashboard rendering; connection already closed above.
 
               await this._resetBaudrateForConsole();
               await this._releaseReaderWriter();
@@ -635,7 +642,7 @@ export class EwtInstallDialog extends LitElement {
                 } catch (e) {
                   this.logger.log("Failed to close Improv client:", e);
                 }
-                this._client = undefined;
+                // Keep client object for dashboard rendering; connection already closed above.
               }
 
               // Keep stub and reader/writer - they will be reused
@@ -703,8 +710,7 @@ export class EwtInstallDialog extends LitElement {
             label="Logs & Console"
             ?disabled=${this._busy}
             @click=${async () => {
-              // Also set `null` back to undefined.
-              this._client = undefined;
+              // Keep client object for dashboard rendering; connection already closed above.
 
               await this._resetBaudrateForConsole();
               await this._releaseReaderWriter();
@@ -727,7 +733,7 @@ export class EwtInstallDialog extends LitElement {
                 } catch (e) {
                   this.logger.log("Failed to close Improv client:", e);
                 }
-                this._client = undefined;
+                // Keep client object for dashboard rendering; connection already closed above.
               }
 
               // Keep stub and reader/writer - they will be reused
