@@ -610,26 +610,30 @@ export class EwtInstallDialog extends LitElement {
               </div>
             `
           : ""}
-        <div>
-          <ewt-button
-            ?disabled=${this._busy}
-            label="Logs & Console"
-            @click=${async () => {
-              const client = this._client;
-              if (client) {
-                await this._closeClientWithoutEvents(client);
-                await sleep(100);
-              }
-              // Keep client object for dashboard rendering; connection already closed above.
+        ${!this._isUSBJTAG_S2()
+          ? html`
+              <div>
+                <ewt-button
+                  ?disabled=${this._busy}
+                  label="Logs & Console"
+                  @click=${async () => {
+                    const client = this._client;
+                    if (client) {
+                      await this._closeClientWithoutEvents(client);
+                      await sleep(100);
+                    }
+                    // Keep client object for dashboard rendering; connection already closed above.
 
-              await this._resetBaudrateForConsole();
-              await this._releaseReaderWriter();
-              await this._resetDeviceAndReleaseLocks();
+                    await this._resetBaudrateForConsole();
+                    await this._releaseReaderWriter();
+                    await this._resetDeviceAndReleaseLocks();
 
-              this._state = "LOGS";
-            }}
-          ></ewt-button>
-        </div>
+                    this._state = "LOGS";
+                  }}
+                ></ewt-button>
+              </div>
+            `
+          : ""}
         <div>
           <ewt-button
             ?disabled=${this._busy}
@@ -705,21 +709,25 @@ export class EwtInstallDialog extends LitElement {
           ></ewt-button>
         </div>
 
-        <div>
-          <ewt-button
-            label="Logs & Console"
-            ?disabled=${this._busy}
-            @click=${async () => {
-              // Keep client object for dashboard rendering; connection already closed above.
+        ${!this._isUSBJTAG_S2()
+          ? html`
+              <div>
+                <ewt-button
+                  label="Logs & Console"
+                  ?disabled=${this._busy}
+                  @click=${async () => {
+                    // Keep client object for dashboard running; connection already closed above.
 
-              await this._resetBaudrateForConsole();
-              await this._releaseReaderWriter();
-              await this._resetDeviceAndReleaseLocks();
+                    await this._resetBaudrateForConsole();
+                    await this._releaseReaderWriter();
+                    await this._resetDeviceAndReleaseLocks();
 
-              this._state = "LOGS";
-            }}
-          ></ewt-button>
-        </div>
+                    this._state = "LOGS";
+                  }}
+                ></ewt-button>
+              </div>
+            `
+          : ""}
 
         <div>
           <ewt-button
@@ -1584,14 +1592,21 @@ export class EwtInstallDialog extends LitElement {
     // If not just installed, reset ESP to firmware mode to ensure firmware is running
     if (!justInstalled) {
       try {
-        // Reset ESP to FIRMWARE mode (needed if we were in bootloader mode)
-        await this._resetDeviceAndReleaseLocks();
-        this.logger.log("ESP reset to firmware mode for Improv test");
-        // ESP32-S2 with USB-OTG need longer after watchdog reset
-        // Port remains open after hardReset(), just reader/writer are released
-        const isUSBOTG = this._isUSBJTAG_S2();
-        const delay = isUSBOTG ? 2000 : 200;
-        await sleep(delay); // Wait for firmware to start (2s for USB-OTG, 200ms for others)
+        if (this._isUSBJTAG_S2()) {
+          // Reset ESP to FIRMWARE is not possible for S2 in USB/JTAG mode
+          // WDT reset does not work - skip reset, fix if possible -> tasmota-webserial-esp
+          // await this._resetDeviceAndReleaseLocks();
+          // await sleep(2000); // Wait for firmware to start (need longer time for USB/JTAG)
+          this.logger.log(
+            "ESP S2 USB/JTAG detected - skipping reset to firmware",
+          );
+        } else {
+          // Reset ESP to FIRMWARE mode (needed if we were in bootloader mode)
+          await this._resetDeviceAndReleaseLocks();
+          this.logger.log("ESP reset to firmware mode for Improv test");
+          // Port remains open after hardReset(), just reader/writer are released
+          await sleep(200); // Wait for firmware to start
+        }
       } catch (e) {
         this.logger.log(`Reset to firmware failed, continuing anyway: ${e}`);
       }
