@@ -83,7 +83,12 @@ export class InstallButton extends HTMLElement {
 
   attributeChangedCallback(name: string, oldValue: string, newValue: string) {
     if (name === "baud-rate" && newValue !== oldValue) {
-      this.baudRate = newValue ? parseInt(newValue, 10) : undefined;
+      if (!newValue) {
+        this.baudRate = undefined;
+      } else {
+        const parsed = parseInt(newValue, 10);
+        this.baudRate = Number.isNaN(parsed) ? undefined : parsed;
+      }
     }
   }
 
