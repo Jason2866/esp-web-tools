@@ -1045,10 +1045,15 @@ import{l as e,o as t,_ as i,n as o,B as n,i as r,a,t as d,e as l,b as s,R as c,x
             .icon=${Yi}
             label="Installation complete!"
           ></ewt-page-message>
-        `,i=!0):t=m`
+          <ewt-button
+            slot="primaryAction"
+            label="Close"
+            dialogAction="close"
+          ></ewt-button>
+        `,i=!1):t=m`
           <ewt-page-message
             .icon=${Yi}
-            label="Installation complete!"
+            label="Installation complete! Reset your device manually."
           ></ewt-page-message>
           <ewt-button
             slot="primaryAction"
