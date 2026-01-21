@@ -1046,12 +1046,18 @@ export class EwtInstallDialog extends LitElement {
 
       // Check if this is ESP32-S2 USB/JTAG mode
       if (this._isUSBJTAG_S2()) {
-        // For USB/JTAG S2: Show success message without Next button
+        // For USB/JTAG S2: Show success message with manual reset instruction
         content = html`
           <ewt-page-message
             .icon=${OK_ICON}
             label="Installation complete!"
           ></ewt-page-message>
+          <p
+            style="text-align: center; margin: 16px 0; color: var(--mdc-theme-on-surface, #000);"
+          >
+            Please press the <strong>RESET</strong> button on your ESP32-S2<br />
+            to boot into firmware mode.
+          </p>
           <ewt-button
             slot="primaryAction"
             label="Close"
