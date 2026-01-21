@@ -551,9 +551,8 @@ export class EwtInstallDialog extends LitElement {
                     }
 
                     // Ensure ESP is in firmware mode at 115200 baud
-                    // Don't release reader/writer - they will be reused
                     await this._resetBaudrateForConsole();
-                    // await this._releaseReaderWriter();
+                    await this._releaseReaderWriter();
 
                     try {
                       await this._resetDeviceAndReleaseLocks();
@@ -626,8 +625,7 @@ export class EwtInstallDialog extends LitElement {
                     // Keep client object for dashboard rendering; connection already closed above.
 
                     await this._resetBaudrateForConsole();
-                    // Don't release reader/writer - console needs them
-                    // await this._releaseReaderWriter();
+                    await this._releaseReaderWriter();
                     await this._resetDeviceAndReleaseLocks();
 
                     this._state = "LOGS";
@@ -721,8 +719,7 @@ export class EwtInstallDialog extends LitElement {
                     // Keep client object for dashboard running; connection already closed above.
 
                     await this._resetBaudrateForConsole();
-                    // Don't release reader/writer - console needs them
-                    // await this._releaseReaderWriter();
+                    await this._releaseReaderWriter();
                     await this._resetDeviceAndReleaseLocks();
 
                     this._state = "LOGS";
