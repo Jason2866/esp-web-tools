@@ -1038,9 +1038,8 @@ import{l as e,o as t,_ as i,n as o,B as n,i as r,a,t as d,e as l,b as s,R as c,x
       `;else if(this._installConfirmed)if(this._installState&&"initializing"!==this._installState.state&&"manifest"!==this._installState.state&&"preparing"!==this._installState.state)if("erasing"===this._installState.state)e="Installing",t=this._renderProgress("Erasing"),i=!0;else if("writing"===this._installState.state||"finished"===this._installState.state&&void 0===this._client){let o,n;e="Installing","finished"===this._installState.state?n="Wrapping up":this._installState.details.percentage<4?n="Installing":o=this._installState.details.percentage,t=this._renderProgress(m`
           ${n?m`${n}<br />`:""}
           <br />
-          This will take
-          ${"ESP8266"===this._installState.chipFamily?"a minute":"2 minutes"}.<br />
-          Keep this page visible to prevent slow down
+          This will take a minute.<br />
+          Keep this page visible until installation is complete.
         `,o),i=!0}else if("finished"===this._installState.state){e=void 0;const o=null!==this._client;this._isUSBJTAG_S2()?(t=m`
           <ewt-page-message
             .icon=${Yi}
