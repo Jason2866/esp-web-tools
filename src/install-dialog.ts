@@ -365,13 +365,15 @@ export class EwtInstallDialog extends LitElement {
 
   // Reset device and release locks - used when returning to dashboard or recovering from errors
   // Reset device to FIRMWARE mode (normal execution)
+  // NOTE: This function should ONLY be called for external serial chips!
+  // For USB-JTAG/OTG devices, hardReset(false) would trigger watchdog reset and change the port!
   private async _resetDeviceAndReleaseLocks() {
     // Release esploader reader/writer if locked
     await this._releaseReaderWriter();
 
     // Hardware reset to FIRMWARE mode (bootloader=false)
-    // hardReset() now automatically detects WebUSB vs WebSerial and uses appropriate method
-    // Also handles chip-specific resets (S2/S3/C3 with USB-JTAG/OTG use watchdog reset)
+    // For external serial chips: Uses DTR/RTS signals, port stays open
+    // For USB-JTAG/OTG: Would use watchdog reset and close port (NOT CALLED for these devices!)
     try {
       await this.esploader.hardReset(false);
       this.logger.log("Device reset to firmware mode");
@@ -575,6 +577,68 @@ export class EwtInstallDialog extends LitElement {
                     : "Change Wi-Fi"}
                   @click=${async () => {
                     this._busy = true;
+
+                    // Check if this is USB-JTAG/OTG device
+                    const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
+
+                    if (isUsbJtagOrOtg) {
+                      // For USB-JTAG/OTG: Device is already in firmware mode
+                      // Just close Improv client and re-initialize for WiFi setup
+                      if (this._client) {
+                        try {
+                          await this._closeClientWithoutEvents(this._client);
+                        } catch (e) {
+                          this.logger.log("Failed to close Improv client:", e);
+                        }
+                        this._client = undefined;
+                      }
+
+                      // Re-create Improv client (firmware is already running at 115200 baud)
+                      this.logger.log(
+                        "Re-initializing Improv Serial for Wi-Fi setup (USB-JTAG/OTG)",
+                      );
+                      const client = new ImprovSerial(this._port, this.logger);
+                      client.addEventListener("state-changed", () => {
+                        this.requestUpdate();
+                      });
+                      client.addEventListener("error-changed", () =>
+                        this.requestUpdate(),
+                      );
+                      try {
+                        this._info = await client.initialize(1000);
+                        this._client = client;
+                        client.addEventListener(
+                          "disconnect",
+                          this._handleDisconnect,
+                        );
+                        this.logger.log(
+                          "Improv client ready for Wi-Fi provisioning",
+                        );
+                      } catch (improvErr: any) {
+                        try {
+                          await this._closeClientWithoutEvents(client);
+                        } catch (closeErr) {
+                          this.logger.log(
+                            "Failed to close Improv client after init error:",
+                            closeErr,
+                          );
+                        }
+                        this.logger.log(
+                          `Improv initialization failed: ${improvErr.message}`,
+                        );
+                        this._error = `Improv initialization failed: ${improvErr.message}`;
+                        this._state = "ERROR";
+                        this._busy = false;
+                        return;
+                      }
+
+                      this._state = "PROVISION";
+                      this._provisionForce = true;
+                      this._busy = false;
+                      return;
+                    }
+
+                    // For external serial chips: Reset to firmware mode if needed
                     // Close Improv client if active
                     if (this._client) {
                       try {
@@ -640,6 +704,7 @@ export class EwtInstallDialog extends LitElement {
 
                     this._state = "PROVISION";
                     this._provisionForce = true;
+                    this._busy = false;
                   }}
                 ></ewt-button>
               </div>
@@ -1693,69 +1758,76 @@ export class EwtInstallDialog extends LitElement {
 
     if (isUsbJtagOrOtg && !justInstalled) {
       this.logger.log(
-        "USB-JTAG/OTG device detected - will need port reconnection for Improv",
+        "USB-JTAG/OTG device detected - switching to firmware mode for Improv",
       );
 
       // For USB-JTAG/OTG devices in bootloader mode:
-      // We need to switch to firmware mode for Improv, but this closes the port
-      // So we skip Improv test here and load stub for flash operations
-      // After flashing, we'll prompt user to reconnect for Improv test
-
-      this.logger.log(
-        "Loading stub for USB-JTAG/OTG device (Improv test after flash)",
-      );
-      this._improvChecked = false; // Will check after flash with new port
-      this._client = null;
-      this._improvSupported = false; // Unknown until after reconnect
+      // We MUST switch to firmware mode for Improv test
+      // This will close the port and user must select new port (User Gesture)
 
       try {
-        // DON'T reset chipFamily - keep it if already detected
-        // Only reset stub state if needed
-        if (!this._espStub || !this._espStub.IS_STUB) {
-          this._espStub = undefined;
-          this.esploader.IS_STUB = false;
-          // Keep chipFamily if already detected
+        // Use enterConsoleMode() to switch to firmware mode
+        const portClosed = await this.esploader.enterConsoleMode();
 
-          // Load stub directly
-          await this._ensureStub();
-          this.logger.log("Stub loaded successfully for USB-JTAG/OTG device");
-        } else {
-          this.logger.log("Stub already loaded for USB-JTAG/OTG device");
+        if (portClosed) {
+          // Port was closed - device is now in firmware mode but port changed
+          // User must manually select new port for Improv test
+          this.logger.log(
+            "Device switched to firmware mode - port changed, user must reconnect",
+          );
+
+          this._improvChecked = false; // Will check after user reconnects
+          this._client = undefined;
+          this._improvSupported = false; // Unknown until after reconnect
+          this._busy = false;
+
+          // Dispatch event to request port selection
+          this.dispatchEvent(
+            new CustomEvent("request-port-selection", {
+              bubbles: true,
+              composed: true,
+              detail: {
+                reason: "firmware-mode-switch",
+                message:
+                  "Device is now in firmware mode. Please select the device port to continue.",
+              },
+            }),
+          );
+
+          // Close dialog - parent will handle port selection and reconnect
+          this.dispatchEvent(
+            new CustomEvent("closed", {
+              bubbles: true,
+              composed: true,
+            }),
+          );
+          return;
         }
-
-        // Set state to DASHBOARD so UI can render
-        this._state = "DASHBOARD";
-      } catch (stubErr: any) {
-        this.logger.error(`Failed to load stub: ${stubErr.message}`);
+      } catch (err: any) {
+        this.logger.error(`Failed to enter firmware mode: ${err.message}`);
         // Show error to user
         this._state = "ERROR";
-        this._error = `Failed to connect: ${stubErr.message}`;
+        this._error = `Failed to switch to firmware mode: ${err.message}`;
+        this._busy = false;
+        return;
       }
 
-      this._busy = false;
-      return;
+      // If we reach here, port didn't close (shouldn't happen for USB-JTAG/OTG)
+      // Fall through to normal Improv test
+      this.logger.log("Port didn't close - continuing with Improv test");
     }
 
+    // For external serial chips: Reset to firmware mode for Improv test
     // Port is at 115200 baud for Improv (no stub loaded yet!)
     // If not just installed, reset ESP to firmware mode to ensure firmware is running
     if (!justInstalled) {
       try {
-        const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
-
-        if (isUsbJtagOrOtg) {
-          // Reset ESP to FIRMWARE is not possible for USB-JTAG/OTG devices in some modes
-          // WDT reset may not work reliably - skip reset
-          this.logger.log(
-            "USB-JTAG/OTG device detected - skipping reset to firmware",
-          );
-        } else {
-          // Reset ESP to FIRMWARE mode (needed if we were in bootloader mode)
-          // hardReset() now automatically uses chip-specific methods
-          await this._resetDeviceAndReleaseLocks();
-          this.logger.log("ESP reset to firmware mode for Improv test");
-          // Port remains open after hardReset(), just reader/writer are released
-          await sleep(200); // Wait for firmware to start
-        }
+        // Reset ESP to FIRMWARE mode (needed if we were in bootloader mode)
+        // hardReset() now automatically uses chip-specific methods
+        await this._resetDeviceAndReleaseLocks();
+        this.logger.log("ESP reset to firmware mode for Improv test");
+        // Port remains open after hardReset(), just reader/writer are released
+        await sleep(200); // Wait for firmware to start
       } catch (e) {
         this.logger.log(`Reset to firmware failed, continuing anyway: ${e}`);
       }
