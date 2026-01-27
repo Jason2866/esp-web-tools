@@ -19,7 +19,7 @@ This document explains how esp-web-tools handles USB-JTAG and USB-OTG devices (E
 ## Complete Flow for USB-JTAG/OTG Devices
 
 ### 1. Initial Connection
-```
+```text
 User clicks "Connect" button
   ↓
 Browser shows port selection dialog (User Gesture #1)
@@ -58,7 +58,7 @@ Dashboard shown with device info
 ```
 
 ### 2. Flash Operation
-```
+```text
 User clicks "Install Firmware"
   ↓
 Device is in FIRMWARE mode (stayed after Improv test)
@@ -101,7 +101,7 @@ Dashboard shown with new firmware info
 ```
 
 ### 3. WiFi Provisioning (After Flash)
-```
+```text
 User reconnects after flash
   ↓
 Device in FIRMWARE mode, Improv test successful
@@ -124,7 +124,7 @@ Dashboard shown
 ```
 
 ### 4. Change WiFi (From Dashboard)
-```
+```text
 User clicks "Change Wi-Fi" button
   ↓
 Device already in FIRMWARE mode
