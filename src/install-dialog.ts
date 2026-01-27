@@ -315,7 +315,7 @@ export class EwtInstallDialog extends LitElement {
       this._improvChecked = false; // Will check after user reconnects
       this._client = undefined; // Will be created after reconnect
       this._improvSupported = false; // Unknown until after reconnect
-      this.esploader.__reader = undefined;
+      this.esploader._reader = undefined;
 
       this.logger.log("Flash complete - waiting for user to select new port");
       this.requestUpdate();
@@ -333,7 +333,7 @@ export class EwtInstallDialog extends LitElement {
     this.esploader.IS_STUB = false;
     this.esploader.chipFamily = null;
     this._improvChecked = false;
-    this.esploader.__reader = undefined;
+    this.esploader._reader = undefined;
     this.logger.log("ESP state reset for Improv test");
 
     // Reconnect with 115200 baud and reset ESP to boot into new firmware
@@ -1227,8 +1227,8 @@ export class EwtInstallDialog extends LitElement {
 
       // Check if this is USB-JTAG or USB-OTG device (use cached state)
       if (this._isUsbJtagOrOtgDevice) {
-        // For USB-JTAG/OTG devices: Show success with port selection prompt
-        // Device is now in firmware mode, user must select new port for Improv test
+        // For USB-JTAG/OTG devices: Show success with instructions to reconnect
+        // Device is now in firmware mode, user must reconnect to test Improv
         content = html`
           <ewt-page-message
             .icon=${OK_ICON}
@@ -1238,39 +1238,11 @@ export class EwtInstallDialog extends LitElement {
             style="text-align: center; margin: 16px 0; color: var(--mdc-theme-on-surface, #000);"
           >
             The device is now in firmware mode.<br />
-            <strong>Please select the device port</strong> to continue.
+            The USB port has changed.<br />
+            <strong>Please close this dialog and reconnect</strong> to test device features.
           </p>
           <ewt-button
             slot="primaryAction"
-            label="Select Port"
-            @click=${async () => {
-              // Trigger port selection (User Gesture)
-              // After port selection, device is in firmware mode at 115200 baud
-              // Parent component will handle port selection and then call _initialize(true)
-              // which will test Improv automatically
-
-              // Dispatch custom event that parent component can listen to
-              this.dispatchEvent(
-                new CustomEvent("request-port-selection", {
-                  bubbles: true,
-                  composed: true,
-                  detail: {
-                    afterFlash: true, // Indicate this is after flash
-                    testImprov: true, // Request Improv test after reconnect
-                  },
-                }),
-              );
-              // Close dialog
-              this.dispatchEvent(
-                new CustomEvent("closed", {
-                  bubbles: true,
-                  composed: true,
-                }),
-              );
-            }}
-          ></ewt-button>
-          <ewt-button
-            slot="secondaryAction"
             label="Close"
             dialogAction="close"
           ></ewt-button>
@@ -1773,7 +1745,7 @@ export class EwtInstallDialog extends LitElement {
           // Port was closed - device is now in firmware mode but port changed
           // User must manually select new port for Improv test
           this.logger.log(
-            "Device switched to firmware mode - port changed, user must reconnect",
+            "Device switched to firmware mode - port closed, dispatching port selection request",
           );
 
           this._improvChecked = false; // Will check after user reconnects
@@ -1781,26 +1753,12 @@ export class EwtInstallDialog extends LitElement {
           this._improvSupported = false; // Unknown until after reconnect
           this._busy = false;
 
-          // Dispatch event to request port selection
-          this.dispatchEvent(
-            new CustomEvent("request-port-selection", {
-              bubbles: true,
-              composed: true,
-              detail: {
-                reason: "firmware-mode-switch",
-                message:
-                  "Device is now in firmware mode. Please select the device port to continue.",
-              },
-            }),
-          );
-
-          // Close dialog - parent will handle port selection and reconnect
-          this.dispatchEvent(
-            new CustomEvent("closed", {
-              bubbles: true,
-              composed: true,
-            }),
-          );
+          // Dispatch event to request port selection (handled in connect.ts)
+          // This will close the dialog and trigger new port selection
+          fireEvent(this, "request-port-selection" as any, {
+            afterFlash: false,
+            testImprov: true,
+          });
           return;
         }
       } catch (err: any) {

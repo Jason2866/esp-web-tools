@@ -105,5 +105,83 @@ export const connect = async (button: InstallButton) => {
     },
     { once: true },
   );
+
+  // Handle request-port-selection event for USB-JTAG/OTG devices
+  const handlePortSelection = async (event: Event) => {
+    const customEvent = event as CustomEvent;
+    const detail = customEvent.detail || {};
+    
+    console.log("Port selection requested:", detail);
+    
+    // Close current dialog
+    try {
+      await esploader.disconnect();
+    } catch (err) {
+      // Ignore disconnect errors
+    }
+    
+    // Remove current dialog
+    el.remove();
+    
+    // Wait a bit for cleanup
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Reconnect with new port selection
+    // This will trigger the browser's port selection dialog (User Gesture)
+    let newEsploader;
+    try {
+      newEsploader = await esptoolConnect({
+        log: () => {}, // Silent logger for connection
+        debug: () => {},
+        error: (msg: string) => console.error(msg),
+      });
+    } catch (err: any) {
+      if ((err as DOMException).name === "NotFoundError") {
+        // User cancelled port selection
+        console.log("Port selection cancelled");
+        return;
+      }
+      alert(`Reconnection failed: ${err.message}`);
+      return;
+    }
+    
+    if (!newEsploader) {
+      alert("Failed to reconnect to device");
+      return;
+    }
+    
+    // Create new dialog with new port
+    const newEl = document.createElement("ewt-install-dialog");
+    newEl.esploader = newEsploader;
+    newEl.manifestPath = button.manifest || button.getAttribute("manifest")!;
+    newEl.overrides = button.overrides;
+    newEl.firmwareFile = button.firmwareFile;
+    
+    // Copy baud rate setting
+    if (el.baudRate) {
+      newEl.baudRate = el.baudRate;
+    }
+    
+    // Add event listeners to new dialog
+    newEl.addEventListener(
+      "closed",
+      async () => {
+        try {
+          await newEsploader.disconnect();
+        } catch (err) {
+          // Ignore disconnect errors
+        }
+      },
+      { once: true },
+    );
+    
+    // Recursively handle request-port-selection for the new dialog
+    newEl.addEventListener("request-port-selection", handlePortSelection);
+    
+    document.body.appendChild(newEl);
+  };
+  
+  el.addEventListener("request-port-selection", handlePortSelection);
+
   document.body.appendChild(el);
 };
