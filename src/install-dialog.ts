@@ -873,20 +873,26 @@ export class EwtInstallDialog extends LitElement {
                       if (this._client) {
                         try {
                           await this._closeClientWithoutEvents(this._client);
-                          this.logger.log("Improv client closed after provisioning");
+                          this.logger.log(
+                            "Improv client closed after provisioning",
+                          );
                         } catch (e) {
                           this.logger.log("Failed to close Improv client:", e);
                         }
                       }
-                      
+
                       // Prepare for flash operations (reset to bootloader, load stub)
                       try {
                         await this._prepareForFlashOperations();
-                        this.logger.log("Device ready for flash operations after provisioning");
+                        this.logger.log(
+                          "Device ready for flash operations after provisioning",
+                        );
                       } catch (err: any) {
-                        this.logger.log(`Failed to prepare for flash: ${err.message}`);
+                        this.logger.log(
+                          `Failed to prepare for flash: ${err.message}`,
+                        );
                       }
-                      
+
                       this._state = "DASHBOARD";
                     }}
                   ></ewt-button>
@@ -903,20 +909,26 @@ export class EwtInstallDialog extends LitElement {
                   if (this._client) {
                     try {
                       await this._closeClientWithoutEvents(this._client);
-                      this.logger.log("Improv client closed after provisioning");
+                      this.logger.log(
+                        "Improv client closed after provisioning",
+                      );
                     } catch (e) {
                       this.logger.log("Failed to close Improv client:", e);
                     }
                   }
-                  
+
                   // Prepare for flash operations (reset to bootloader, load stub)
                   try {
                     await this._prepareForFlashOperations();
-                    this.logger.log("Device ready for flash operations after provisioning");
+                    this.logger.log(
+                      "Device ready for flash operations after provisioning",
+                    );
                   } catch (err: any) {
-                    this.logger.log(`Failed to prepare for flash: ${err.message}`);
+                    this.logger.log(
+                      `Failed to prepare for flash: ${err.message}`,
+                    );
                   }
-                  
+
                   this._state = "DASHBOARD";
                 }}
               ></ewt-button>
@@ -1008,7 +1020,7 @@ export class EwtInstallDialog extends LitElement {
                 this.logger.log("Failed to close Improv client:", e);
               }
             }
-            
+
             // Prepare for flash operations (reset to bootloader, load stub)
             try {
               await this._prepareForFlashOperations();
@@ -1016,7 +1028,7 @@ export class EwtInstallDialog extends LitElement {
             } catch (err: any) {
               this.logger.log(`Failed to prepare for flash: ${err.message}`);
             }
-            
+
             this._state = "DASHBOARD";
           }}
         ></ewt-button>
@@ -1171,7 +1183,7 @@ export class EwtInstallDialog extends LitElement {
               // After port selection, device is in firmware mode at 115200 baud
               // Parent component will handle port selection and then call _initialize(true)
               // which will test Improv automatically
-              
+
               // Dispatch custom event that parent component can listen to
               this.dispatchEvent(
                 new CustomEvent("request-port-selection", {
@@ -1180,7 +1192,7 @@ export class EwtInstallDialog extends LitElement {
                   detail: {
                     afterFlash: true, // Indicate this is after flash
                     testImprov: true, // Request Improv test after reconnect
-                  }
+                  },
                 }),
               );
               // Close dialog
@@ -1862,7 +1874,9 @@ export class EwtInstallDialog extends LitElement {
     // we need to reset to bootloader mode first
     // Check if we have Improv info (indicates firmware mode)
     if (this._info && this._improvSupported) {
-      this.logger.log("Device in firmware mode - preparing for flash operations");
+      this.logger.log(
+        "Device in firmware mode - preparing for flash operations",
+      );
       try {
         await this._prepareForFlashOperations();
       } catch (err: any) {
