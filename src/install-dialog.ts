@@ -194,13 +194,6 @@ export class EwtInstallDialog extends LitElement {
     return this.esploader.port;
   }
 
-  // Helper to check if this is ESP32-S2 USB/JTAG mode
-  // DEPRECATED: Use esploader.usingUsbJtagSerial() or esploader.usingUsbOtg() instead
-  private _isUSBJTAG_S2(): boolean {
-    const portInfo = this._port.getInfo();
-    return portInfo.usbProductId === 0x0002; // S2 USB_JTAG_SERIAL_PID
-  }
-
   // Helper to check if device is using USB-JTAG or USB-OTG (not external serial chip)
   private async _isUsbJtagOrOtg(): Promise<boolean> {
     try {
@@ -210,8 +203,10 @@ export class EwtInstallDialog extends LitElement {
       return isJtag || isOtg;
     } catch (err) {
       this.logger.debug(`Could not detect USB connection type: ${err}`);
-      // Fallback to old method
-      return this._isUSBJTAG_S2();
+      // Fallback to PID-based detection for S2 and S3
+      const portInfo = this._port.getInfo();
+      const pid = portInfo.usbProductId;
+      return pid === 0x0002 || pid === 0x1001; // S2 or S3 USB-JTAG PID
     }
   }
 
@@ -1984,6 +1979,7 @@ export class EwtInstallDialog extends LitElement {
         this.logger.error(`Flash error: ${flashErr.message || flashErr}`);
         this._state = "ERROR";
         this._error = `Flash failed: ${flashErr.message || flashErr}`;
+        this._busy = false;
       });
     }
   }
@@ -2016,6 +2012,7 @@ export class EwtInstallDialog extends LitElement {
       this.logger.error(`Flash error: ${flashErr.message || flashErr}`);
       this._state = "ERROR";
       this._error = `Flash failed: ${flashErr.message || flashErr}`;
+      this._busy = false;
     });
   }
 
