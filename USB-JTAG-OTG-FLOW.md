@@ -187,16 +187,27 @@ fireEvent(this, "request-port-selection" as any, {
 });
 ```
 
-Handled by connect.ts:
+Handled by connect.ts with proper reference management:
 ```typescript
 const handlePortSelection = async (event: Event) => {
-  // Close current dialog
-  // Disconnect current port
+  // Use event.currentTarget to get the CURRENT dialog (not stale closure)
+  const currentEl = event.currentTarget as HTMLElement & {
+    esploader?: { disconnect: () => Promise<void> };
+    baudRate?: number;
+  };
+  const currentEsploader = currentEl.esploader;
+  
+  // Close CURRENT dialog and esploader (not stale references)
+  await currentEsploader?.disconnect();
+  currentEl.remove();
+  
   // Trigger new port selection (User Gesture)
   // Create new dialog with new port
   // Recursively attach event handler
 };
 ```
+
+**Critical Fix**: Uses `event.currentTarget` instead of closure variables to avoid stale references after reconnection. This ensures the correct dialog and esploader are disposed when the event fires on a reconnected dialog.
 
 ## State Variables
 

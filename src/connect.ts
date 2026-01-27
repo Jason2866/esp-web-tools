@@ -109,19 +109,24 @@ export const connect = async (button: InstallButton) => {
   // Handle request-port-selection event for USB-JTAG/OTG devices
   const handlePortSelection = async (event: Event) => {
     const customEvent = event as CustomEvent;
+    const currentEl = event.currentTarget as HTMLElement & {
+      esploader?: { disconnect: () => Promise<void> };
+      baudRate?: number;
+    };
+    const currentEsploader = currentEl.esploader;
     const detail = customEvent.detail || {};
 
     console.log("Port selection requested:", detail);
 
     // Close current dialog
     try {
-      await esploader.disconnect();
+      await currentEsploader?.disconnect();
     } catch (err) {
       // Ignore disconnect errors
     }
 
     // Remove current dialog
-    el.remove();
+    currentEl.remove();
 
     // Wait a bit for cleanup
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -157,9 +162,9 @@ export const connect = async (button: InstallButton) => {
     newEl.overrides = button.overrides;
     newEl.firmwareFile = button.firmwareFile;
 
-    // Copy baud rate setting
-    if (el.baudRate) {
-      newEl.baudRate = el.baudRate;
+    // Copy baud rate setting from current dialog
+    if (currentEl.baudRate) {
+      newEl.baudRate = currentEl.baudRate;
     }
 
     // Add event listeners to new dialog
