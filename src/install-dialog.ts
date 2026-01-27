@@ -1747,69 +1747,91 @@ export class EwtInstallDialog extends LitElement {
     const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
     this._isUsbJtagOrOtgDevice = isUsbJtagOrOtg; // Update state for UI
 
-    if (isUsbJtagOrOtg && !justInstalled) {
-      this.logger.log(
-        "USB-JTAG/OTG device detected - switching to firmware mode for Improv",
-      );
+    // For ALL devices: We need to be in FIRMWARE mode for Improv test
+    // But the method to get there is different for USB-JTAG/OTG vs external serial chips
+    if (!justInstalled) {
+      // Check if we're in bootloader mode by checking if chipFamily is set
+      // If chipFamily is set, we connected to bootloader (esptoolConnect does this)
+      const inBootloaderMode = this.esploader.chipFamily !== null;
 
-      // For USB-JTAG/OTG devices in bootloader mode:
-      // We MUST switch to firmware mode for Improv test
-      // This will close the port and user must select new port (User Gesture)
-
-      try {
-        // Use enterConsoleMode() to switch to firmware mode
-        const portClosed = await this.esploader.enterConsoleMode();
-
-        if (portClosed) {
-          // Port was closed - device is now in firmware mode but port changed
-          // User must manually select new port for Improv test
+      if (isUsbJtagOrOtg) {
+        // USB-JTAG/OTG devices: Use enterConsoleMode() to switch to firmware
+        // This will CLOSE the port and require user to select new port
+        if (inBootloaderMode) {
           this.logger.log(
-            "Device switched to firmware mode - port closed, dispatching port selection request",
+            "USB-JTAG/OTG device in bootloader mode - switching to firmware mode for Improv",
           );
 
-          this._improvChecked = false; // Will check after user reconnects
-          this._client = undefined;
-          this._improvSupported = false; // Unknown until after reconnect
-          this._busy = false;
+          try {
+            // Use enterConsoleMode() to switch to firmware mode
+            const portClosed = await this.esploader.enterConsoleMode();
 
-          // Dispatch event to request port selection (handled in connect.ts)
-          // This will close the dialog and trigger new port selection
-          fireEvent(this, "request-port-selection" as any, {
-            afterFlash: false,
-            testImprov: true,
-          });
-          return;
+            if (portClosed) {
+              // Port was closed - device is now in firmware mode but port changed
+              // User must manually select new port for Improv test
+              this.logger.log(
+                "Device switched to firmware mode - port closed, dispatching port selection request",
+              );
+
+              this._improvChecked = false; // Will check after user reconnects
+              this._client = undefined;
+              this._improvSupported = false; // Unknown until after reconnect
+              this._busy = false;
+
+              // Dispatch event to request port selection (handled in connect.ts)
+              // This will close the dialog and trigger new port selection
+              fireEvent(this, "request-port-selection" as any, {
+                afterFlash: false,
+                testImprov: true,
+              });
+              return;
+            } else {
+              // Port didn't close - device might already be in firmware mode
+              this.logger.log(
+                "Port didn't close - device might already be in firmware mode",
+              );
+            }
+          } catch (err: any) {
+            this.logger.error(`Failed to enter firmware mode: ${err.message}`);
+            // Show error to user
+            this._state = "ERROR";
+            this._error = `Failed to switch to firmware mode: ${err.message}`;
+            this._busy = false;
+            return;
+          }
+        } else {
+          this.logger.log(
+            "USB-JTAG/OTG device already in firmware mode, ready for Improv test",
+          );
         }
-      } catch (err: any) {
-        this.logger.error(`Failed to enter firmware mode: ${err.message}`);
-        // Show error to user
-        this._state = "ERROR";
-        this._error = `Failed to switch to firmware mode: ${err.message}`;
-        this._busy = false;
-        return;
-      }
+      } else {
+        // External serial chips: Use hardReset(false) to switch to firmware
+        // Port stays OPEN, just device resets
+        if (inBootloaderMode) {
+          this.logger.log(
+            "External serial chip in bootloader mode - resetting to firmware mode for Improv test",
+          );
 
-      // If we reach here, port didn't close (shouldn't happen for USB-JTAG/OTG)
-      // Fall through to normal Improv test
-      this.logger.log("Port didn't close - continuing with Improv test");
-    }
+          try {
+            // Release any locks first
+            await this._releaseReaderWriter();
 
-    // For external serial chips: Reset to firmware mode for Improv test
-    // Port is at 115200 baud for Improv (no stub loaded yet!)
-    // If not just installed, reset ESP to firmware mode to ensure firmware is running
-    if (!justInstalled && !isUsbJtagOrOtg) {
-      try {
-        // Reset ESP to FIRMWARE mode (needed if we were in bootloader mode)
-        // hardReset() now automatically uses chip-specific methods
-        await this._resetDeviceAndReleaseLocks();
-        this.logger.log("ESP reset to firmware mode for Improv test");
-        // Port remains open after hardReset(), just reader/writer are released
-        await sleep(200); // Wait for firmware to start
-      } catch (e) {
-        this.logger.log(`Reset to firmware failed, continuing anyway: ${e}`);
+            // Reset to firmware mode using hardReset
+            await this.esploader.hardReset(false); // false = firmware mode
+
+            this.logger.log("Device reset to firmware mode");
+            await sleep(500); // Wait for firmware to start
+          } catch (e) {
+            this.logger.log(
+              `Reset to firmware failed, continuing anyway: ${e}`,
+            );
+          }
+        } else {
+          this.logger.log(
+            "External serial chip already in firmware mode, ready for Improv test",
+          );
+        }
       }
-    } else if (isUsbJtagOrOtg) {
-      this.logger.log("USB-JTAG/OTG: skipping hard reset for Improv test");
     }
 
     this._improvChecked = true;
