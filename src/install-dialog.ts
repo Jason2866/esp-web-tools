@@ -1797,7 +1797,7 @@ export class EwtInstallDialog extends LitElement {
     // For external serial chips: Reset to firmware mode for Improv test
     // Port is at 115200 baud for Improv (no stub loaded yet!)
     // If not just installed, reset ESP to firmware mode to ensure firmware is running
-    if (!justInstalled) {
+    if (!justInstalled && !isUsbJtagOrOtg) {
       try {
         // Reset ESP to FIRMWARE mode (needed if we were in bootloader mode)
         // hardReset() now automatically uses chip-specific methods
@@ -1808,6 +1808,8 @@ export class EwtInstallDialog extends LitElement {
       } catch (e) {
         this.logger.log(`Reset to firmware failed, continuing anyway: ${e}`);
       }
+    } else if (isUsbJtagOrOtg) {
+      this.logger.log("USB-JTAG/OTG: skipping hard reset for Improv test");
     }
 
     this._improvChecked = true;
