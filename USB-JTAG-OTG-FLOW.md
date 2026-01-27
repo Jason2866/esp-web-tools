@@ -52,6 +52,8 @@ _initialize() runs again, device is now in firmware mode
   ↓
 Improv test runs successfully at 115200 baud
   ↓
+**Device stays in FIRMWARE mode** (no switch to bootloader)
+  ↓
 Dashboard shown with device info
 ```
 
@@ -59,9 +61,13 @@ Dashboard shown with device info
 ```
 User clicks "Install Firmware"
   ↓
-Device is in FIRMWARE mode (from Improv test)
+Device is in FIRMWARE mode (stayed after Improv test)
   ↓
-_prepareForFlashOperations() called
+_confirmInstall() called
+  ↓
+Closes Improv client
+  ↓
+Calls _prepareForFlashOperations()
   ↓
 Calls esploader.reconnectToBootloader()
   ↓
@@ -108,7 +114,11 @@ Improv client re-initialized
   ↓
 WiFi provisioning proceeds
   ↓
-After provisioning: Device stays in FIRMWARE mode
+User clicks "Continue" or "Skip"
+  ↓
+**USB-JTAG/OTG: Device stays in FIRMWARE mode**
+  ↓
+Dashboard shown
   ↓
 "Visit Device" and "Add to HA" links work (firmware running)
 ```
@@ -142,6 +152,14 @@ WiFi provisioning screen shown
 - **MUST** request port selection whenever port changes
 - Cannot programmatically select port (browser security)
 - User must manually select port from browser dialog
+
+### 4. USB-JTAG/OTG Specific Requirements
+- **Device stays in firmware mode after successful Improv test**
+- **Device stays in firmware mode after WiFi provisioning**
+- **Device stays in firmware mode when navigating back from provision screen**
+- Only switches to bootloader when user initiates flash operation
+- Avoids unnecessary port changes and User Gestures
+- Keeps device accessible for "Visit Device" and "Add to HA" links
 
 ## Functions Used from tasmota-webserial-esptool v9.2.10
 
