@@ -308,7 +308,7 @@ export class EwtInstallDialog extends LitElement {
       this.esploader.IS_STUB = false;
       this.esploader.chipFamily = null;
       this._improvChecked = false; // Will check after user reconnects
-      this._client = undefined; // Will be created after reconnect
+      this._client = null; // Set to null (not undefined) to avoid "Wrapping up" UI state
       this._improvSupported = false; // Unknown until after reconnect
       this.esploader._reader = undefined;
 
@@ -1211,8 +1211,10 @@ export class EwtInstallDialog extends LitElement {
       this._installState.state === FlashStateType.WRITING ||
       // When we're finished, keep showing this screen with 100% written
       // until Improv is initialized / not detected.
+      // EXCEPTION: USB-JTAG/OTG devices skip this (they show reconnect message instead)
       (this._installState.state === FlashStateType.FINISHED &&
-        this._client === undefined)
+        this._client === undefined &&
+        !this._isUsbJtagOrOtgDevice)
     ) {
       heading = "Installing";
       let percentage: number | undefined;

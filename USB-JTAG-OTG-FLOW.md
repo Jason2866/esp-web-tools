@@ -215,6 +215,7 @@ const handlePortSelection = async (event: Event) => {
 - Type: `boolean`
 - Purpose: Cache USB-JTAG/OTG detection result
 - Used by: UI rendering to hide "Logs & Console" button (not supported for USB-JTAG/OTG)
+- Used by: Install progress UI to skip "Wrapping up" state for USB-JTAG/OTG devices
 
 ### _improvChecked
 - Type: `boolean`
@@ -225,6 +226,14 @@ const handlePortSelection = async (event: Event) => {
 - Type: `boolean`
 - Purpose: Track if device supports Improv
 - Separate from `_client` (client can be closed but support remains)
+
+### _client
+- Type: `ImprovSerial | null | undefined`
+- Purpose: Active Improv client instance
+- Values:
+  - `undefined` = Not yet tested or testing in progress
+  - `null` = Tested and not supported, OR USB-JTAG/OTG waiting for reconnection
+  - `ImprovSerial` = Active client instance
 
 ## UI Differences for USB-JTAG/OTG
 
@@ -237,6 +246,12 @@ const handlePortSelection = async (event: Event) => {
 - After flash: "Please close this dialog and reconnect"
   - Reason: Port changed, need User Gesture to select new port
   - Alternative: Automatic port selection via request-port-selection event
+
+### Modified UI States
+- "Wrapping up" spinner - Skipped for USB-JTAG/OTG devices
+  - Condition: `FINISHED && _client === undefined && !_isUsbJtagOrOtgDevice`
+  - Reason: USB-JTAG/OTG devices set `_client = null` (not undefined) after flash
+  - Goes directly to "Installation complete" message with reconnect instructions
 
 ## Testing Checklist
 
