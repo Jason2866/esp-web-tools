@@ -35,7 +35,7 @@ const ERROR_ICON = "⚠️";
 const OK_ICON = "🎉";
 
 export class EwtInstallDialog extends LitElement {
-  public esploader!: any; // ESPLoader instance from tasmota-webserial-esptool
+  public esploader!: any; // ESPLoader instance from tasmota-webserial-esptool v9.2.10
 
   public manifestPath!: string;
 
@@ -98,6 +98,9 @@ export class EwtInstallDialog extends LitElement {
   // Track if Improv is supported (separate from active client)
   private _improvSupported = false;
 
+  // Track if device is using USB-JTAG or USB-OTG (not external serial chip)
+  @state() private _isUsbJtagOrOtgDevice = false;
+
   // Ensure stub is initialized (called before any operation that needs it)
   private async _ensureStub(): Promise<any> {
     if (this._espStub && this._espStub.IS_STUB) {
@@ -107,7 +110,7 @@ export class EwtInstallDialog extends LitElement {
 
       // Ensure baudrate is set even if stub already exists
       if (this.baudRate && this.baudRate > 115200) {
-        const currentBaud = this._espStub._currentBaudRate || 115200;
+        const currentBaud = this._espStub.currentBaudRate || 115200;
         if (currentBaud !== this.baudRate) {
           this.logger.log(
             `Adjusting baudrate from ${currentBaud} to ${this.baudRate}...`,
@@ -167,6 +170,7 @@ export class EwtInstallDialog extends LitElement {
     if (this.baudRate && this.baudRate > 115200) {
       this.logger.log(`Setting baudrate to ${this.baudRate}...`);
       try {
+        // setBaudrate now supports S2 on Android (WebUSB) in v9.2.10
         await espStub.setBaudrate(this.baudRate);
         this.logger.log(`Baudrate set to ${this.baudRate}`);
       } catch (baudErr: any) {
@@ -191,9 +195,24 @@ export class EwtInstallDialog extends LitElement {
   }
 
   // Helper to check if this is ESP32-S2 USB/JTAG mode
+  // DEPRECATED: Use esploader.usingUsbJtagSerial() or esploader.usingUsbOtg() instead
   private _isUSBJTAG_S2(): boolean {
     const portInfo = this._port.getInfo();
     return portInfo.usbProductId === 0x0002; // S2 USB_JTAG_SERIAL_PID
+  }
+
+  // Helper to check if device is using USB-JTAG or USB-OTG (not external serial chip)
+  private async _isUsbJtagOrOtg(): Promise<boolean> {
+    try {
+      // Use new methods from tasmota-webserial-esptool v9.2.10
+      const isJtag = await this.esploader.usingUsbJtagSerial();
+      const isOtg = await this.esploader.usingUsbOtg();
+      return isJtag || isOtg;
+    } catch (err) {
+      this.logger.debug(`Could not detect USB connection type: ${err}`);
+      // Fallback to old method
+      return this._isUSBJTAG_S2();
+    }
   }
 
   // Helper to release reader/writer locks (used by multiple methods)
@@ -231,11 +250,13 @@ export class EwtInstallDialog extends LitElement {
   // CRITICAL: The ESP stub might be at higher baudrate (e.g., 460800) for flashing
   // But firmware console always runs at 115200
   private async _resetBaudrateForConsole() {
-    if (this._espStub && this._espStub._currentBaudRate !== 115200) {
+    if (this._espStub && this._espStub.currentBaudRate !== 115200) {
       this.logger.log(
-        `Resetting baudrate from ${this._espStub._currentBaudRate} to 115200 for console...`,
+        `Resetting baudrate from ${this._espStub.currentBaudRate} to 115200 for console...`,
       );
       try {
+        // Use setBaudrate from tasmota-webserial-esptool v9.2.10
+        // This now supports S2 baudrate changes on Android (WebUSB)
         await this._espStub.setBaudrate(115200);
         this.logger.log("Baudrate set to 115200 for console");
       } catch (baudErr: any) {
@@ -266,11 +287,14 @@ export class EwtInstallDialog extends LitElement {
   // Helper to handle post-flash cleanup and Improv re-initialization
   // Called when flash operation completes successfully
   private async _handleFlashComplete() {
-    // Check if this is ESP32-S2 USB/JTAG mode
-    if (this._isUSBJTAG_S2()) {
-      // For USB/JTAG S2: NO baudrate change, NO Improv test, NO reconnect
+    // Check if this is USB-JTAG or USB-OTG device (not external serial chip)
+    const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
+    this._isUsbJtagOrOtgDevice = isUsbJtagOrOtg; // Update state for UI
+
+    if (isUsbJtagOrOtg) {
+      // For USB-JTAG/OTG devices: NO baudrate change, NO Improv test, NO reconnect
       // Just mark as complete and show success
-      this.logger.log("ESP32-S2 USB/JTAG - skipping post-flash Improv test");
+      this.logger.log("USB-JTAG/OTG device - skipping post-flash Improv test");
 
       // Release locks and reset ESP state
       await sleep(100);
@@ -282,15 +306,14 @@ export class EwtInstallDialog extends LitElement {
       this._improvChecked = true; // Mark as checked (but not supported)
       this._client = null;
       this._improvSupported = false;
-      this.esploader._reader = undefined;
-      this.esploader._writer = undefined;
+      this.esploader.__reader = undefined;
 
       this.logger.log("Flash complete - ready for next operation");
       this.requestUpdate();
       return;
     }
 
-    // Normal flow for non-USB/JTAG devices
+    // Normal flow for non-USB-JTAG/OTG devices
     // Release locks and reset ESP state for Improv test
     await sleep(100);
 
@@ -301,14 +324,14 @@ export class EwtInstallDialog extends LitElement {
     this.esploader.IS_STUB = false;
     this.esploader.chipFamily = null;
     this._improvChecked = false;
-    this.esploader._reader = undefined;
-    this.esploader._writer = undefined;
+    this.esploader.__reader = undefined;
     this.logger.log("ESP state reset for Improv test");
 
     // Reconnect with 115200 baud and reset ESP to boot into new firmware
     try {
       // CRITICAL: After flashing at higher baudrate, reconnect at 115200
       // reconnectToBootloader() closes port and reopens at 115200 baud
+      // It now automatically detects WebUSB vs WebSerial and uses appropriate methods
       this.logger.log("Reconnecting at 115200 baud for firmware reset...");
       try {
         await this.esploader.reconnectToBootloader();
@@ -318,6 +341,7 @@ export class EwtInstallDialog extends LitElement {
       }
 
       // Reset device and release locks to ensure clean state for new firmware
+      // hardReset() now uses chip-specific reset methods (S2/S3/C3 with USB-JTAG use watchdog)
       this.logger.log("Performing hardware reset to start new firmware...");
       await this._resetDeviceAndReleaseLocks();
     } catch (resetErr: any) {
@@ -336,8 +360,9 @@ export class EwtInstallDialog extends LitElement {
     // Release esploader reader/writer if locked
     await this._releaseReaderWriter();
 
-    // Hardware reset to FIRMWARE mode (bootloader=false) and to fix connection issues
-    // Use appropriate method based on platform (Desktop vs Android)
+    // Hardware reset to FIRMWARE mode (bootloader=false)
+    // hardReset() now automatically detects WebUSB vs WebSerial and uses appropriate method
+    // Also handles chip-specific resets (S2/S3/C3 with USB-JTAG/OTG use watchdog reset)
     try {
       await this.esploader.hardReset(false);
       this.logger.log("Device reset to firmware mode");
@@ -358,8 +383,9 @@ export class EwtInstallDialog extends LitElement {
     // - Closing port completely (releases all locks)
     // - Reopening port at 115200 baud
     // - Restarting readLoop()
-    // - Reset strategies to enter bootloader
+    // - Reset strategies to enter bootloader (connectWithResetStrategies)
     // - Chip detection
+    // - WebUSB vs WebSerial detection and appropriate reset methods
     try {
       this.logger.log("Resetting ESP to bootloader mode...");
       await this.esploader.reconnectToBootloader();
@@ -610,7 +636,7 @@ export class EwtInstallDialog extends LitElement {
               </div>
             `
           : ""}
-        ${!this._isUSBJTAG_S2()
+        ${!this._isUsbJtagOrOtgDevice
           ? html`
               <div>
                 <ewt-button
@@ -709,7 +735,7 @@ export class EwtInstallDialog extends LitElement {
           ></ewt-button>
         </div>
 
-        ${!this._isUSBJTAG_S2()
+        ${!this._isUsbJtagOrOtgDevice
           ? html`
               <div>
                 <ewt-button
@@ -1052,9 +1078,9 @@ export class EwtInstallDialog extends LitElement {
       heading = undefined;
       const supportsImprov = this._client !== null;
 
-      // Check if this is ESP32-S2 USB/JTAG mode
-      if (this._isUSBJTAG_S2()) {
-        // For USB/JTAG S2: Show success message with manual reset instruction
+      // Check if this is USB-JTAG or USB-OTG device (use cached state)
+      if (this._isUsbJtagOrOtgDevice) {
+        // For USB-JTAG/OTG devices: Show success message with manual reset instruction
         content = html`
           <ewt-page-message
             .icon=${OK_ICON}
@@ -1063,7 +1089,7 @@ export class EwtInstallDialog extends LitElement {
           <p
             style="text-align: center; margin: 16px 0; color: var(--mdc-theme-on-surface, #000);"
           >
-            Please press the <strong>RESET</strong> button on your ESP32-S2<br />
+            Please press the <strong>RESET</strong> button on your device<br />
             to boot into firmware mode.
           </p>
           <ewt-button
@@ -1548,11 +1574,14 @@ export class EwtInstallDialog extends LitElement {
       return;
     }
 
-    // CRITICAL: Check if ESP32-S2 connected via USB/JTAG (PID 0x0002)
+    // CRITICAL: Check if device is using USB-JTAG or USB-OTG (not external serial chip)
     // No auto reset possible out of boot mode - skip test and load stub directly
-    if (this._isUSBJTAG_S2() && !justInstalled) {
+    const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
+    this._isUsbJtagOrOtgDevice = isUsbJtagOrOtg; // Update state for UI
+
+    if (isUsbJtagOrOtg && !justInstalled) {
       this.logger.log(
-        "ESP32-S2 USB/JTAG detected - skipping Improv, loading stub directly",
+        "USB-JTAG/OTG device detected - skipping Improv, loading stub directly",
       );
       this._improvChecked = true;
       this._client = null;
@@ -1568,11 +1597,9 @@ export class EwtInstallDialog extends LitElement {
 
           // Load stub directly
           await this._ensureStub();
-          this.logger.log(
-            "Stub loaded successfully for ESP32-S2 USB/JTAG device",
-          );
+          this.logger.log("Stub loaded successfully for USB-JTAG/OTG device");
         } else {
-          this.logger.log("Stub already loaded for ESP32-S2 USB/JTAG device");
+          this.logger.log("Stub already loaded for USB-JTAG/OTG device");
         }
 
         // Set state to DASHBOARD so UI can render
@@ -1592,16 +1619,17 @@ export class EwtInstallDialog extends LitElement {
     // If not just installed, reset ESP to firmware mode to ensure firmware is running
     if (!justInstalled) {
       try {
-        if (this._isUSBJTAG_S2()) {
-          // Reset ESP to FIRMWARE is not possible for S2 in USB/JTAG mode
-          // WDT reset does not work - skip reset, fix if possible -> tasmota-webserial-esp
-          // await this._resetDeviceAndReleaseLocks();
-          // await sleep(2000); // Wait for firmware to start (need longer time for USB/JTAG)
+        const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
+
+        if (isUsbJtagOrOtg) {
+          // Reset ESP to FIRMWARE is not possible for USB-JTAG/OTG devices in some modes
+          // WDT reset may not work reliably - skip reset
           this.logger.log(
-            "ESP S2 USB/JTAG detected - skipping reset to firmware",
+            "USB-JTAG/OTG device detected - skipping reset to firmware",
           );
         } else {
           // Reset ESP to FIRMWARE mode (needed if we were in bootloader mode)
+          // hardReset() now automatically uses chip-specific methods
           await this._resetDeviceAndReleaseLocks();
           this.logger.log("ESP reset to firmware mode for Improv test");
           // Port remains open after hardReset(), just reader/writer are released
