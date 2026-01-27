@@ -161,7 +161,7 @@ WiFi provisioning screen shown
 - Avoids unnecessary port changes and User Gestures
 - Keeps device accessible for "Visit Device" and "Add to HA" links
 
-## Functions Used from tasmota-webserial-esptool v9.2.10
+## Functions Used from tasmota-webserial-esptool v9.2.12
 
 ### Detection Functions
 - `esploader.usingUsbJtagSerial()` - Detects USB-JTAG devices
