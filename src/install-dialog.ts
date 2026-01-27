@@ -292,9 +292,18 @@ export class EwtInstallDialog extends LitElement {
     this._isUsbJtagOrOtgDevice = isUsbJtagOrOtg; // Update state for UI
 
     if (isUsbJtagOrOtg) {
-      // For USB-JTAG/OTG devices: NO baudrate change, NO Improv test, NO reconnect
-      // Just mark as complete and show success
-      this.logger.log("USB-JTAG/OTG device - skipping post-flash Improv test");
+      // For USB-JTAG/OTG devices: Reset to firmware mode (port will change!)
+      // Then user must select new port (User Gesture) and we test Improv
+      this.logger.log("USB-JTAG/OTG device - resetting to firmware mode");
+
+      try {
+        // Use new resetToFirmware() method from v9.2.10
+        // This will close the port and device will reboot to firmware
+        await this.esploader.resetToFirmware();
+        this.logger.log("Device reset to firmware mode - port closed");
+      } catch (err: any) {
+        this.logger.debug(`Reset to firmware error (expected): ${err.message}`);
+      }
 
       // Release locks and reset ESP state
       await sleep(100);
@@ -303,12 +312,12 @@ export class EwtInstallDialog extends LitElement {
       this._espStub = undefined;
       this.esploader.IS_STUB = false;
       this.esploader.chipFamily = null;
-      this._improvChecked = true; // Mark as checked (but not supported)
-      this._client = null;
-      this._improvSupported = false;
+      this._improvChecked = false; // Will check after user reconnects
+      this._client = undefined; // Will be created after reconnect
+      this._improvSupported = false; // Unknown until after reconnect
       this.esploader.__reader = undefined;
 
-      this.logger.log("Flash complete - ready for next operation");
+      this.logger.log("Flash complete - waiting for user to select new port");
       this.requestUpdate();
       return;
     }
@@ -826,6 +835,8 @@ export class EwtInstallDialog extends LitElement {
                           class="has-button"
                           target="_blank"
                           @click=${() => {
+                            // Visit Device opens external page - firmware must keep running
+                            // Just close the dialog, don't reset to bootloader
                             this._state = "DASHBOARD";
                           }}
                         >
@@ -842,6 +853,8 @@ export class EwtInstallDialog extends LitElement {
                           class="has-button"
                           target="_blank"
                           @click=${() => {
+                            // Add to HA opens external page - firmware must keep running
+                            // Just close the dialog, don't reset to bootloader
                             this._state = "DASHBOARD";
                           }}
                         >
@@ -854,7 +867,26 @@ export class EwtInstallDialog extends LitElement {
                 <div>
                   <ewt-button
                     label="Skip"
-                    @click=${() => {
+                    @click=${async () => {
+                      // After WiFi provisioning: Return to bootloader mode for flash operations
+                      // Close Improv client first
+                      if (this._client) {
+                        try {
+                          await this._closeClientWithoutEvents(this._client);
+                          this.logger.log("Improv client closed after provisioning");
+                        } catch (e) {
+                          this.logger.log("Failed to close Improv client:", e);
+                        }
+                      }
+                      
+                      // Prepare for flash operations (reset to bootloader, load stub)
+                      try {
+                        await this._prepareForFlashOperations();
+                        this.logger.log("Device ready for flash operations after provisioning");
+                      } catch (err: any) {
+                        this.logger.log(`Failed to prepare for flash: ${err.message}`);
+                      }
+                      
                       this._state = "DASHBOARD";
                     }}
                   ></ewt-button>
@@ -865,7 +897,26 @@ export class EwtInstallDialog extends LitElement {
               <ewt-button
                 slot="primaryAction"
                 label="Continue"
-                @click=${() => {
+                @click=${async () => {
+                  // After WiFi provisioning: Return to bootloader mode for flash operations
+                  // Close Improv client first
+                  if (this._client) {
+                    try {
+                      await this._closeClientWithoutEvents(this._client);
+                      this.logger.log("Improv client closed after provisioning");
+                    } catch (e) {
+                      this.logger.log("Failed to close Improv client:", e);
+                    }
+                  }
+                  
+                  // Prepare for flash operations (reset to bootloader, load stub)
+                  try {
+                    await this._prepareForFlashOperations();
+                    this.logger.log("Device ready for flash operations after provisioning");
+                  } catch (err: any) {
+                    this.logger.log(`Failed to prepare for flash: ${err.message}`);
+                  }
+                  
                   this._state = "DASHBOARD";
                 }}
               ></ewt-button>
@@ -946,7 +997,26 @@ export class EwtInstallDialog extends LitElement {
         <ewt-button
           slot="secondaryAction"
           .label=${this._installState && this._installErase ? "Skip" : "Back"}
-          @click=${() => {
+          @click=${async () => {
+            // When going back from provision: Return to bootloader mode
+            // Close Improv client first
+            if (this._client) {
+              try {
+                await this._closeClientWithoutEvents(this._client);
+                this.logger.log("Improv client closed");
+              } catch (e) {
+                this.logger.log("Failed to close Improv client:", e);
+              }
+            }
+            
+            // Prepare for flash operations (reset to bootloader, load stub)
+            try {
+              await this._prepareForFlashOperations();
+              this.logger.log("Device ready for flash operations");
+            } catch (err: any) {
+              this.logger.log(`Failed to prepare for flash: ${err.message}`);
+            }
+            
             this._state = "DASHBOARD";
           }}
         ></ewt-button>
@@ -1080,7 +1150,8 @@ export class EwtInstallDialog extends LitElement {
 
       // Check if this is USB-JTAG or USB-OTG device (use cached state)
       if (this._isUsbJtagOrOtgDevice) {
-        // For USB-JTAG/OTG devices: Show success message with manual reset instruction
+        // For USB-JTAG/OTG devices: Show success with port selection prompt
+        // Device is now in firmware mode, user must select new port for Improv test
         content = html`
           <ewt-page-message
             .icon=${OK_ICON}
@@ -1089,11 +1160,40 @@ export class EwtInstallDialog extends LitElement {
           <p
             style="text-align: center; margin: 16px 0; color: var(--mdc-theme-on-surface, #000);"
           >
-            Please press the <strong>RESET</strong> button on your device<br />
-            to boot into firmware mode.
+            The device is now in firmware mode.<br />
+            <strong>Please select the device port</strong> to continue.
           </p>
           <ewt-button
             slot="primaryAction"
+            label="Select Port"
+            @click=${async () => {
+              // Trigger port selection (User Gesture)
+              // After port selection, device is in firmware mode at 115200 baud
+              // Parent component will handle port selection and then call _initialize(true)
+              // which will test Improv automatically
+              
+              // Dispatch custom event that parent component can listen to
+              this.dispatchEvent(
+                new CustomEvent("request-port-selection", {
+                  bubbles: true,
+                  composed: true,
+                  detail: {
+                    afterFlash: true, // Indicate this is after flash
+                    testImprov: true, // Request Improv test after reconnect
+                  }
+                }),
+              );
+              // Close dialog
+              this.dispatchEvent(
+                new CustomEvent("closed", {
+                  bubbles: true,
+                  composed: true,
+                }),
+              );
+            }}
+          ></ewt-button>
+          <ewt-button
+            slot="secondaryAction"
             label="Close"
             dialogAction="close"
           ></ewt-button>
@@ -1575,17 +1675,26 @@ export class EwtInstallDialog extends LitElement {
     }
 
     // CRITICAL: Check if device is using USB-JTAG or USB-OTG (not external serial chip)
-    // No auto reset possible out of boot mode - skip test and load stub directly
+    // These devices CAN support Improv, but require port reconnection after mode changes
     const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
     this._isUsbJtagOrOtgDevice = isUsbJtagOrOtg; // Update state for UI
 
     if (isUsbJtagOrOtg && !justInstalled) {
       this.logger.log(
-        "USB-JTAG/OTG device detected - skipping Improv, loading stub directly",
+        "USB-JTAG/OTG device detected - will need port reconnection for Improv",
       );
-      this._improvChecked = true;
+
+      // For USB-JTAG/OTG devices in bootloader mode:
+      // We need to switch to firmware mode for Improv, but this closes the port
+      // So we skip Improv test here and load stub for flash operations
+      // After flashing, we'll prompt user to reconnect for Improv test
+
+      this.logger.log(
+        "Loading stub for USB-JTAG/OTG device (Improv test after flash)",
+      );
+      this._improvChecked = false; // Will check after flash with new port
       this._client = null;
-      this._improvSupported = false;
+      this._improvSupported = false; // Unknown until after reconnect
 
       try {
         // DON'T reset chipFamily - keep it if already detected
@@ -1748,6 +1857,19 @@ export class EwtInstallDialog extends LitElement {
       await this._closeClientWithoutEvents(this._client);
     }
     this._client = undefined;
+
+    // If device is in firmware mode (e.g., after "Visit Device" or WiFi setup),
+    // we need to reset to bootloader mode first
+    // Check if we have Improv info (indicates firmware mode)
+    if (this._info && this._improvSupported) {
+      this.logger.log("Device in firmware mode - preparing for flash operations");
+      try {
+        await this._prepareForFlashOperations();
+      } catch (err: any) {
+        this.logger.log(`Failed to prepare for flash: ${err.message}`);
+        // Continue anyway - _ensureStub will handle it
+      }
+    }
 
     // Ensure stub is initialized before flash
     try {
