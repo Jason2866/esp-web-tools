@@ -668,7 +668,7 @@ export class EwtInstallDialog extends LitElement {
                         this.logger.log("Failed to close Improv client:", e);
                       }
                       this._client = undefined;
-                      
+
                       // Wait for port to be ready after closing client
                       await sleep(200);
                     }
