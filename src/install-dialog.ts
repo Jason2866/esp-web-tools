@@ -408,7 +408,7 @@ export class EwtInstallDialog extends LitElement {
     if (!this.esploader) {
       return html``;
     }
-    
+
     // Safety check: Don't render DASHBOARD state until Improv check is complete
     if (this._state === "DASHBOARD" && !this._improvChecked) {
       return html`
@@ -417,7 +417,7 @@ export class EwtInstallDialog extends LitElement {
         </ewt-dialog>
       `;
     }
-    
+
     let heading: string | undefined;
     let content: TemplateResult;
     let hideActions = false;
@@ -449,7 +449,9 @@ export class EwtInstallDialog extends LitElement {
     } else if (this._state === "ERROR") {
       [heading, content, hideActions] = this._renderError(this._error!);
     } else if (this._state === "DASHBOARD") {
-      this.logger.log(`Rendering DASHBOARD: _improvSupported=${this._improvSupported}, _info=${this._info}`);
+      this.logger.log(
+        `Rendering DASHBOARD: _improvSupported=${this._improvSupported}, _info=${this._info}`,
+      );
       try {
         [heading, content, hideActions, allowClosing] =
           this._improvSupported && this._info
@@ -458,7 +460,9 @@ export class EwtInstallDialog extends LitElement {
         this.logger.log(`Dashboard rendered successfully`);
       } catch (err: any) {
         this.logger.error(`Error rendering dashboard: ${err.message}`, err);
-        [heading, content, hideActions] = this._renderError(`Dashboard render error: ${err.message}`);
+        [heading, content, hideActions] = this._renderError(
+          `Dashboard render error: ${err.message}`,
+        );
       }
     } else if (this._state === "PROVISION") {
       [heading, content, hideActions] = this._renderProvision();
@@ -471,10 +475,14 @@ export class EwtInstallDialog extends LitElement {
     } else {
       // Fallback for unknown state
       this.logger.error(`Unknown state: ${this._state}`);
-      [heading, content, hideActions] = this._renderError(`Unknown state: ${this._state}`);
+      [heading, content, hideActions] = this._renderError(
+        `Unknown state: ${this._state}`,
+      );
     }
 
-    this.logger.log(`Render complete: heading=${heading}, content=${content ? 'defined' : 'undefined'}, hideActions=${hideActions}, allowClosing=${allowClosing}`);
+    this.logger.log(
+      `Render complete: heading=${heading}, content=${content ? "defined" : "undefined"}, hideActions=${hideActions}, allowClosing=${allowClosing}`,
+    );
 
     return html`
       <ewt-dialog
@@ -753,7 +761,7 @@ export class EwtInstallDialog extends LitElement {
                   label="Open Console"
                   @click=${async () => {
                     this._busy = true;
-                    
+
                     // Close Improv client if active
                     if (this._client) {
                       try {
@@ -762,15 +770,17 @@ export class EwtInstallDialog extends LitElement {
                         this.logger.log("Failed to close Improv client:", e);
                       }
                     }
-                    
+
                     // For USB-JTAG/OTG: Device is already in firmware mode at 115200 baud
                     // Just open console directly
-                    this.logger.log("Opening console for USB-JTAG/OTG device (already in firmware mode)");
-                    
+                    this.logger.log(
+                      "Opening console for USB-JTAG/OTG device (already in firmware mode)",
+                    );
+
                     // Release any locks
                     await this._releaseReaderWriter();
                     await sleep(100);
-                    
+
                     this._state = "LOGS";
                     this._busy = false;
                   }}
@@ -859,7 +869,9 @@ export class EwtInstallDialog extends LitElement {
     let hideActions = true;
     let allowClosing = true;
 
-    this.logger.log(`_renderDashboardNoImprov: _manifest=${this._manifest ? 'defined' : 'undefined'}`);
+    this.logger.log(
+      `_renderDashboardNoImprov: _manifest=${this._manifest ? "defined" : "undefined"}`,
+    );
 
     content = html`
       <div class="dashboard-buttons">
@@ -898,7 +910,6 @@ export class EwtInstallDialog extends LitElement {
               </div>
             `
           : ""}
-
         ${this._isUsbJtagOrOtgDevice
           ? html`
               <div>
@@ -907,7 +918,7 @@ export class EwtInstallDialog extends LitElement {
                   ?disabled=${this._busy}
                   @click=${async () => {
                     this._busy = true;
-                    
+
                     // Close Improv client if active
                     if (this._client) {
                       try {
@@ -916,15 +927,17 @@ export class EwtInstallDialog extends LitElement {
                         this.logger.log("Failed to close Improv client:", e);
                       }
                     }
-                    
+
                     // For USB-JTAG/OTG: Device is already in firmware mode at 115200 baud
                     // Just open console directly
-                    this.logger.log("Opening console for USB-JTAG/OTG device (already in firmware mode)");
-                    
+                    this.logger.log(
+                      "Opening console for USB-JTAG/OTG device (already in firmware mode)",
+                    );
+
                     // Release any locks
                     await this._releaseReaderWriter();
                     await sleep(100);
-                    
+
                     this._state = "LOGS";
                     this._busy = false;
                   }}
@@ -1898,7 +1911,9 @@ export class EwtInstallDialog extends LitElement {
             // esp32tool: const loaderToSave = espStub._parent || espStub;
             //            espLoaderBeforeConsole = loaderToSave;
             const loaderToSave = this._espStub._parent || this._espStub;
-            this.logger.log(`Saving parent loader for later restore: ${loaderToSave === this._espStub._parent ? 'parent' : 'stub'}`);
+            this.logger.log(
+              `Saving parent loader for later restore: ${loaderToSave === this._espStub._parent ? "parent" : "stub"}`,
+            );
             // We'll need this later to restore the connection
             (this as any)._savedLoaderBeforeConsole = loaderToSave;
 
@@ -1908,14 +1923,18 @@ export class EwtInstallDialog extends LitElement {
               await loaderToUse.setBaudrate(115200);
               this.logger.log("Baudrate set to 115200 before WDT reset");
             } catch (baudErr: any) {
-              this.logger.log(`Failed to set baudrate to 115200: ${baudErr.message}`);
+              this.logger.log(
+                `Failed to set baudrate to 115200: ${baudErr.message}`,
+              );
             }
 
             // Use enterConsoleMode() to switch to firmware mode
             const portClosed = await loaderToUse.enterConsoleMode();
 
             this.logger.log(`enterConsoleMode() returned: ${portClosed}`);
-            this.logger.log(`isUsbJtagOrOtg value: ${this.esploader.isUsbJtagOrOtg}`);
+            this.logger.log(
+              `isUsbJtagOrOtg value: ${this.esploader.isUsbJtagOrOtg}`,
+            );
             this.logger.log(`chipFamily: ${this.esploader.chipFamily}`);
 
             if (portClosed) {
@@ -1986,12 +2005,12 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log(
         "Skipping mode switch - device already in firmware mode after port reconnection",
       );
-      
+
       // Wait for device to fully boot after WDT reset (500ms like esp32tool)
       this.logger.log("Waiting 500ms for device to fully boot...");
       await sleep(500);
       this.logger.log("Boot delay complete, ready for Improv test");
-      
+
       // CRITICAL: For USB-JTAG/OTG after WDT reset, we need to ensure the port is clean
       // Release and recreate reader/writer to flush any stale data
       this.logger.log("Flushing port buffers after reconnect...");
@@ -2247,28 +2266,34 @@ export class EwtInstallDialog extends LitElement {
   private async _handleSelectNewPort() {
     // Prevent multiple clicks
     if (this._busy) {
-      this.logger.log("Already processing port selection, ignoring duplicate click");
+      this.logger.log(
+        "Already processing port selection, ignoring duplicate click",
+      );
       return;
     }
-    
+
     this._busy = true;
-    this.logger.log("User clicked 'Select Port' button - requesting new port...");
-    this.logger.log(`Dialog in DOM at start: ${this.parentNode ? 'yes' : 'no'}`);
-    
+    this.logger.log(
+      "User clicked 'Select Port' button - requesting new port...",
+    );
+    this.logger.log(
+      `Dialog in DOM at start: ${this.parentNode ? "yes" : "no"}`,
+    );
+
     // Hide the "Select Port" button immediately and show progress
     // This avoids confusion when the port selection dialog appears
     this._state = "DASHBOARD"; // Change state to hide the button
     this._improvChecked = false; // Show "Connecting" message
     this.requestUpdate();
-    
+
     // Ensure dialog stays in DOM
     if (!this.parentNode) {
       document.body.appendChild(this);
       this.logger.log("Dialog re-added to DOM before port selection");
     }
-    
-    await new Promise(resolve => setTimeout(resolve, 50)); // Small delay to ensure UI updates
-    
+
+    await new Promise((resolve) => setTimeout(resolve, 50)); // Small delay to ensure UI updates
+
     // This is called directly from button click (User Gesture preserved!)
     let newPort;
     try {
@@ -2276,8 +2301,8 @@ export class EwtInstallDialog extends LitElement {
       if ((globalThis as any).requestSerialPort) {
         // Android WebUSB
         this.logger.log("Using WebUSB port selection (Android)");
-        newPort = await (globalThis as any).requestSerialPort(
-          (msg: string) => this.logger.log("[WebUSB]", msg)
+        newPort = await (globalThis as any).requestSerialPort((msg: string) =>
+          this.logger.log("[WebUSB]", msg),
         );
       } else {
         // Desktop Web Serial
@@ -2285,8 +2310,10 @@ export class EwtInstallDialog extends LitElement {
         newPort = await navigator.serial.requestPort();
       }
       this.logger.log("Port selected by user");
-      this.logger.log(`Dialog in DOM after port selection: ${this.parentNode ? 'yes' : 'no'}`);
-      
+      this.logger.log(
+        `Dialog in DOM after port selection: ${this.parentNode ? "yes" : "no"}`,
+      );
+
       // Ensure dialog is still in DOM after port selection
       if (!this.parentNode) {
         document.body.appendChild(this);
@@ -2318,11 +2345,15 @@ export class EwtInstallDialog extends LitElement {
 
     // Open port at 115200 baud (firmware mode default)
     this.logger.log("Opening port at 115200 baud for firmware mode...");
-    this.logger.log(`Dialog in DOM before opening port: ${this.parentNode ? 'yes' : 'no'}`);
+    this.logger.log(
+      `Dialog in DOM before opening port: ${this.parentNode ? "yes" : "no"}`,
+    );
     try {
       await newPort.open({ baudRate: 115200 });
       this.logger.log("Port opened successfully at 115200 baud");
-      this.logger.log(`Dialog in DOM after opening port: ${this.parentNode ? 'yes' : 'no'}`);
+      this.logger.log(
+        `Dialog in DOM after opening port: ${this.parentNode ? "yes" : "no"}`,
+      );
     } catch (err: any) {
       this.logger.error("Port open error:", err);
       this._busy = false;
@@ -2333,67 +2364,79 @@ export class EwtInstallDialog extends LitElement {
 
     // Don't create a new ESPLoader - reuse the existing one and just update the port!
     // This is how esp32tool does it: espStub.port = newPort
-    this.logger.log("Updating existing ESPLoader with new port for firmware mode...");
-    
+    this.logger.log(
+      "Updating existing ESPLoader with new port for firmware mode...",
+    );
+
     // CRITICAL: Update ALL port references (like esp32tool does)
     // esp32tool updates: espStub.port, espStub._parent.port, espLoaderBeforeConsole.port
-    
+
     // 1. Update base loader port (CRITICAL - this is what _port getter uses!)
     this.logger.log("Updating base loader port");
     this.esploader.port = newPort;
     this.esploader.connected = true;
-    
+
     // 2. Update stub port if it exists
     if (this._espStub) {
       this.logger.log("Updating STUB port");
       this._espStub.port = newPort;
       this._espStub.connected = true;
-      
+
       // 3. Update parent if it exists
       if (this._espStub._parent) {
         this.logger.log("Updating parent loader port");
         this._espStub._parent.port = newPort;
       }
     }
-    
+
     // 4. Update saved loader if it exists (like esp32tool does)
     if ((this as any)._savedLoaderBeforeConsole) {
       this.logger.log("Updating saved loader port");
       (this as any)._savedLoaderBeforeConsole.port = newPort;
     }
-    this.logger.log("ESPLoader port updated for firmware mode (no bootloader sync)");
+    this.logger.log(
+      "ESPLoader port updated for firmware mode (no bootloader sync)",
+    );
 
     // Wait for device to fully boot into firmware after WDT reset
     // AND for port to be ready for communication
     // esp32tool: waits 500ms after WDT reset, then opens port, then waits 200ms before console init
     // Total: ~700ms from WDT reset to console init
-    this.logger.log("Waiting 700ms for device to fully boot and port to be ready...");
+    this.logger.log(
+      "Waiting 700ms for device to fully boot and port to be ready...",
+    );
     await sleep(700);
 
     // CRITICAL: Verify port is actually open and ready
-    this.logger.log(`Port state check: readable=${this._port.readable !== null}, writable=${this._port.writable !== null}`);
-    
+    this.logger.log(
+      `Port state check: readable=${this._port.readable !== null}, writable=${this._port.writable !== null}`,
+    );
+
     // CRITICAL: Check if there are any reader/writer locks that could interfere with Improv
-    this.logger.log(`Checking for locks: reader=${this.esploader._reader ? 'LOCKED' : 'free'}, writer=${this.esploader._writer ? 'LOCKED' : 'free'}`);
+    this.logger.log(
+      `Checking for locks: reader=${this.esploader._reader ? "LOCKED" : "free"}, writer=${this.esploader._writer ? "LOCKED" : "free"}`,
+    );
     if (this.esploader._reader || this.esploader._writer) {
-      this.logger.log("WARNING: Port has active locks! Releasing them before Improv test...");
+      this.logger.log(
+        "WARNING: Port has active locks! Releasing them before Improv test...",
+      );
       await this._releaseReaderWriter();
       await sleep(100);
       this.logger.log("Locks released");
     }
-    
+
     this.logger.log("Device should be ready now");
 
     // Now test Improv at 115200 baud
     this.logger.log("Testing Improv at 115200 baud...");
-    
+
     // CRITICAL: Mark that we're skipping mode switch for any future _initialize() calls
     this._skipModeSwitch = true;
-    
+
     // Show progress while testing Improv
     this._state = "DASHBOARD";
     this.requestUpdate(); // Force UI update to show progress
-    
+
     // Continue with Improv test (this is the ONLY place we test Improv after port reconnection)
     await this._testImprov();
   }
@@ -2401,18 +2444,17 @@ export class EwtInstallDialog extends LitElement {
   private async _testImprov() {
     // CRITICAL: Mark Improv as checked BEFORE testing to prevent duplicate tests
     this._improvChecked = true;
-    
+
     // Test Improv support
     try {
       // Use _port getter which returns esploader.port (now updated with new port)
       this.logger.log("Initializing Improv Serial");
-      this.logger.log(`Port for Improv: readable=${this._port.readable !== null}, writable=${this._port.writable !== null}`);
-      this.logger.log(`Port info: ${JSON.stringify(this._port.getInfo())}`);
-      
-      const improvSerial = new ImprovSerial(
-        this._port,
-        this.logger,
+      this.logger.log(
+        `Port for Improv: readable=${this._port.readable !== null}, writable=${this._port.writable !== null}`,
       );
+      this.logger.log(`Port info: ${JSON.stringify(this._port.getInfo())}`);
+
+      const improvSerial = new ImprovSerial(this._port, this.logger);
       improvSerial.addEventListener("state-changed", () => {
         this.requestUpdate();
       });
@@ -2435,27 +2477,31 @@ export class EwtInstallDialog extends LitElement {
       this._info = undefined; // Explicitly clear info
       this._improvSupported = false;
       // _improvChecked is already set to true at the beginning of this method
-      this.logger.log(`State after Improv failure: _client=${this._client}, _info=${this._info}, _improvSupported=${this._improvSupported}, _improvChecked=${this._improvChecked}`);
+      this.logger.log(
+        `State after Improv failure: _client=${this._client}, _info=${this._info}, _improvSupported=${this._improvSupported}, _improvChecked=${this._improvChecked}`,
+      );
     }
 
     this._busy = false;
     this._state = "DASHBOARD";
     this.logger.log(`Setting state to DASHBOARD, calling requestUpdate()`);
-    this.logger.log(`Before requestUpdate - Dialog in DOM: ${this.parentNode ? 'yes' : 'no'}, isConnected: ${this.isConnected}`);
-    
+    this.logger.log(
+      `Before requestUpdate - Dialog in DOM: ${this.parentNode ? "yes" : "no"}, isConnected: ${this.isConnected}`,
+    );
+
     // If dialog was removed from DOM, add it back
     if (!this.parentNode) {
       this.logger.log("Dialog was removed from DOM - adding it back");
       document.body.appendChild(this);
       this.logger.log("Dialog re-added to DOM");
     }
-    
+
     this.requestUpdate(); // Force UI update after state changes
-    
+
     // Additional check to ensure dialog is visible
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
     this.logger.log(`After requestUpdate - dialog should be visible now`);
-    this.logger.log(`Dialog element in DOM: ${this.parentNode ? 'yes' : 'no'}`);
+    this.logger.log(`Dialog element in DOM: ${this.parentNode ? "yes" : "no"}`);
     this.logger.log(`Dialog isConnected: ${this.isConnected}`);
   }
 
