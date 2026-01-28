@@ -1179,7 +1179,9 @@ export class EwtInstallDialog extends LitElement {
                   const index = ev.detail.index;
                   // The "Join Other" item is always the last item.
                   this._selectedSsid =
-                    index === this._ssids!.length ? null : this._ssids![index].name;
+                    index === this._ssids!.length
+                      ? null
+                      : this._ssids![index].name;
                 }}
                 @closed=${(ev: Event) => ev.stopPropagation()}
               >
@@ -2154,7 +2156,7 @@ export class EwtInstallDialog extends LitElement {
         this.logger.log("Releasing reader/writer...");
         await this._releaseReaderWriter();
         await sleep(100);
-        
+
         this.logger.log("Calling hardReset(false)...");
         await this.esploader.hardReset(false); // false = firmware mode
         this.logger.log("Device reset to firmware mode");
@@ -2168,7 +2170,7 @@ export class EwtInstallDialog extends LitElement {
       } catch (err: any) {
         this.logger.log(`Reset to firmware failed: ${err.message}`);
         // Continue anyway - might already be in firmware
-        
+
         // Still reset ESP state
         this._espStub = undefined;
         this.esploader.IS_STUB = false;
@@ -2559,9 +2561,7 @@ export class EwtInstallDialog extends LitElement {
         // 2. Connect to WiFi
         // 3. Get IP address
         // 4. Send Improv packets with correct URL
-        this.logger.log(
-          "Waiting for device to boot...",
-        );
+        this.logger.log("Waiting for device to boot...");
         await sleep(500); // Increased from 500ms to 3000ms
       } catch (resetErr: any) {
         this.logger.log(`Failed to reset device: ${resetErr.message}`);
