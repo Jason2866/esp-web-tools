@@ -1751,12 +1751,14 @@ export class EwtInstallDialog extends LitElement {
     if (this._state === "PROVISION") {
       // Check if client exists before scanning
       if (!this._client) {
-        this.logger.error("Cannot scan for SSIDs: Improv client not initialized");
+        this.logger.error(
+          "Cannot scan for SSIDs: Improv client not initialized",
+        );
         this._state = "ERROR";
         this._error = "Improv client not available. Please reconnect.";
         return;
       }
-      
+
       this._ssids = undefined;
       this._busy = true;
       this._client.scan().then(
