@@ -668,6 +668,9 @@ export class EwtInstallDialog extends LitElement {
                         this.logger.log("Failed to close Improv client:", e);
                       }
                       this._client = undefined;
+                      
+                      // Wait for port to be ready after closing client
+                      await sleep(200);
                     }
 
                     // Re-create Improv client (firmware is running at 115200 baud)
@@ -2533,8 +2536,8 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _closeClientWithoutEvents(client: ImprovSerial) {
-    client.removeEventListener("disconnect", this._handleDisconnect);
     await client.close();
+    client.removeEventListener("disconnect", this._handleDisconnect);
   }
 
   static styles = [
