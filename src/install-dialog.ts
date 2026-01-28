@@ -288,6 +288,14 @@ export class EwtInstallDialog extends LitElement {
       await this._releaseReaderWriter();
       await sleep(100);
 
+      // CRITICAL: Forget the old port so browser doesn't show it in selection
+      try {
+        await this._port.forget();
+        this.logger.log("Old port forgotten");
+      } catch (forgetErr: any) {
+        this.logger.log(`Port forget failed: ${forgetErr.message}`);
+      }
+
       try {
         // Use new resetToFirmware() method from >=v9.2.13
         // This will close the port and device will reboot to firmware
@@ -1741,9 +1749,17 @@ export class EwtInstallDialog extends LitElement {
     }
     // Scan for SSIDs on provision
     if (this._state === "PROVISION") {
+      // Check if client exists before scanning
+      if (!this._client) {
+        this.logger.error("Cannot scan for SSIDs: Improv client not initialized");
+        this._state = "ERROR";
+        this._error = "Improv client not available. Please reconnect.";
+        return;
+      }
+      
       this._ssids = undefined;
       this._busy = true;
-      this._client!.scan().then(
+      this._client.scan().then(
         (ssids) => {
           this._busy = false;
           this._ssids = ssids;
@@ -2102,21 +2118,28 @@ export class EwtInstallDialog extends LitElement {
           this._installState = state;
 
           if (state.state === FlashStateType.FINISHED) {
-            // CRITICAL: For USB-JTAG/OTG, immediately set state to avoid showing "Installation complete" dialog
+            // CRITICAL: For USB-JTAG/OTG, wait for cleanup before showing port selection
             const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
             if (isUsbJtagOrOtg) {
               this._isUsbJtagOrOtgDevice = true;
-              this._state = "REQUEST_PORT_SELECTION";
-              this.requestUpdate();
+              // Wait for reset to complete before showing port selection
+              await this._handleFlashComplete().catch((err: any) => {
+                this.logger.error(
+                  `Post-flash cleanup failed: ${err?.message || err}`,
+                );
+                this._state = "ERROR";
+                this._error = `Post-flash cleanup failed: ${err?.message || err}`;
+              });
+            } else {
+              // For non-USB-JTAG/OTG, run async (no need to wait)
+              void this._handleFlashComplete().catch((err: any) => {
+                this.logger.error(
+                  `Post-flash cleanup failed: ${err?.message || err}`,
+                );
+                this._state = "ERROR";
+                this._error = `Post-flash cleanup failed: ${err?.message || err}`;
+              });
             }
-
-            void this._handleFlashComplete().catch((err: any) => {
-              this.logger.error(
-                `Post-flash cleanup failed: ${err?.message || err}`,
-              );
-              this._state = "ERROR";
-              this._error = `Post-flash cleanup failed: ${err?.message || err}`;
-            });
           }
         },
         loaderToUse,
