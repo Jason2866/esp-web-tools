@@ -454,7 +454,6 @@ export class EwtInstallDialog extends LitElement {
           this._improvSupported && this._info
             ? this._renderDashboard()
             : this._renderDashboardNoImprov();
-        this.logger.log(`Dashboard rendered successfully`);
       } catch (err: any) {
         this.logger.error(`Error rendering dashboard: ${err.message}`, err);
         [heading, content, hideActions] = this._renderError(
@@ -2441,7 +2440,10 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log(
         `Port for Improv: readable=${this._port.readable !== null}, writable=${this._port.writable !== null}`,
       );
-      this.logger.log(`Port info: ${JSON.stringify(this._port.getInfo())}`);
+      const portInfo = this._port.getInfo();
+      this.logger.log(
+        `Port info: VID=0x${portInfo.usbVendorId?.toString(16).padStart(4, "0")}, PID=0x${portInfo.usbProductId?.toString(16).padStart(4, "0")}`,
+      );
 
       const improvSerial = new ImprovSerial(this._port, this.logger);
       improvSerial.addEventListener("state-changed", () => {
@@ -2473,14 +2475,9 @@ export class EwtInstallDialog extends LitElement {
 
     this._busy = false;
     this._state = "DASHBOARD";
-    this.logger.log(`Setting state to DASHBOARD, calling requestUpdate()`);
-    this.logger.log(
-      `Before requestUpdate - Dialog in DOM: ${this.parentNode ? "yes" : "no"}, isConnected: ${this.isConnected}`,
-    );
 
     // If dialog was removed from DOM, add it back
     if (!this.parentNode) {
-      this.logger.log("Dialog was removed from DOM - adding it back");
       document.body.appendChild(this);
       this.logger.log("Dialog re-added to DOM");
     }
@@ -2489,9 +2486,6 @@ export class EwtInstallDialog extends LitElement {
 
     // Additional check to ensure dialog is visible
     await new Promise((resolve) => setTimeout(resolve, 100));
-    this.logger.log(`After requestUpdate - dialog should be visible now`);
-    this.logger.log(`Dialog element in DOM: ${this.parentNode ? "yes" : "no"}`);
-    this.logger.log(`Dialog isConnected: ${this.isConnected}`);
   }
 
   private async _handleClose() {
