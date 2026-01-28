@@ -1432,12 +1432,15 @@ export class EwtInstallDialog extends LitElement {
         percentage,
       );
       hideActions = true;
-    } else if (this._installState.state === FlashStateType.FINISHED) {
+    } else if (
+      this._installState.state === FlashStateType.FINISHED &&
+      !this._isUsbJtagOrOtgDevice
+    ) {
+      // NOTE: USB-JTAG/OTG devices go directly to REQUEST_PORT_SELECTION
+      // This is only for external serial chips
       heading = undefined;
       const supportsImprov = this._client !== null;
 
-      // NOTE: USB-JTAG/OTG devices should never reach here - they go directly to REQUEST_PORT_SELECTION
-      // This is only for external serial chips
       content = html`
         <ewt-page-message
           .icon=${OK_ICON}
