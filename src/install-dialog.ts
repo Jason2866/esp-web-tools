@@ -2368,9 +2368,7 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log("Dialog re-added to DOM before port selection");
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 50)); // Small delay to ensure UI updates
 
-    // This is called directly from button click (User Gesture preserved!)
     let newPort;
     try {
       // Check if we're using WebUSB (Android) or Web Serial (Desktop)
@@ -2385,10 +2383,11 @@ export class EwtInstallDialog extends LitElement {
         this.logger.log("Using Web Serial port selection (Desktop)");
         newPort = await navigator.serial.requestPort();
       }
+
+    // UI updates can happen after requestPort completes
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
       this.logger.log("Port selected by user");
-      this.logger.log(
-        `Dialog in DOM after port selection: ${this.parentNode ? "yes" : "no"}`,
-      );
 
       // Ensure dialog is still in DOM after port selection
       if (!this.parentNode) {
