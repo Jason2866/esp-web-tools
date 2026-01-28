@@ -1076,17 +1076,7 @@ import{l as e,o as t,_ as i,n as o,B as r,i as n,a,t as d,e as s,b as l,R as c,x
           <br />
           This will take a minute.<br />
           Keep this page visible until installation is complete.
-        `,o),i=!0}else if("finished"===this._installState.state){e=void 0;const i=null!==this._client;t=h`
-        <ewt-page-message
-          .icon=${"🎉"}
-          label="Installation complete!"
-        ></ewt-page-message>
-        <ewt-button
-          slot="primaryAction"
-          label="Next"
-          @click=${()=>{this._state=i&&this._installErase?"PROVISION":"DASHBOARD"}}
-        ></ewt-button>
-      `}else"error"===this._installState.state&&(e="Installation failed",t=h`
+        `,o),i=!0}else if("finished"!==this._installState.state||this._isUsbJtagOrOtgDevice)"error"===this._installState.state&&(e="Installation failed",t=h`
         <ewt-page-message
           .icon=${Xi}
           .label=${this._installState.message}
@@ -1096,7 +1086,17 @@ import{l as e,o as t,_ as i,n as o,B as r,i as n,a,t as d,e as s,b as l,R as c,x
           label="Back"
           @click=${async()=>{this._improvChecked=!1,await this._initialize(),this._state="DASHBOARD"}}
         ></ewt-button>
-      `);else e="Installing",t=this._renderProgress("Preparing installation"),i=!0;else{e="Confirm Installation";const i=o?"update to":"install";t=h`
+      `);else{e=void 0;const i=null!==this._client;t=h`
+        <ewt-page-message
+          .icon=${"🎉"}
+          label="Installation complete!"
+        ></ewt-page-message>
+        <ewt-button
+          slot="primaryAction"
+          label="Next"
+          @click=${()=>{this._state=i&&this._installErase?"PROVISION":"DASHBOARD"}}
+        ></ewt-button>
+      `}else e="Installing",t=this._renderProgress("Preparing installation"),i=!0;else{e="Confirm Installation";const i=o?"update to":"install";t=h`
         ${o?h`Your device is running
               ${this._info.firmware}&nbsp;${this._info.version}.<br /><br />`:""}
         Do you want to ${i}
