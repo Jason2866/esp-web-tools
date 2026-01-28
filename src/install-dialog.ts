@@ -309,7 +309,7 @@ export class EwtInstallDialog extends LitElement {
       this.esploader._reader = undefined;
 
       this.logger.log("Flash complete - waiting for user to select new port");
-      
+
       // CRITICAL: Set state to REQUEST_PORT_SELECTION to show "Select Port" button
       this._state = "REQUEST_PORT_SELECTION";
       this._error = "";
@@ -1440,9 +1440,7 @@ export class EwtInstallDialog extends LitElement {
           label="Next"
           @click=${() => {
             this._state =
-              supportsImprov && this._installErase
-                ? "PROVISION"
-                : "DASHBOARD";
+              supportsImprov && this._installErase ? "PROVISION" : "DASHBOARD";
           }}
         ></ewt-button>
       `;
@@ -2111,7 +2109,7 @@ export class EwtInstallDialog extends LitElement {
               this._state = "REQUEST_PORT_SELECTION";
               this.requestUpdate();
             }
-            
+
             void this._handleFlashComplete().catch((err: any) => {
               this.logger.error(
                 `Post-flash cleanup failed: ${err?.message || err}`,
@@ -2286,7 +2284,7 @@ export class EwtInstallDialog extends LitElement {
     this.logger.log(
       `Dialog in DOM before opening port: ${this.parentNode ? "yes" : "no"}`,
     );
-    
+
     // Check if port is already open (shouldn't be, but just in case)
     if (newPort.readable !== null || newPort.writable !== null) {
       this.logger.log("WARNING: Port appears to be open, closing it first...");
@@ -2299,7 +2297,7 @@ export class EwtInstallDialog extends LitElement {
         // Continue anyway - maybe it wasn't really open
       }
     }
-    
+
     try {
       await newPort.open({ baudRate: 115200 });
       this.logger.log("Port opened successfully at 115200 baud");
