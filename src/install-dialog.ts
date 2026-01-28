@@ -102,6 +102,9 @@ export class EwtInstallDialog extends LitElement {
   // Track if device is using USB-JTAG or USB-OTG (not external serial chip)
   @state() private _isUsbJtagOrOtgDevice = false;
 
+  // Track if user wants to open console after port reconnection
+  private _openConsoleAfterReconnect = false;
+
   // Ensure stub is initialized (called before any operation that needs it)
   private async _ensureStub(): Promise<any> {
     if (this._espStub && this._espStub.IS_STUB) {
@@ -590,13 +593,25 @@ export class EwtInstallDialog extends LitElement {
           ? ""
           : html`
               <div>
-                <a
-                  href=${this._client.nextUrl}
-                  class="has-button"
-                  target="_blank"
-                >
-                  <ewt-button label="Visit Device"></ewt-button>
-                </a>
+                <ewt-button
+                  ?disabled=${this._busy}
+                  label="Visit Device"
+                  @click=${async () => {
+                    this._busy = true;
+
+                    // Switch to firmware mode if needed
+                    const needsReconnect = await this._switchToFirmwareMode('visit');
+                    if (needsReconnect) {
+                      return; // Will continue after port reconnection
+                    }
+
+                    // Device is already in firmware mode - open URL
+                    if (this._client && this._client.nextUrl) {
+                      window.open(this._client.nextUrl, "_blank");
+                    }
+                    this._busy = false;
+                  }}
+                ></ewt-button>
               </div>
             `}
         ${!this._client ||
@@ -605,13 +620,28 @@ export class EwtInstallDialog extends LitElement {
           ? ""
           : html`
               <div>
-                <a
-                  href=${`https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`}
-                  class="has-button"
-                  target="_blank"
-                >
-                  <ewt-button label="Add to Home Assistant"></ewt-button>
-                </a>
+                <ewt-button
+                  ?disabled=${this._busy}
+                  label="Add to Home Assistant"
+                  @click=${async () => {
+                    this._busy = true;
+
+                    // Switch to firmware mode if needed
+                    const needsReconnect = await this._switchToFirmwareMode('homeassistant');
+                    if (needsReconnect) {
+                      return; // Will continue after port reconnection
+                    }
+
+                    // Device is already in firmware mode - open HA URL
+                    if (this._manifest.home_assistant_domain) {
+                      window.open(
+                        `https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`,
+                        "_blank"
+                      );
+                    }
+                    this._busy = false;
+                  }}
+                ></ewt-button>
               </div>
             `}
         ${this._client
@@ -625,40 +655,14 @@ export class EwtInstallDialog extends LitElement {
                   @click=${async () => {
                     this._busy = true;
 
-                    // CRITICAL: Check if device is in bootloader mode
-                    const inBootloaderMode = this.esploader.chipFamily !== null;
-
-                    if (inBootloaderMode) {
-                      this.logger.log(
-                        "Device is in bootloader mode - need to switch to firmware for Wi-Fi setup",
-                      );
-
-                      // Check if this is USB-JTAG/OTG device
-                      const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
-
-                      if (isUsbJtagOrOtg) {
-                        // For USB-JTAG/OTG: Would need WDT reset and port reconnect
-                        // Too complex, show error
-                        this._error =
-                          "Please reconnect device to configure Wi-Fi after flashing";
-                        this._state = "ERROR";
-                        this._busy = false;
-                        return;
-                      } else {
-                        // For external serial: Can reset to firmware
-                        await this._resetBaudrateForConsole();
-                        await this._releaseReaderWriter();
-                        await this._resetDeviceAndReleaseLocks();
-                        this.logger.log(
-                          "Device reset to firmware mode for Wi-Fi setup",
-                        );
-                        await sleep(100);
-                      }
-                    } else {
-                      this.logger.log(
-                        "Device already in firmware mode for Wi-Fi setup",
-                      );
+                    // Switch to firmware mode if needed
+                    const needsReconnect = await this._switchToFirmwareMode('wifi');
+                    if (needsReconnect) {
+                      return; // Will continue after port reconnection
                     }
+
+                    // Device is already in firmware mode
+                    this.logger.log("Device already in firmware mode for Wi-Fi setup");
 
                     // Close Improv client and re-initialize for WiFi setup
                     if (this._client) {
@@ -738,84 +742,10 @@ export class EwtInstallDialog extends LitElement {
                       }
                     }
 
-                    // CRITICAL: Ensure device is in firmware mode
-                    const inBootloaderMode = this.esploader.chipFamily !== null;
-
-                    if (inBootloaderMode) {
-                      this.logger.log(
-                        "Device is in bootloader mode - switching to firmware for console",
-                      );
-
-                      // For USB-JTAG/OTG: Need proper preparation before reset
-                      try {
-                        // CRITICAL: Ensure chipFamily is set
-                        if (!this.esploader.chipFamily) {
-                          this.logger.log("Detecting chip type...");
-                          await this.esploader.initialize();
-                          this.logger.log(
-                            `Chip detected: ${this.esploader.chipFamily}`,
-                          );
-                        }
-
-                        // CRITICAL: Create stub before reset
-                        if (!this._espStub) {
-                          this.logger.log(
-                            "Creating stub for firmware mode switch...",
-                          );
-                          this._espStub = await this.esploader.runStub();
-                          this.logger.log(
-                            `Stub created: IS_STUB=${this._espStub.IS_STUB}`,
-                          );
-                        }
-
-                        // CRITICAL: Save parent loader
-                        const loaderToSave =
-                          this._espStub._parent || this._espStub;
-                        (this as any)._savedLoaderBeforeConsole = loaderToSave;
-
-                        // CRITICAL: Release locks BEFORE calling resetToFirmware()
-                        await this._releaseReaderWriter();
-                        await sleep(100);
-
-                        // CRITICAL: Forget the old port so browser doesn't show it in selection
-                        try {
-                          await this._port.forget();
-                          this.logger.log("Old port forgotten");
-                        } catch (forgetErr: any) {
-                          this.logger.log(
-                            `Port forget failed: ${forgetErr.message}`,
-                          );
-                        }
-
-                        // Use resetToFirmware() for WDT reset
-                        await this.esploader.resetToFirmware();
-                        this.logger.log(
-                          "Device reset to firmware mode - port closed",
-                        );
-                      } catch (err: any) {
-                        this.logger.debug(
-                          `Reset to firmware error (expected): ${err.message}`,
-                        );
-                      }
-
-                      // Reset ESP state (port is already closed by resetToFirmware)
-                      await sleep(100);
-
-                      this._espStub = undefined;
-                      this.esploader.IS_STUB = false;
-                      this.esploader.chipFamily = null;
-                      this._improvChecked = false; // Will check after user reconnects
-                      this._client = null;
-                      this._improvSupported = false;
-                      this.esploader._reader = undefined;
-
-                      this.logger.log("Waiting for user to select new port");
-
-                      // Show port selection UI
-                      this._state = "REQUEST_PORT_SELECTION";
-                      this._error = "";
-                      this._busy = false;
-                      return;
+                    // Switch to firmware mode if needed
+                    const needsReconnect = await this._switchToFirmwareMode('console');
+                    if (needsReconnect) {
+                      return; // Will continue after port reconnection
                     }
 
                     // Device is already in firmware mode
@@ -2071,6 +2001,119 @@ export class EwtInstallDialog extends LitElement {
     }
   }
 
+  /**
+   * Switch device from bootloader mode to firmware mode.
+   * For USB-JTAG/OTG devices: Requires port reconnection (sets REQUEST_PORT_SELECTION state).
+   * For external serial: Resets device without port change.
+   * 
+   * @param actionAfterReconnect - Action to perform after reconnect: 'console', 'visit', 'homeassistant', 'wifi', or null
+   */
+  private async _switchToFirmwareMode(actionAfterReconnect: 'console' | 'visit' | 'homeassistant' | 'wifi' | null = null): Promise<boolean> {
+    const inBootloaderMode = this.esploader.chipFamily !== null;
+    
+    if (!inBootloaderMode) {
+      this.logger.log("Device already in firmware mode");
+      return false; // No switch needed
+    }
+
+    this.logger.log(`Device is in bootloader mode - switching to firmware for ${actionAfterReconnect || 'operation'}`);
+
+    // Check if USB-JTAG/OTG device
+    const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
+
+    if (isUsbJtagOrOtg) {
+      // USB-JTAG/OTG: Need WDT reset and port reconnection
+      try {
+        // CRITICAL: Ensure chipFamily is set
+        if (!this.esploader.chipFamily) {
+          this.logger.log("Detecting chip type...");
+          await this.esploader.initialize();
+          this.logger.log(`Chip detected: ${this.esploader.chipFamily}`);
+        }
+
+        // CRITICAL: Create stub before reset
+        if (!this._espStub) {
+          this.logger.log("Creating stub for firmware mode switch...");
+          this._espStub = await this.esploader.runStub();
+          this.logger.log(`Stub created: IS_STUB=${this._espStub.IS_STUB}`);
+        }
+
+        // CRITICAL: Save parent loader
+        const loaderToSave = this._espStub._parent || this._espStub;
+        (this as any)._savedLoaderBeforeSwitch = loaderToSave;
+
+        // CRITICAL: Release locks BEFORE calling resetToFirmware()
+        await this._releaseReaderWriter();
+        await sleep(100);
+
+        // CRITICAL: Forget the old port
+        try {
+          await this._port.forget();
+          this.logger.log("Old port forgotten");
+        } catch (forgetErr: any) {
+          this.logger.log(`Port forget failed: ${forgetErr.message}`);
+        }
+
+        // Use resetToFirmware() for WDT reset
+        await this.esploader.resetToFirmware();
+        this.logger.log("Device reset to firmware mode - port closed");
+      } catch (err: any) {
+        this.logger.debug(`Reset to firmware error (expected): ${err.message}`);
+      }
+
+      // Reset ESP state
+      await sleep(100);
+
+      this._espStub = undefined;
+      this.esploader.IS_STUB = false;
+      this.esploader.chipFamily = null;
+      this._improvChecked = false;
+      this._client = null;
+      this._improvSupported = false;
+      this.esploader._reader = undefined;
+
+      // Set flag for action after reconnect
+      if (actionAfterReconnect === 'console') {
+        this._openConsoleAfterReconnect = true;
+      } else if (actionAfterReconnect === 'visit') {
+        (this as any)._visitDeviceAfterReconnect = true;
+      } else if (actionAfterReconnect === 'homeassistant') {
+        (this as any)._addToHAAfterReconnect = true;
+      } else if (actionAfterReconnect === 'wifi') {
+        (this as any)._changeWiFiAfterReconnect = true;
+      }
+
+      this.logger.log("Waiting for user to select new port");
+
+      // Show port selection UI
+      this._state = "REQUEST_PORT_SELECTION";
+      this._error = "";
+      this._busy = false;
+      return true; // Port reconnection needed
+    } else {
+      // External serial chip: Can reset to firmware without port change
+      this.logger.log("External serial chip - resetting to firmware mode");
+
+      try {
+        await this._releaseReaderWriter();
+        await this.esploader.hardReset(false); // false = firmware mode
+        this.logger.log("Device reset to firmware mode");
+
+        // Reset ESP state
+        this._espStub = undefined;
+        this.esploader.IS_STUB = false;
+        this.esploader.chipFamily = null;
+
+        await sleep(500); // Wait for firmware to start
+      } catch (err: any) {
+        this.logger.log(`Reset to firmware failed: ${err.message}`);
+        // Continue anyway - might already be in firmware
+      }
+
+      return false; // No port reconnection needed
+    }
+  }
+
   private _startInstall(erase: boolean) {
     this._state = "INSTALL";
     this._installErase = erase;
@@ -2493,7 +2536,102 @@ export class EwtInstallDialog extends LitElement {
     }
 
     this._busy = false;
-    this._state = "DASHBOARD";
+    
+    // Check if user wanted specific action after reconnect
+    if (this._openConsoleAfterReconnect) {
+      this.logger.log("Opening console as requested by user");
+      this._openConsoleAfterReconnect = false; // Reset flag
+      
+      // CRITICAL: Close Improv client before opening console
+      if (this._client) {
+        try {
+          await this._closeClientWithoutEvents(this._client);
+          this.logger.log("Improv client closed before opening console");
+        } catch (e) {
+          this.logger.log("Failed to close Improv client:", e);
+        }
+        this._client = undefined;
+        
+        // Wait for port to be ready after closing client
+        await sleep(200);
+      }
+      
+      // Ensure all locks are released
+      await this._releaseReaderWriter();
+      await sleep(100);
+      
+      this._state = "LOGS";
+    } else if ((this as any)._visitDeviceAfterReconnect) {
+      this.logger.log("Opening Visit Device URL as requested by user");
+      (this as any)._visitDeviceAfterReconnect = false; // Reset flag
+      if (this._client && this._client.nextUrl) {
+        window.open(this._client.nextUrl, "_blank");
+      }
+      this._state = "DASHBOARD";
+    } else if ((this as any)._addToHAAfterReconnect) {
+      this.logger.log("Opening Home Assistant URL as requested by user");
+      (this as any)._addToHAAfterReconnect = false; // Reset flag
+      if (this._manifest.home_assistant_domain) {
+        window.open(
+          `https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`,
+          "_blank"
+        );
+      }
+      this._state = "DASHBOARD";
+    } else if ((this as any)._changeWiFiAfterReconnect) {
+      this.logger.log("Opening Wi-Fi provisioning as requested by user");
+      (this as any)._changeWiFiAfterReconnect = false; // Reset flag
+      
+      // Close Improv client and re-initialize for WiFi setup
+      if (this._client) {
+        try {
+          await this._closeClientWithoutEvents(this._client);
+        } catch (e) {
+          this.logger.log("Failed to close Improv client:", e);
+        }
+        this._client = undefined;
+        
+        // Wait for port to be ready after closing client
+        await sleep(200);
+      }
+
+      // Re-create Improv client for Wi-Fi provisioning
+      this.logger.log("Re-initializing Improv Serial for Wi-Fi setup");
+      const client = new ImprovSerial(this._port, this.logger);
+      client.addEventListener("state-changed", () => {
+        this.requestUpdate();
+      });
+      client.addEventListener("error-changed", () =>
+        this.requestUpdate(),
+      );
+      try {
+        this._info = await client.initialize(1000);
+        this._client = client;
+        client.addEventListener(
+          "disconnect",
+          this._handleDisconnect,
+        );
+        this.logger.log("Improv client ready for Wi-Fi provisioning");
+        this._state = "PROVISION";
+        this._provisionForce = true;
+      } catch (improvErr: any) {
+        try {
+          await this._closeClientWithoutEvents(client);
+        } catch (closeErr) {
+          this.logger.log(
+            "Failed to close Improv client after init error:",
+            closeErr,
+          );
+        }
+        this.logger.log(
+          `Improv initialization failed: ${improvErr.message}`,
+        );
+        this._error = `Improv initialization failed: ${improvErr.message}`;
+        this._state = "ERROR";
+      }
+    } else {
+      this._state = "DASHBOARD";
+    }
 
     // If dialog was removed from DOM, add it back
     if (!this.parentNode) {
