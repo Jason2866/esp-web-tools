@@ -2560,7 +2560,7 @@ export class EwtInstallDialog extends LitElement {
         // 3. Get IP address
         // 4. Send Improv packets with correct URL
         this.logger.log("Waiting for device to boot...");
-        await sleep(500); // Increased from 500ms to 3000ms
+        await sleep(500);
       } catch (resetErr: any) {
         this.logger.log(`Failed to reset device: ${resetErr.message}`);
         // Continue anyway - maybe device is already in the right state
