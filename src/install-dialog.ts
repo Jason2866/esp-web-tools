@@ -600,7 +600,8 @@ export class EwtInstallDialog extends LitElement {
                     this._busy = true;
 
                     // Switch to firmware mode if needed
-                    const needsReconnect = await this._switchToFirmwareMode('visit');
+                    const needsReconnect =
+                      await this._switchToFirmwareMode("visit");
                     if (needsReconnect) {
                       return; // Will continue after port reconnection
                     }
@@ -627,7 +628,8 @@ export class EwtInstallDialog extends LitElement {
                     this._busy = true;
 
                     // Switch to firmware mode if needed
-                    const needsReconnect = await this._switchToFirmwareMode('homeassistant');
+                    const needsReconnect =
+                      await this._switchToFirmwareMode("homeassistant");
                     if (needsReconnect) {
                       return; // Will continue after port reconnection
                     }
@@ -636,7 +638,7 @@ export class EwtInstallDialog extends LitElement {
                     if (this._manifest.home_assistant_domain) {
                       window.open(
                         `https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`,
-                        "_blank"
+                        "_blank",
                       );
                     }
                     this._busy = false;
@@ -656,13 +658,16 @@ export class EwtInstallDialog extends LitElement {
                     this._busy = true;
 
                     // Switch to firmware mode if needed
-                    const needsReconnect = await this._switchToFirmwareMode('wifi');
+                    const needsReconnect =
+                      await this._switchToFirmwareMode("wifi");
                     if (needsReconnect) {
                       return; // Will continue after port reconnection
                     }
 
                     // Device is already in firmware mode
-                    this.logger.log("Device already in firmware mode for Wi-Fi setup");
+                    this.logger.log(
+                      "Device already in firmware mode for Wi-Fi setup",
+                    );
 
                     // Close Improv client and re-initialize for WiFi setup
                     if (this._client) {
@@ -743,7 +748,8 @@ export class EwtInstallDialog extends LitElement {
                     }
 
                     // Switch to firmware mode if needed
-                    const needsReconnect = await this._switchToFirmwareMode('console');
+                    const needsReconnect =
+                      await this._switchToFirmwareMode("console");
                     if (needsReconnect) {
                       return; // Will continue after port reconnection
                     }
@@ -2005,18 +2011,27 @@ export class EwtInstallDialog extends LitElement {
    * Switch device from bootloader mode to firmware mode.
    * For USB-JTAG/OTG devices: Requires port reconnection (sets REQUEST_PORT_SELECTION state).
    * For external serial: Resets device without port change.
-   * 
+   *
    * @param actionAfterReconnect - Action to perform after reconnect: 'console', 'visit', 'homeassistant', 'wifi', or null
    */
-  private async _switchToFirmwareMode(actionAfterReconnect: 'console' | 'visit' | 'homeassistant' | 'wifi' | null = null): Promise<boolean> {
+  private async _switchToFirmwareMode(
+    actionAfterReconnect:
+      | "console"
+      | "visit"
+      | "homeassistant"
+      | "wifi"
+      | null = null,
+  ): Promise<boolean> {
     const inBootloaderMode = this.esploader.chipFamily !== null;
-    
+
     if (!inBootloaderMode) {
       this.logger.log("Device already in firmware mode");
       return false; // No switch needed
     }
 
-    this.logger.log(`Device is in bootloader mode - switching to firmware for ${actionAfterReconnect || 'operation'}`);
+    this.logger.log(
+      `Device is in bootloader mode - switching to firmware for ${actionAfterReconnect || "operation"}`,
+    );
 
     // Check if USB-JTAG/OTG device
     const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
@@ -2073,13 +2088,13 @@ export class EwtInstallDialog extends LitElement {
       this.esploader._reader = undefined;
 
       // Set flag for action after reconnect
-      if (actionAfterReconnect === 'console') {
+      if (actionAfterReconnect === "console") {
         this._openConsoleAfterReconnect = true;
-      } else if (actionAfterReconnect === 'visit') {
+      } else if (actionAfterReconnect === "visit") {
         (this as any)._visitDeviceAfterReconnect = true;
-      } else if (actionAfterReconnect === 'homeassistant') {
+      } else if (actionAfterReconnect === "homeassistant") {
         (this as any)._addToHAAfterReconnect = true;
-      } else if (actionAfterReconnect === 'wifi') {
+      } else if (actionAfterReconnect === "wifi") {
         (this as any)._changeWiFiAfterReconnect = true;
       }
 
@@ -2536,12 +2551,12 @@ export class EwtInstallDialog extends LitElement {
     }
 
     this._busy = false;
-    
+
     // Check if user wanted specific action after reconnect
     if (this._openConsoleAfterReconnect) {
       this.logger.log("Opening console as requested by user");
       this._openConsoleAfterReconnect = false; // Reset flag
-      
+
       // CRITICAL: Close Improv client before opening console
       if (this._client) {
         try {
@@ -2551,15 +2566,15 @@ export class EwtInstallDialog extends LitElement {
           this.logger.log("Failed to close Improv client:", e);
         }
         this._client = undefined;
-        
+
         // Wait for port to be ready after closing client
         await sleep(200);
       }
-      
+
       // Ensure all locks are released
       await this._releaseReaderWriter();
       await sleep(100);
-      
+
       this._state = "LOGS";
     } else if ((this as any)._visitDeviceAfterReconnect) {
       this.logger.log("Opening Visit Device URL as requested by user");
@@ -2574,14 +2589,14 @@ export class EwtInstallDialog extends LitElement {
       if (this._manifest.home_assistant_domain) {
         window.open(
           `https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`,
-          "_blank"
+          "_blank",
         );
       }
       this._state = "DASHBOARD";
     } else if ((this as any)._changeWiFiAfterReconnect) {
       this.logger.log("Opening Wi-Fi provisioning as requested by user");
       (this as any)._changeWiFiAfterReconnect = false; // Reset flag
-      
+
       // Close Improv client and re-initialize for WiFi setup
       if (this._client) {
         try {
@@ -2590,7 +2605,7 @@ export class EwtInstallDialog extends LitElement {
           this.logger.log("Failed to close Improv client:", e);
         }
         this._client = undefined;
-        
+
         // Wait for port to be ready after closing client
         await sleep(200);
       }
@@ -2601,16 +2616,11 @@ export class EwtInstallDialog extends LitElement {
       client.addEventListener("state-changed", () => {
         this.requestUpdate();
       });
-      client.addEventListener("error-changed", () =>
-        this.requestUpdate(),
-      );
+      client.addEventListener("error-changed", () => this.requestUpdate());
       try {
         this._info = await client.initialize(1000);
         this._client = client;
-        client.addEventListener(
-          "disconnect",
-          this._handleDisconnect,
-        );
+        client.addEventListener("disconnect", this._handleDisconnect);
         this.logger.log("Improv client ready for Wi-Fi provisioning");
         this._state = "PROVISION";
         this._provisionForce = true;
@@ -2623,9 +2633,7 @@ export class EwtInstallDialog extends LitElement {
             closeErr,
           );
         }
-        this.logger.log(
-          `Improv initialization failed: ${improvErr.message}`,
-        );
+        this.logger.log(`Improv initialization failed: ${improvErr.message}`);
         this._error = `Improv initialization failed: ${improvErr.message}`;
         this._state = "ERROR";
       }
