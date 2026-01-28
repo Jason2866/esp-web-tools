@@ -284,6 +284,10 @@ export class EwtInstallDialog extends LitElement {
       // Then user must select new port (User Gesture) and we test Improv
       this.logger.log("USB-JTAG/OTG device - resetting to firmware mode");
 
+      // CRITICAL: Release locks BEFORE resetToFirmware()
+      await this._releaseReaderWriter();
+      await sleep(100);
+
       try {
         // Use new resetToFirmware() method from >=v9.2.13
         // This will close the port and device will reboot to firmware
@@ -293,9 +297,8 @@ export class EwtInstallDialog extends LitElement {
         this.logger.debug(`Reset to firmware error (expected): ${err.message}`);
       }
 
-      // Release locks and reset ESP state
+      // Reset ESP state
       await sleep(100);
-      await this._releaseReaderWriter();
 
       this._espStub = undefined;
       this.esploader.IS_STUB = false;
@@ -306,6 +309,10 @@ export class EwtInstallDialog extends LitElement {
       this.esploader._reader = undefined;
 
       this.logger.log("Flash complete - waiting for user to select new port");
+      
+      // CRITICAL: Set state to REQUEST_PORT_SELECTION to show "Select Port" button
+      this._state = "REQUEST_PORT_SELECTION";
+      this._error = "";
       this.requestUpdate();
       return;
     }
@@ -1421,55 +1428,24 @@ export class EwtInstallDialog extends LitElement {
       heading = undefined;
       const supportsImprov = this._client !== null;
 
-      // Check if this is USB-JTAG or USB-OTG device (use cached state)
-      if (this._isUsbJtagOrOtgDevice) {
-        // For USB-JTAG/OTG devices: Port has changed, need user gesture to select new port
-        // Then test Improv and show dashboard
-        content = html`
-          <ewt-page-message
-            .icon=${OK_ICON}
-            label="Installation complete!"
-          ></ewt-page-message>
-          <p
-            style="text-align: center; margin: 16px 0; color: var(--mdc-theme-on-surface, #000);"
-          >
-            The device is now in firmware mode.<br />
-            The USB port has changed.<br />
-            <strong
-              >Click "Select Port" to reconnect and test device
-              features.</strong
-            >
-          </p>
-          <ewt-button
-            slot="primaryAction"
-            label="Select Port"
-            @click=${async () => {
-              // User gesture - can now request port selection
-              this._state = "REQUEST_PORT_SELECTION";
-              this._error = "";
-            }}
-          ></ewt-button>
-        `;
-        hideActions = false;
-      } else {
-        // Normal flow with Next button
-        content = html`
-          <ewt-page-message
-            .icon=${OK_ICON}
-            label="Installation complete!"
-          ></ewt-page-message>
-          <ewt-button
-            slot="primaryAction"
-            label="Next"
-            @click=${() => {
-              this._state =
-                supportsImprov && this._installErase
-                  ? "PROVISION"
-                  : "DASHBOARD";
-            }}
-          ></ewt-button>
-        `;
-      }
+      // NOTE: USB-JTAG/OTG devices should never reach here - they go directly to REQUEST_PORT_SELECTION
+      // This is only for external serial chips
+      content = html`
+        <ewt-page-message
+          .icon=${OK_ICON}
+          label="Installation complete!"
+        ></ewt-page-message>
+        <ewt-button
+          slot="primaryAction"
+          label="Next"
+          @click=${() => {
+            this._state =
+              supportsImprov && this._installErase
+                ? "PROVISION"
+                : "DASHBOARD";
+          }}
+        ></ewt-button>
+      `;
     } else if (this._installState.state === FlashStateType.ERROR) {
       heading = "Installation failed";
       content = html`
@@ -2124,10 +2100,18 @@ export class EwtInstallDialog extends LitElement {
     } else {
       // Use "standard way" with URL to manifest and firmware binary
       flash(
-        (state) => {
+        async (state) => {
           this._installState = state;
 
           if (state.state === FlashStateType.FINISHED) {
+            // CRITICAL: For USB-JTAG/OTG, immediately set state to avoid showing "Installation complete" dialog
+            const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
+            if (isUsbJtagOrOtg) {
+              this._isUsbJtagOrOtgDevice = true;
+              this._state = "REQUEST_PORT_SELECTION";
+              this.requestUpdate();
+            }
+            
             void this._handleFlashComplete().catch((err: any) => {
               this.logger.error(
                 `Post-flash cleanup failed: ${err?.message || err}`,
@@ -2297,11 +2281,25 @@ export class EwtInstallDialog extends LitElement {
     }
 
     // Open port at 115200 baud (firmware mode default)
-    // Port is already closed by resetToFirmware(), so we can open it directly
+    // Port should be closed by resetToFirmware(), but check first
     this.logger.log("Opening port at 115200 baud for firmware mode...");
     this.logger.log(
       `Dialog in DOM before opening port: ${this.parentNode ? "yes" : "no"}`,
     );
+    
+    // Check if port is already open (shouldn't be, but just in case)
+    if (newPort.readable !== null || newPort.writable !== null) {
+      this.logger.log("WARNING: Port appears to be open, closing it first...");
+      try {
+        await newPort.close();
+        await sleep(200); // Wait for port to fully close
+        this.logger.log("Port closed successfully");
+      } catch (closeErr: any) {
+        this.logger.log(`Port close failed: ${closeErr.message}`);
+        // Continue anyway - maybe it wasn't really open
+      }
+    }
+    
     try {
       await newPort.open({ baudRate: 115200 });
       this.logger.log("Port opened successfully at 115200 baud");
