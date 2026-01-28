@@ -1435,7 +1435,10 @@ export class EwtInstallDialog extends LitElement {
           >
             The device is now in firmware mode.<br />
             The USB port has changed.<br />
-            <strong>Click "Select Port" to reconnect and test device features.</strong>
+            <strong
+              >Click "Select Port" to reconnect and test device
+              features.</strong
+            >
           </p>
           <ewt-button
             slot="primaryAction"
