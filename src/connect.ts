@@ -105,6 +105,5 @@ export const connect = async (button: InstallButton) => {
     },
     { once: true },
   );
-
   document.body.appendChild(el);
 };
