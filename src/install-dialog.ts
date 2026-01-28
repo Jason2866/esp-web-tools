@@ -102,10 +102,6 @@ export class EwtInstallDialog extends LitElement {
   // Track if device is using USB-JTAG or USB-OTG (not external serial chip)
   @state() private _isUsbJtagOrOtgDevice = false;
 
-  // Track if device is currently in firmware mode (not bootloader)
-  // This is critical for knowing when firmware-only features are available
-  @state() private _inFirmwareMode = true; // Start as true (initial connect is firmware mode)
-
   // Ensure stub is initialized (called before any operation that needs it)
   private async _ensureStub(): Promise<any> {
     if (this._espStub && this._espStub.IS_STUB) {
@@ -369,9 +365,6 @@ export class EwtInstallDialog extends LitElement {
     try {
       await this.esploader.hardReset(false);
       this.logger.log("Device reset to firmware mode");
-
-      // Mark that we're now in firmware mode
-      this._inFirmwareMode = true;
     } catch (err) {
       this.logger.log("Could not reset device:", err);
     }
@@ -398,9 +391,6 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log(
         `ESP in bootloader mode: ${getChipFamilyName(this.esploader)}`,
       );
-
-      // Mark that we're now in bootloader mode
-      this._inFirmwareMode = false;
     } catch (err: any) {
       this.logger.error(`Failed to reset ESP to bootloader: ${err.message}`);
       throw err;
@@ -581,9 +571,7 @@ export class EwtInstallDialog extends LitElement {
               </div>
             `
           : ""}
-        ${!this._client ||
-        this._client.nextUrl === undefined ||
-        !this._inFirmwareMode
+        ${!this._client || this._client.nextUrl === undefined
           ? ""
           : html`
               <div>
@@ -598,8 +586,7 @@ export class EwtInstallDialog extends LitElement {
             `}
         ${!this._client ||
         !this._manifest.home_assistant_domain ||
-        this._client.state !== ImprovSerialCurrentState.PROVISIONED ||
-        !this._inFirmwareMode
+        this._client.state !== ImprovSerialCurrentState.PROVISIONED
           ? ""
           : html`
               <div>
@@ -612,7 +599,7 @@ export class EwtInstallDialog extends LitElement {
                 </a>
               </div>
             `}
-        ${this._client && this._inFirmwareMode
+        ${this._client
           ? html`
               <div>
                 <ewt-button
@@ -623,7 +610,7 @@ export class EwtInstallDialog extends LitElement {
                   @click=${async () => {
                     this._busy = true;
 
-                    // CRITICAL: Ensure device is in firmware mode for Wi-Fi provisioning
+                    // CRITICAL: Check if device is in bootloader mode
                     const inBootloaderMode = this.esploader.chipFamily !== null;
 
                     if (inBootloaderMode) {
@@ -652,70 +639,13 @@ export class EwtInstallDialog extends LitElement {
                         );
                         await sleep(100);
                       }
-                    }
-
-                    // Check if this is USB-JTAG/OTG device
-                    const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
-
-                    if (isUsbJtagOrOtg) {
-                      // For USB-JTAG/OTG: Device is already in firmware mode
-                      // Just close Improv client and re-initialize for WiFi setup
-                      if (this._client) {
-                        try {
-                          await this._closeClientWithoutEvents(this._client);
-                        } catch (e) {
-                          this.logger.log("Failed to close Improv client:", e);
-                        }
-                        this._client = undefined;
-                      }
-
-                      // Re-create Improv client (firmware is already running at 115200 baud)
+                    } else {
                       this.logger.log(
-                        "Re-initializing Improv Serial for Wi-Fi setup (USB-JTAG/OTG)",
+                        "Device already in firmware mode for Wi-Fi setup",
                       );
-                      const client = new ImprovSerial(this._port, this.logger);
-                      client.addEventListener("state-changed", () => {
-                        this.requestUpdate();
-                      });
-                      client.addEventListener("error-changed", () =>
-                        this.requestUpdate(),
-                      );
-                      try {
-                        this._info = await client.initialize(1000);
-                        this._client = client;
-                        client.addEventListener(
-                          "disconnect",
-                          this._handleDisconnect,
-                        );
-                        this.logger.log(
-                          "Improv client ready for Wi-Fi provisioning",
-                        );
-                      } catch (improvErr: any) {
-                        try {
-                          await this._closeClientWithoutEvents(client);
-                        } catch (closeErr) {
-                          this.logger.log(
-                            "Failed to close Improv client after init error:",
-                            closeErr,
-                          );
-                        }
-                        this.logger.log(
-                          `Improv initialization failed: ${improvErr.message}`,
-                        );
-                        this._error = `Improv initialization failed: ${improvErr.message}`;
-                        this._state = "ERROR";
-                        this._busy = false;
-                        return;
-                      }
-
-                      this._state = "PROVISION";
-                      this._provisionForce = true;
-                      this._busy = false;
-                      return;
                     }
 
-                    // For external serial chips: Reset to firmware mode if needed
-                    // Close Improv client if active
+                    // Close Improv client and re-initialize for WiFi setup
                     if (this._client) {
                       try {
                         await this._closeClientWithoutEvents(this._client);
@@ -725,21 +655,7 @@ export class EwtInstallDialog extends LitElement {
                       this._client = undefined;
                     }
 
-                    // Ensure ESP is in firmware mode at 115200 baud
-                    await this._resetBaudrateForConsole();
-                    await this._releaseReaderWriter();
-
-                    try {
-                      await this._resetDeviceAndReleaseLocks();
-                      this.logger.log(
-                        "ESP reset to firmware mode for Wi-Fi setup",
-                      );
-                      await sleep(100);
-                    } catch (resetErr: any) {
-                      this.logger.log(`Reset failed: ${resetErr.message}`);
-                    }
-
-                    // Re-create Improv client (firmware is now running at 115200 baud)
+                    // Re-create Improv client (firmware is running at 115200 baud)
                     this.logger.log(
                       "Re-initializing Improv Serial for Wi-Fi setup",
                     );
@@ -786,7 +702,7 @@ export class EwtInstallDialog extends LitElement {
               </div>
             `
           : ""}
-        ${this._isUsbJtagOrOtgDevice && this._inFirmwareMode
+        ${this._isUsbJtagOrOtgDevice
           ? html`
               <div>
                 <ewt-button
@@ -873,7 +789,6 @@ export class EwtInstallDialog extends LitElement {
                       this._improvChecked = false; // Will check after user reconnects
                       this._client = null;
                       this._improvSupported = false;
-                      this._inFirmwareMode = true; // Will be in firmware after reconnect
                       this.esploader._reader = undefined;
 
                       this.logger.log("Waiting for user to select new port");
@@ -901,7 +816,7 @@ export class EwtInstallDialog extends LitElement {
               </div>
             `
           : ""}
-        ${!this._isUsbJtagOrOtgDevice && this._inFirmwareMode
+        ${!this._isUsbJtagOrOtgDevice
           ? html`
               <div>
                 <ewt-button
@@ -1508,8 +1423,8 @@ export class EwtInstallDialog extends LitElement {
 
       // Check if this is USB-JTAG or USB-OTG device (use cached state)
       if (this._isUsbJtagOrOtgDevice) {
-        // For USB-JTAG/OTG devices: Show success with instructions to reconnect
-        // Device is now in firmware mode, user must reconnect to test Improv
+        // For USB-JTAG/OTG devices: Port has changed, need user gesture to select new port
+        // Then test Improv and show dashboard
         content = html`
           <ewt-page-message
             .icon=${OK_ICON}
@@ -1520,13 +1435,16 @@ export class EwtInstallDialog extends LitElement {
           >
             The device is now in firmware mode.<br />
             The USB port has changed.<br />
-            <strong>Please close this dialog and reconnect</strong> to test
-            device features.
+            <strong>Click "Select Port" to reconnect and test device features.</strong>
           </p>
           <ewt-button
             slot="primaryAction"
-            label="Close"
-            dialogAction="close"
+            label="Select Port"
+            @click=${async () => {
+              // User gesture - can now request port selection
+              this._state = "REQUEST_PORT_SELECTION";
+              this._error = "";
+            }}
           ></ewt-button>
         `;
         hideActions = false;
@@ -1587,23 +1505,11 @@ export class EwtInstallDialog extends LitElement {
         @click=${async () => {
           await this.shadowRoot!.querySelector("ewt-console")!.disconnect();
 
-          // After console: ESP is in firmware mode
-          // Need to reset to bootloader and reload stub for flash/filesystem operations
-          this.logger.log("Preparing ESP for flash operations...");
-          try {
-            // Reset to BOOTLOADER mode and load stub
-            await this._resetToBootloaderAndReleaseLocks();
-
-            // Wait for bootloader to start
-            await sleep(100);
-
-            // Load stub and restore baudrate
-            await this._ensureStub();
-
-            this.logger.log("ESP ready for flash operations");
-          } catch (err: any) {
-            this.logger.error(`Failed to prepare ESP: ${err.message}`);
-          }
+          // After console: Device is in firmware mode
+          // Stay in firmware mode - only switch to bootloader when Install/Filesystem is clicked
+          this.logger.log(
+            "Returning to dashboard (device stays in firmware mode)",
+          );
 
           this._state = "DASHBOARD";
           // Don't reset _improvChecked - console only reads, doesn't change firmware
@@ -2073,7 +1979,6 @@ export class EwtInstallDialog extends LitElement {
         this._improvChecked = false; // Will check after user reconnects
         this._client = undefined;
         this._improvSupported = false;
-        this._inFirmwareMode = true; // Will be in firmware after reconnect
         this.esploader._reader = undefined;
 
         this.logger.log("Waiting for user to select new port");
@@ -2091,7 +1996,6 @@ export class EwtInstallDialog extends LitElement {
           await this._releaseReaderWriter();
           await this.esploader.hardReset(false); // false = firmware mode
           this.logger.log("Device reset to firmware mode");
-          this._inFirmwareMode = true;
 
           // Reset ESP state
           this._espStub = undefined;
@@ -2108,7 +2012,6 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log(
         "Device is already in FIRMWARE mode - ready for Improv test",
       );
-      this._inFirmwareMode = true;
     }
 
     // NEW FLOW: Don't switch to bootloader on initial connect!
@@ -2137,9 +2040,6 @@ export class EwtInstallDialog extends LitElement {
       client.addEventListener("disconnect", this._handleDisconnect);
 
       this.logger.log("Improv detected successfully!");
-
-      // Mark that device is in firmware mode (Improv only works in firmware)
-      this._inFirmwareMode = true;
 
       // Clear busy flag when Improv successful
       this._busy = false;
@@ -2517,8 +2417,15 @@ export class EwtInstallDialog extends LitElement {
         await this.esploader.hardReset(false);
         this.logger.log("Device reset sent, device is rebooting...");
 
-        // Wait for device to start booting and send Improv packets
-        await sleep(500);
+        // Wait longer for device to:
+        // 1. Boot up
+        // 2. Connect to WiFi
+        // 3. Get IP address
+        // 4. Send Improv packets with correct URL
+        this.logger.log(
+          "Waiting for device to boot, connect to WiFi, and get IP address...",
+        );
+        await sleep(3000); // Increased from 500ms to 3000ms
       } catch (resetErr: any) {
         this.logger.log(`Failed to reset device: ${resetErr.message}`);
         // Continue anyway - maybe device is already in the right state
@@ -2541,6 +2448,9 @@ export class EwtInstallDialog extends LitElement {
       this._info = info;
       this._improvSupported = true;
       this.logger.log("Improv Wi-Fi Serial detected");
+      this.logger.log(
+        `Improv state: ${improvSerial.state}, nextUrl: ${improvSerial.nextUrl || "undefined"}`,
+      );
     } catch (err: any) {
       this.logger.log(`Improv Wi-Fi Serial not detected: ${err.message}`);
       this._client = null;
