@@ -449,9 +449,6 @@ export class EwtInstallDialog extends LitElement {
     } else if (this._state === "ERROR") {
       [heading, content, hideActions] = this._renderError(this._error!);
     } else if (this._state === "DASHBOARD") {
-      this.logger.log(
-        `Rendering DASHBOARD: _improvSupported=${this._improvSupported}, _info=${this._info}`,
-      );
       try {
         [heading, content, hideActions, allowClosing] =
           this._improvSupported && this._info
@@ -479,10 +476,6 @@ export class EwtInstallDialog extends LitElement {
         `Unknown state: ${this._state}`,
       );
     }
-
-    this.logger.log(
-      `Render complete: heading=${heading}, content=${content ? "defined" : "undefined"}, hideActions=${hideActions}, allowClosing=${allowClosing}`,
-    );
 
     return html`
       <ewt-dialog
@@ -868,10 +861,6 @@ export class EwtInstallDialog extends LitElement {
     let content: TemplateResult;
     let hideActions = true;
     let allowClosing = true;
-
-    this.logger.log(
-      `_renderDashboardNoImprov: _manifest=${this._manifest ? "defined" : "undefined"}`,
-    );
 
     content = html`
       <div class="dashboard-buttons">
