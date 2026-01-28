@@ -85,8 +85,8 @@ export class EwtInstallDialog extends LitElement {
   // null = not available
   @state() private _ssids?: Ssid[] | null;
 
-  // -1 = custom
-  @state() private _selectedSsid = -1;
+  // Name of Ssid. Null = other
+  @state() private _selectedSsid: string | null = null;
 
   // Partition table support
   @state() private _partitions?: Partition[];
@@ -122,11 +122,17 @@ export class EwtInstallDialog extends LitElement {
           try {
             await this._espStub.setBaudrate(this.baudRate);
             this.logger.log(`Baudrate set to ${this.baudRate}`);
+            // Update currentBaudRate to prevent re-setting
+            this._espStub.currentBaudRate = this.baudRate;
           } catch (baudErr: any) {
             this.logger.log(
               `Failed to set baudrate: ${baudErr.message}, continuing with current`,
             );
+            // Assume baudrate is already correct if setBaudrate fails
+            this._espStub.currentBaudRate = this.baudRate;
           }
+        } else {
+          this.logger.log(`Baudrate already at ${this.baudRate}, skipping`);
         }
       }
 
@@ -177,6 +183,8 @@ export class EwtInstallDialog extends LitElement {
         // setBaudrate now supports CDC/JTAG on Android (WebUSB) in >=v9.2.13
         await espStub.setBaudrate(this.baudRate);
         this.logger.log(`Baudrate set to ${this.baudRate}`);
+        // Update currentBaudRate to prevent re-setting
+        espStub.currentBaudRate = this.baudRate;
       } catch (baudErr: any) {
         this.logger.error(
           `[DEBUG] setBaudrate() threw error: ${baudErr.message}`,
@@ -1171,14 +1179,14 @@ export class EwtInstallDialog extends LitElement {
                   const index = ev.detail.index;
                   // The "Join Other" item is always the last item.
                   this._selectedSsid =
-                    index === this._ssids!.length ? -1 : index;
+                    index === this._ssids!.length ? null : this._ssids![index].name;
                 }}
                 @closed=${(ev: Event) => ev.stopPropagation()}
               >
                 ${this._ssids!.map(
                   (info, idx) => html`
                     <ewt-list-item
-                      .selected=${this._selectedSsid === idx}
+                      .selected=${this._selectedSsid === info.name}
                       value=${idx}
                     >
                       ${info.name}
@@ -1186,7 +1194,7 @@ export class EwtInstallDialog extends LitElement {
                   `,
                 )}
                 <ewt-list-item
-                  .selected=${this._selectedSsid === -1}
+                  .selected=${this._selectedSsid === null}
                   value="-1"
                 >
                   Join other…
@@ -1196,7 +1204,7 @@ export class EwtInstallDialog extends LitElement {
           : ""}
         ${
           // Show input box if command not supported or "Join Other" selected
-          this._selectedSsid === -1
+          this._selectedSsid === null
             ? html`
                 <ewt-textfield label="Network Name" name="ssid"></ewt-textfield>
               `
@@ -1432,11 +1440,23 @@ export class EwtInstallDialog extends LitElement {
         @click=${async () => {
           await this.shadowRoot!.querySelector("ewt-console")!.disconnect();
 
-          // After console: Device is in firmware mode
-          // Stay in firmware mode - only switch to bootloader when Install/Filesystem is clicked
-          this.logger.log(
-            "Returning to dashboard (device stays in firmware mode)",
-          );
+          // After console: ESP is in firmware mode
+          // Need to reset to bootloader and reload stub for flash/filesystem operations
+          this.logger.log("Preparing ESP for flash operations...");
+          try {
+            // Reset to BOOTLOADER mode and load stub
+            await this._resetToBootloaderAndReleaseLocks();
+
+            // Wait for bootloader to start
+            await sleep(100);
+
+            // Load stub and restore baudrate
+            await this._ensureStub();
+
+            this.logger.log("ESP ready for flash operations");
+          } catch (err: any) {
+            this.logger.error(`Failed to prepare ESP: ${err.message}`);
+          }
 
           this._state = "DASHBOARD";
           // Don't reset _improvChecked - console only reads, doesn't change firmware
@@ -1484,10 +1504,11 @@ export class EwtInstallDialog extends LitElement {
           slot="primaryAction"
           label="Back"
           @click=${async () => {
-            await this._resetDeviceAndReleaseLocks();
+            // Just release locks and go back to dashboard
+            // Device stays in firmware mode (no need to switch)
+            await this._releaseReaderWriter();
             this._state = "DASHBOARD";
             // Don't reset _improvChecked - status is still valid after console operations
-            await this._initialize();
           }}
         ></ewt-button>
       `;
@@ -1534,10 +1555,24 @@ export class EwtInstallDialog extends LitElement {
           slot="primaryAction"
           label="Back"
           @click=${async () => {
-            // DON'T reset device or release locks - keep stub for Console/Install
-            this._state = "DASHBOARD";
-            // Don't reset _improvChecked - status is still valid after filesystem operations
-            await this._initialize();
+            try {
+              // For USB-JTAG/OTG: Need to re-initialize after port changes
+              // For External Serial: Just go back to dashboard
+              if (this._isUsbJtagOrOtgDevice) {
+                this._state = "DASHBOARD";
+                await this._initialize();
+              } else {
+                // External serial - just go back, device stays in bootloader mode
+                this._state = "DASHBOARD";
+                // Ensure _busy is false so buttons are enabled
+                this._busy = false;
+              }
+            } catch (err: any) {
+              this.logger.error(`Partitions Back error: ${err.message}`);
+              this._state = "ERROR";
+              this._error = `Failed to return to dashboard: ${err.message}`;
+              this._busy = false;
+            }
           }}
         ></ewt-button>
       `;
@@ -1600,12 +1635,12 @@ export class EwtInstallDialog extends LitElement {
       this.logger.error(`Failed to read partition table: ${e.message || e}`);
 
       if (e.message === "Port selection cancelled") {
-        await this._resetDeviceAndReleaseLocks();
+        await this._releaseReaderWriter();
         this._error = "Port selection cancelled";
         this._state = "ERROR";
       } else if (e.message && e.message.includes("Failed to connect")) {
         // Connection error - show error state so user can retry
-        await this._resetDeviceAndReleaseLocks();
+        await this._releaseReaderWriter();
         this._error = e.message;
         this._state = "ERROR";
       } else {
@@ -1691,30 +1726,7 @@ export class EwtInstallDialog extends LitElement {
     }
     // Scan for SSIDs on provision
     if (this._state === "PROVISION") {
-      // Check if client exists before scanning
-      if (!this._client) {
-        this.logger.error(
-          "Cannot scan for SSIDs: Improv client not initialized",
-        );
-        this._state = "ERROR";
-        this._error = "Improv client not available. Please reconnect.";
-        return;
-      }
-
-      this._ssids = undefined;
-      this._busy = true;
-      this._client.scan().then(
-        (ssids) => {
-          this._busy = false;
-          this._ssids = ssids;
-          this._selectedSsid = ssids.length ? 0 : -1;
-        },
-        () => {
-          this._busy = false;
-          this._ssids = null;
-          this._selectedSsid = -1;
-        },
-      );
+      this._updateSsids();
     } else {
       // Reset this value if we leave provisioning.
       this._provisionForce = false;
@@ -1724,6 +1736,35 @@ export class EwtInstallDialog extends LitElement {
       this._installConfirmed = false;
       this._installState = undefined;
     }
+  }
+
+  private async _updateSsids(tries = 0) {
+    this._ssids = undefined;
+    this._busy = true;
+
+    let ssids: Ssid[];
+    try {
+      ssids = await this._client!.scan();
+    } catch (err) {
+      // When we fail while loading, pick "Join other"
+      if (this._ssids === undefined) {
+        this._ssids = null;
+        this._selectedSsid = null;
+      }
+      this._busy = false;
+      return;
+    }
+
+    // We will retry a few times if we don't get any results
+    if (ssids.length === 0 && tries < 3) {
+      console.log("SCHEDULE RETRY", tries);
+      setTimeout(() => this._updateSsids(tries + 1), 2000);
+      return;
+    }
+
+    this._ssids = ssids;
+    this._selectedSsid = ssids.length ? ssids[0].name : null;
+    this._busy = false;
   }
 
   protected override firstUpdated(changedProps: PropertyValues) {
@@ -1762,7 +1803,7 @@ export class EwtInstallDialog extends LitElement {
       return;
     }
 
-    if (changedProps.has("_selectedSsid") && this._selectedSsid === -1) {
+    if (changedProps.has("_selectedSsid") && this._selectedSsid === null) {
       // If we pick "Join other", select SSID input.
       this._focusFormElement("ewt-textfield[name=ssid]");
     } else if (changedProps.has("_ssids")) {
@@ -2110,7 +2151,11 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log("External serial chip - resetting to firmware mode");
 
       try {
+        this.logger.log("Releasing reader/writer...");
         await this._releaseReaderWriter();
+        await sleep(100);
+        
+        this.logger.log("Calling hardReset(false)...");
         await this.esploader.hardReset(false); // false = firmware mode
         this.logger.log("Device reset to firmware mode");
 
@@ -2123,6 +2168,11 @@ export class EwtInstallDialog extends LitElement {
       } catch (err: any) {
         this.logger.log(`Reset to firmware failed: ${err.message}`);
         // Continue anyway - might already be in firmware
+        
+        // Still reset ESP state
+        this._espStub = undefined;
+        this.esploader.IS_STUB = false;
+        this.esploader.chipFamily = null;
       }
 
       return false; // No port reconnection needed
@@ -2260,13 +2310,13 @@ export class EwtInstallDialog extends LitElement {
     this._wasProvisioned =
       this._client!.state === ImprovSerialCurrentState.PROVISIONED;
     const ssid =
-      this._selectedSsid === -1
+      this._selectedSsid === null
         ? (
             this.shadowRoot!.querySelector(
               "ewt-textfield[name=ssid]",
             ) as EwtTextfield
           ).value
-        : this._ssids![this._selectedSsid].name;
+        : this._selectedSsid;
     const password = (
       this.shadowRoot!.querySelector(
         "ewt-textfield[name=password]",
@@ -2494,7 +2544,6 @@ export class EwtInstallDialog extends LitElement {
       );
 
       // CRITICAL: Reset device BEFORE testing Improv
-      // Tasmota only checks for Improv during early boot phase
       this.logger.log("Resetting device for Improv detection...");
 
       try {
@@ -2505,15 +2554,15 @@ export class EwtInstallDialog extends LitElement {
         await this.esploader.hardReset(false);
         this.logger.log("Device reset sent, device is rebooting...");
 
-        // Wait longer for device to:
+        // Wait device to:
         // 1. Boot up
         // 2. Connect to WiFi
         // 3. Get IP address
         // 4. Send Improv packets with correct URL
         this.logger.log(
-          "Waiting for device to boot, connect to WiFi, and get IP address...",
+          "Waiting for device to boot...",
         );
-        await sleep(3000); // Increased from 500ms to 3000ms
+        await sleep(500); // Increased from 500ms to 3000ms
       } catch (resetErr: any) {
         this.logger.log(`Failed to reset device: ${resetErr.message}`);
         // Continue anyway - maybe device is already in the right state
@@ -2530,6 +2579,31 @@ export class EwtInstallDialog extends LitElement {
       // Don't set _client until we successfully initialize
       this.logger.log("Calling improvSerial.initialize()...");
       const info = await improvSerial.initialize();
+
+      // CRITICAL: Wait for firmware to complete WiFi scan and connection
+      // Poll for valid IP address (not 0.0.0.0) with timeout
+      this.logger.log(
+        "Waiting for firmware to get valid IP address (checking every 500ms, max 10 seconds)...",
+      );
+      const startTime = Date.now();
+      const maxWaitTime = 10000; // 10 seconds max
+      let hasValidIp = false;
+
+      while (Date.now() - startTime < maxWaitTime) {
+        const currentUrl = improvSerial.nextUrl;
+        if (currentUrl && !currentUrl.includes("0.0.0.0")) {
+          this.logger.log(`Valid IP found: ${currentUrl}`);
+          hasValidIp = true;
+          break;
+        }
+        await sleep(500); // Check every 500ms
+      }
+
+      if (!hasValidIp) {
+        this.logger.log(
+          `Timeout after ${maxWaitTime / 1000} seconds - continuing with current URL: ${improvSerial.nextUrl || "undefined"}`,
+        );
+      }
 
       // Success - set all the values
       this._client = improvSerial;
@@ -2682,8 +2756,17 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _closeClientWithoutEvents(client: ImprovSerial) {
-    await client.close();
-    client.removeEventListener("disconnect", this._handleDisconnect);
+    // For CDC/USB-JTAG devices: close() must be called BEFORE removeEventListener
+    // For Serial devices: removeEventListener must be called BEFORE close()
+    if (this._isUsbJtagOrOtgDevice) {
+      // CDC: close first, then remove listener
+      await client.close();
+      client.removeEventListener("disconnect", this._handleDisconnect);
+    } else {
+      // Serial: remove listener first, then close (v1000 logic)
+      client.removeEventListener("disconnect", this._handleDisconnect);
+      await client.close();
+    }
   }
 
   static styles = [
