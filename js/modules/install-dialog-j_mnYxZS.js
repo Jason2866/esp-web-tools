@@ -777,7 +777,7 @@ import{l as e,o as t,_ as i,n as o,B as r,i as n,a,t as d,e as s,b as l,R as c,x
         <ewt-dialog open .heading=${"Connecting"} scrimClickAction>
           ${this._renderProgress("Initializing")}
         </ewt-dialog>
-      `;let e,t,i=!1,o=!1;if(void 0!==this._client||this._improvChecked||"INSTALL"===this._state||"LOGS"===this._state||"PARTITIONS"===this._state||"LITTLEFS"===this._state||"REQUEST_PORT_SELECTION"===this._state||"DASHBOARD"===this._state)if("INSTALL"===this._state)[e,t,i,o]=this._renderInstall();else if("REQUEST_PORT_SELECTION"===this._state)[e,t,i]=this._renderRequestPortSelection();else if("ASK_ERASE"===this._state)[e,t]=this._renderAskErase();else if("ERROR"===this._state)[e,t,i]=this._renderError(this._error);else if("DASHBOARD"===this._state){this.logger.log(`Rendering DASHBOARD: _improvSupported=${this._improvSupported}, _info=${this._info}`);try{[e,t,i,o]=this._improvSupported&&this._info?this._renderDashboard():this._renderDashboardNoImprov(),this.logger.log("Dashboard rendered successfully")}catch(o){this.logger.error(`Error rendering dashboard: ${o.message}`,o),[e,t,i]=this._renderError(`Dashboard render error: ${o.message}`)}}else"PROVISION"===this._state?[e,t,i]=this._renderProvision():"LOGS"===this._state?[e,t,i]=this._renderLogs():"PARTITIONS"===this._state?[e,t,i]=this._renderPartitions():"LITTLEFS"===this._state?[e,t,i,o]=this._renderLittleFS():(this.logger.error(`Unknown state: ${this._state}`),[e,t,i]=this._renderError(`Unknown state: ${this._state}`));else this._error?[e,t,i]=this._renderError(this._error):(t=this._renderProgress("Connecting"),i=!0);return this.logger.log(`Render complete: heading=${e}, content=${t?"defined":"undefined"}, hideActions=${i}, allowClosing=${o}`),h`
+      `;let e,t,i=!1,o=!1;if(void 0!==this._client||this._improvChecked||"INSTALL"===this._state||"LOGS"===this._state||"PARTITIONS"===this._state||"LITTLEFS"===this._state||"REQUEST_PORT_SELECTION"===this._state||"DASHBOARD"===this._state)if("INSTALL"===this._state)[e,t,i,o]=this._renderInstall();else if("REQUEST_PORT_SELECTION"===this._state)[e,t,i]=this._renderRequestPortSelection();else if("ASK_ERASE"===this._state)[e,t]=this._renderAskErase();else if("ERROR"===this._state)[e,t,i]=this._renderError(this._error);else if("DASHBOARD"===this._state)try{[e,t,i,o]=this._improvSupported&&this._info?this._renderDashboard():this._renderDashboardNoImprov(),this.logger.log("Dashboard rendered successfully")}catch(o){this.logger.error(`Error rendering dashboard: ${o.message}`,o),[e,t,i]=this._renderError(`Dashboard render error: ${o.message}`)}else"PROVISION"===this._state?[e,t,i]=this._renderProvision():"LOGS"===this._state?[e,t,i]=this._renderLogs():"PARTITIONS"===this._state?[e,t,i]=this._renderPartitions():"LITTLEFS"===this._state?[e,t,i,o]=this._renderLittleFS():(this.logger.error(`Unknown state: ${this._state}`),[e,t,i]=this._renderError(`Unknown state: ${this._state}`));else this._error?[e,t,i]=this._renderError(this._error):(t=this._renderProgress("Connecting"),i=!0);return h`
       <ewt-dialog
         open
         .heading=${e}
@@ -912,7 +912,7 @@ import{l as e,o as t,_ as i,n as o,B as r,i as n,a,t as d,e as s,b as l,R as c,x
               </div>
             `:""}
       </div>
-    `,[e,t,!0,!0]}_renderDashboardNoImprov(){let e;return this.logger.log("_renderDashboardNoImprov: _manifest="+(this._manifest?"defined":"undefined")),e=h`
+    `,[e,t,!0,!0]}_renderDashboardNoImprov(){let e;return e=h`
       <div class="dashboard-buttons">
         <div>
           <ewt-button
