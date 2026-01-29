@@ -101,8 +101,11 @@ export class EwtInstallDialog extends LitElement {
   // Track if device is using USB-JTAG or USB-OTG (not external serial chip)
   @state() private _isUsbJtagOrOtgDevice = false;
 
-  // Track if user wants to open console after port reconnection
+  // Track action to perform after port reconnection (for USB-JTAG/OTG devices)
   private _openConsoleAfterReconnect = false;
+  private _visitDeviceAfterReconnect = false;
+  private _addToHAAfterReconnect = false;
+  private _changeWiFiAfterReconnect = false;
 
   // Ensure stub is initialized (called before any operation that needs it)
   private async _ensureStub(): Promise<any> {
@@ -2361,11 +2364,11 @@ export class EwtInstallDialog extends LitElement {
       if (actionAfterReconnect === "console") {
         this._openConsoleAfterReconnect = true;
       } else if (actionAfterReconnect === "visit") {
-        (this as any)._visitDeviceAfterReconnect = true;
+        this._visitDeviceAfterReconnect = true;
       } else if (actionAfterReconnect === "homeassistant") {
-        (this as any)._addToHAAfterReconnect = true;
+        this._addToHAAfterReconnect = true;
       } else if (actionAfterReconnect === "wifi") {
-        (this as any)._changeWiFiAfterReconnect = true;
+        this._changeWiFiAfterReconnect = true;
       }
 
       this.logger.log("Waiting for user to select new port");
@@ -2874,16 +2877,16 @@ export class EwtInstallDialog extends LitElement {
       await sleep(100);
 
       this._state = "LOGS";
-    } else if ((this as any)._visitDeviceAfterReconnect) {
+    } else if (this._visitDeviceAfterReconnect) {
       this.logger.log("Opening Visit Device URL as requested by user");
-      (this as any)._visitDeviceAfterReconnect = false; // Reset flag
+      this._visitDeviceAfterReconnect = false; // Reset flag
       if (this._client && this._client.nextUrl) {
         window.open(this._client.nextUrl, "_blank");
       }
       this._state = "DASHBOARD";
-    } else if ((this as any)._addToHAAfterReconnect) {
+    } else if (this._addToHAAfterReconnect) {
       this.logger.log("Opening Home Assistant URL as requested by user");
-      (this as any)._addToHAAfterReconnect = false; // Reset flag
+      this._addToHAAfterReconnect = false; // Reset flag
       if (this._manifest.home_assistant_domain) {
         window.open(
           `https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`,
@@ -2891,9 +2894,9 @@ export class EwtInstallDialog extends LitElement {
         );
       }
       this._state = "DASHBOARD";
-    } else if ((this as any)._changeWiFiAfterReconnect) {
+    } else if (this._changeWiFiAfterReconnect) {
       this.logger.log("Opening Wi-Fi provisioning as requested by user");
-      (this as any)._changeWiFiAfterReconnect = false; // Reset flag
+      this._changeWiFiAfterReconnect = false; // Reset flag
 
       // Close Improv client and re-initialize for WiFi setup
       if (this._client) {
