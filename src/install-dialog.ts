@@ -2578,8 +2578,8 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log("Calling improvSerial.initialize()...");
       const info = await improvSerial.initialize();
 
-      // CRITICAL: Wait for firmware to complete WiFi scan and connection
-      // Poll for valid IP address (not 0.0.0.0) with timeout
+      // CRITICAL: Wait for firmware to complete WiFi scan and connection with timeout
+      // Poll for valid IP address (not 0.0.0.0) by requesting current state with timeout
       this.logger.log(
         "Waiting for firmware to get valid IP address (checking every 500ms, max 10 seconds)...",
       );
@@ -2588,11 +2588,17 @@ export class EwtInstallDialog extends LitElement {
       let hasValidIp = false;
 
       while (Date.now() - startTime < maxWaitTime) {
-        const currentUrl = improvSerial.nextUrl;
-        if (currentUrl && !currentUrl.includes("0.0.0.0")) {
-          this.logger.log(`Valid IP found: ${currentUrl}`);
-          hasValidIp = true;
-          break;
+        // CRITICAL!! Active request current state to get updated URL
+        try {
+          await improvSerial.requestCurrentState();
+          const currentUrl = improvSerial.nextUrl;
+          if (currentUrl && !currentUrl.includes("0.0.0.0")) {
+            this.logger.log(`Valid IP found: ${currentUrl}`);
+            hasValidIp = true;
+            break;
+          }
+        } catch (err: any) {
+          this.logger.log(`Failed to request current state: ${err.message}`);
         }
         await sleep(500); // Check every 500ms
       }
