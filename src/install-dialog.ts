@@ -690,9 +690,6 @@ export class EwtInstallDialog extends LitElement {
                     }
 
                     // Re-create Improv client (firmware is running at 115200 baud)
-                    this.logger.log(
-                      "Re-initializing Improv Serial for Wi-Fi setup",
-                    );
                     const client = new ImprovSerial(this._port, this.logger);
                     client.addEventListener("state-changed", () => {
                       this.requestUpdate();
@@ -2492,7 +2489,6 @@ export class EwtInstallDialog extends LitElement {
     // Test Improv support
     try {
       // Use _port getter which returns esploader.port (now updated with new port)
-      this.logger.log("Initializing Improv Serial");
       this.logger.log(
         `Port for Improv: readable=${this._port.readable !== null}, writable=${this._port.writable !== null}`,
       );
