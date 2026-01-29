@@ -390,79 +390,14 @@ export class EwtInstallDialog extends LitElement {
   // Reset device and release locks - used when returning to dashboard or recovering from errors
   // Reset device to FIRMWARE mode (normal execution)
   private async _resetDeviceAndReleaseLocks() {
-    // CRITICAL: Find the actual object that has the reader/writer
-    // The stub has a _parent pointer, and the reader/writer runs on the parent!
-    let readerOwner = this._espStub || this.esploader;
-    if (readerOwner._parent) {
-      readerOwner = readerOwner._parent;
-      this.logger.log("Using parent loader for reader/writer");
+    // Release esploader reader/writer if locked
+    await this._releaseReaderWriter();
+    try {
+      await this.esploader.hardReset(false);
+      this.logger.log("Device reset sent");
+    } catch (err) {
+      this.logger.log("Reset error (expected):", err);
     }
-
-    // Try multiple resets until writer is released
-    // This mimics the manual "Reset Device" button behavior
-    let writerReleased = false;
-    let attempts = 0;
-    const maxAttempts = 5;
-
-    while (!writerReleased && attempts < maxAttempts) {
-      attempts++;
-      this.logger.log(`Reset attempt ${attempts}/${maxAttempts}...`);
-
-      try {
-        await this.esploader.hardReset(false);
-        this.logger.log("Device reset sent");
-      } catch (err) {
-        this.logger.log("Reset error (expected):", err);
-      }
-
-      // Check if writer is now released
-      if (!readerOwner._writer) {
-        this.logger.log("Writer was released by reset");
-        writerReleased = true;
-        break;
-      }
-
-      // Try to release writer
-      if (readerOwner._writer) {
-        const writer = readerOwner._writer;
-        try {
-          writer.releaseLock();
-          this.logger.log("Writer lock released");
-          readerOwner._writer = undefined;
-          writerReleased = true;
-        } catch (err) {
-          this.logger.log(
-            `Writer still locked, attempt ${attempts}/${maxAttempts}`,
-          );
-        }
-      }
-
-      if (!writerReleased) {
-        await sleep(200); // Wait before next attempt
-      }
-    }
-
-    if (!writerReleased) {
-      this.logger.log("Warning: Writer may still be locked after all attempts");
-    }
-
-    // Release reader
-    if (readerOwner._reader) {
-      const reader = readerOwner._reader;
-      try {
-        await reader.cancel();
-      } catch (err) {
-        this.logger.log("Reader cancel failed:", err);
-      }
-      try {
-        reader.releaseLock();
-        this.logger.log("Reader released");
-      } catch (err) {
-        this.logger.log("Reader releaseLock failed:", err);
-      }
-      readerOwner._reader = undefined;
-    }
-
     this.logger.log("Device reset to firmware mode");
 
     // Reset ESP state
@@ -2102,7 +2037,7 @@ export class EwtInstallDialog extends LitElement {
     }
 
     // Set baudrate to 115200 BEFORE switching
-    await this._espStub._resetBaudrateForConsole();
+    await this._resetBaudrateForConsole();
 
     // CRITICAL: Save parent loader
     const loaderToSave = this._espStub._parent || this._espStub;
