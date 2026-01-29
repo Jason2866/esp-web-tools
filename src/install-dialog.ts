@@ -374,7 +374,7 @@ export class EwtInstallDialog extends LitElement {
       }
 
       // Reset device and release locks to ensure clean state for new firmware
-      // hardReset() now uses chip-specific reset methods (S2/S3/C3 with USB-JTAG use watchdog)
+      // Uses chip-specific reset methods (S2/S3/C3 with USB-JTAG use watchdog)
       this.logger.log("Performing hardware reset to start new firmware...");
       await this._resetDeviceAndReleaseLocks();
     } catch (resetErr: any) {
@@ -866,49 +866,24 @@ export class EwtInstallDialog extends LitElement {
                         "Device is in bootloader mode - resetting to firmware for console",
                       );
 
-                      // 1. Set baudrate to 115200 BEFORE reset
-                      if (
-                        this._espStub &&
-                        this._espStub.currentBaudRate !== 115200
-                      ) {
-                        try {
-                          await this._espStub.setBaudrate(115200);
-                          this.logger.log("Baudrate set to 115200");
-                        } catch (err: any) {
-                          this.logger.log("Baudrate change failed:", err);
-                        }
-                      }
+                      //                      // Set baudrate to 115200 BEFORE switching
+                      //                      if (
+                      //                        this._espStub &&
+                      //                        this._espStub.currentBaudRate !== 115200
+                      //                      ) {
+                      //                        try {
+                      //                          await this._espStub.setBaudrate(115200);
+                      //                          this.logger.log("Baudrate set to 115200");
+                      //                        } catch (err: any) {
+                      //                          this.logger.log("Baudrate change failed:", err);
+                      //                        }
+                      //                      }
 
-                      // 2. Call hardReset(false) BEFORE releasing locks
-                      // This is critical - hardReset needs the reader/writer to communicate
-                      try {
-                        await this.esploader.hardReset(false);
-                        this.logger.log("Device reset to firmware mode");
-                      } catch (err: any) {
-                        this.logger.log(
-                          "Slip read error as expected, caused by hardware reset",
-                        );
-                      }
-
-                      // 3. Wait for reset to complete
-                      await sleep(500);
-
-                      // 4. NOW release locks after reset is done
+                      // switch to Firmware mode for Console
+                      await this._switchToFirmwareMode("console");
+                      // Release any locks
                       await this._releaseReaderWriter();
-                      this.logger.log("Locks released after reset");
-
-                      // 5. Reset ESP state
-                      this._espStub = undefined;
-                      this.esploader.IS_STUB = false;
-                      this.esploader.chipFamily = null;
-
-                      this.logger.log("Ready for console");
-                    } else {
-                      this.logger.log(
-                        "Device already in firmware mode - opening console",
-                      );
-
-                      await this._resetDeviceAndReleaseLocks();
+                      await sleep(100);
                     }
 
                     this._state = "LOGS";
@@ -2125,34 +2100,45 @@ export class EwtInstallDialog extends LitElement {
       `Device is in bootloader mode - switching to firmware for ${actionAfterReconnect || "operation"}`,
     );
 
+    // CRITICAL: Ensure chipFamily is set
+    if (!this.esploader.chipFamily) {
+      this.logger.log("Detecting chip type...");
+      await this.esploader.initialize();
+      this.logger.log(`Chip detected: ${this.esploader.chipFamily}`);
+    }
+
+    // CRITICAL: Create stub before reset
+    if (!this._espStub) {
+      this.logger.log("Creating stub for firmware mode switch...");
+      this._espStub = await this.esploader.runStub();
+      this.logger.log(`Stub created: IS_STUB=${this._espStub.IS_STUB}`);
+    }
+
+    // Set baudrate to 115200 BEFORE switching
+    if (this._espStub && this._espStub.currentBaudRate !== 115200) {
+      try {
+        await this._espStub.setBaudrate(115200);
+        this.logger.log("Baudrate set to 115200");
+      } catch (err: any) {
+        this.logger.log("Baudrate change failed:", err);
+      }
+    }
+
+    // CRITICAL: Save parent loader
+    const loaderToSave = this._espStub._parent || this._espStub;
+    (this as any)._savedLoaderBeforeSwitch = loaderToSave;
+
+    // CRITICAL: Release locks BEFORE calling resetToFirmware()
+    this.logger.log("Releasing reader/writer...");
+    await this._releaseReaderWriter();
+    await sleep(100);
+
     // Check if USB-JTAG/OTG device
     const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
 
     if (isUsbJtagOrOtg) {
       // USB-JTAG/OTG: Need WDT reset and port reconnection
       try {
-        // CRITICAL: Ensure chipFamily is set
-        if (!this.esploader.chipFamily) {
-          this.logger.log("Detecting chip type...");
-          await this.esploader.initialize();
-          this.logger.log(`Chip detected: ${this.esploader.chipFamily}`);
-        }
-
-        // CRITICAL: Create stub before reset
-        if (!this._espStub) {
-          this.logger.log("Creating stub for firmware mode switch...");
-          this._espStub = await this.esploader.runStub();
-          this.logger.log(`Stub created: IS_STUB=${this._espStub.IS_STUB}`);
-        }
-
-        // CRITICAL: Save parent loader
-        const loaderToSave = this._espStub._parent || this._espStub;
-        (this as any)._savedLoaderBeforeSwitch = loaderToSave;
-
-        // CRITICAL: Release locks BEFORE calling resetToFirmware()
-        await this._releaseReaderWriter();
-        await sleep(100);
-
         // CRITICAL: Forget the old port
         try {
           await this._port.forget();
@@ -2161,7 +2147,7 @@ export class EwtInstallDialog extends LitElement {
           this.logger.log(`Port forget failed: ${forgetErr.message}`);
         }
 
-        // Use resetToFirmware() for WDT reset
+        // Use resetToFirmware() for CDC this is doing a WDT reset
         await this.esploader.resetToFirmware();
         this.logger.log("Device reset to firmware mode - port closed");
       } catch (err: any) {
@@ -2202,25 +2188,18 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log("External serial chip - resetting to firmware mode");
 
       try {
-        this.logger.log("Releasing reader/writer...");
-        await this._releaseReaderWriter();
-        await sleep(100);
-
         this.logger.log("Calling hardReset(false)...");
         await this.esploader.hardReset(false); // false = firmware mode
         this.logger.log("Device reset to firmware mode");
 
-        // Reset ESP state
-        this._espStub = undefined;
-        this.esploader.IS_STUB = false;
-        this.esploader.chipFamily = null;
-
         await sleep(500); // Wait for firmware to start
       } catch (err: any) {
-        this.logger.log(`Reset to firmware failed: ${err.message}`);
-        // Continue anyway - might already be in firmware
+        this.logger.log(
+          `Reset worked. Expected slip Timeout read error: ${err.message}`,
+        );
+        // Continue - might already be in firmware
 
-        // Still reset ESP state
+        // Reset ESP state
         this._espStub = undefined;
         this.esploader.IS_STUB = false;
         this.esploader.chipFamily = null;
