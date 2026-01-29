@@ -1080,6 +1080,18 @@ export class EwtInstallDialog extends LitElement {
                   label="Logs & Console"
                   ?disabled=${this._busy}
                   @click=${async () => {
+                    // Switch to firmware mode if needed
+                    const needsReconnect =
+                      await this._switchToFirmwareMode("console");
+                    if (needsReconnect) {
+                      return; // Will continue after port reconnection
+                    }
+
+                    // Device is already in firmware mode
+                    this.logger.log(
+                      "Opening console for USB-JTAG/OTG device (in firmware mode)",
+                    );
+
                     // Check if device is in bootloader mode
                     const inBootloaderMode = this.esploader.chipFamily !== null;
 
@@ -1107,15 +1119,16 @@ export class EwtInstallDialog extends LitElement {
                         this.logger.log("Device reset to firmware mode");
                       }
                       await sleep(500);
-                    } else {
-                      this.logger.log(
-                        "Device already in firmware mode - opening console",
-                      );
-
-                      // Just release locks, no reset needed
+                      // switch to Firmware mode for Console
+                      await this._switchToFirmwareMode("console");
+                      // Release any locks
                       await this._releaseReaderWriter();
                       await sleep(100);
                     }
+
+                    // Release any locks
+                    await this._releaseReaderWriter();
+                    await sleep(100);
 
                     this._state = "LOGS";
                   }}
