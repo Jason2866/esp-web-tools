@@ -2028,7 +2028,9 @@ export class EwtInstallDialog extends LitElement {
 
     // We will retry a few times if we don't get any results
     if (ssids.length === 0 && tries < 3) {
-      console.log("SCHEDULE RETRY", tries);
+      this.logger.log(
+        `SSID scan returned empty, scheduling retry ${tries + 1}/3`,
+      );
       setTimeout(() => this._updateSsids(tries + 1), 2000);
       return;
     }
