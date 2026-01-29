@@ -256,8 +256,8 @@ export class EwtInstallDialog extends LitElement {
   }
 
   // Helper to reset baudrate to 115200 for console
-  // CRITICAL: The ESP stub might be at higher baudrate (e.g., 460800) for flashing
-  // But firmware console always runs at 115200
+  // The ESP stub might be at higher baudrate (e.g., 460800) for flashing
+  // Firmware console always runs at 115200
   private async _resetBaudrateForConsole() {
     if (this._espStub && this._espStub.currentBaudRate !== 115200) {
       this.logger.log(
@@ -792,7 +792,7 @@ export class EwtInstallDialog extends LitElement {
                       await sleep(100);
                     }
 
-                    // CRITICAL: Ensure device is in firmware mode
+                    // Ensure device is in firmware mode
                     const inBootloaderMode = this.esploader.chipFamily !== null;
 
                     if (inBootloaderMode) {
@@ -818,7 +818,7 @@ export class EwtInstallDialog extends LitElement {
             ?disabled=${this._busy}
             label="Manage Filesystem"
             @click=${async () => {
-              // CRITICAL: Filesystem management requires bootloader mode
+              // Filesystem management requires bootloader mode
               // Close Improv client if active (it locks the reader)
               if (this._client) {
                 try {
@@ -1885,11 +1885,11 @@ export class EwtInstallDialog extends LitElement {
       return;
     }
 
-    // CRITICAL: Check if device is using USB-JTAG or USB-OTG (not external serial chip)
+    // Check if device is using USB-JTAG or USB-OTG (not external serial chip)
     const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
     this._isUsbJtagOrOtgDevice = isUsbJtagOrOtg; // Update state for UI
 
-    // NEW FLOW: Check if device is in bootloader mode
+    // Check if device is in bootloader mode
     // If yes, switch to firmware mode first (needed for Improv)
     const inBootloaderMode = this.esploader.chipFamily !== null;
 
@@ -1919,7 +1919,7 @@ export class EwtInstallDialog extends LitElement {
             this.logger.log(`Stub created: IS_STUB=${this._espStub.IS_STUB}`);
           }
 
-          // CRITICAL: Save parent loader (like esp32tool does)
+          // CRITICAL: Save parent loader
           const loaderToSave = this._espStub._parent || this._espStub;
           (this as any)._savedLoaderBeforeConsole = loaderToSave;
 
@@ -2035,7 +2035,7 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log(`Stub created: IS_STUB=${this._espStub.IS_STUB}`);
     }
 
-    // Set baudrate to 115200 BEFORE switching
+    // CRITICAL: Set baudrate to 115200 BEFORE switching
     await this._resetBaudrateForConsole();
 
     // CRITICAL: Save parent loader
@@ -2138,7 +2138,7 @@ export class EwtInstallDialog extends LitElement {
     }
     this._client = undefined;
 
-    // CRITICAL: For flash operations, we MUST be in bootloader mode
+    // For flash operations, we MUST be in bootloader mode
     // This is the ONLY place where we switch to bootloader (not on initial connect)
     this.logger.log(
       "Preparing device for flash operations (switching to bootloader mode)...",
@@ -2178,7 +2178,7 @@ export class EwtInstallDialog extends LitElement {
           this._installState = state;
 
           if (state.state === FlashStateType.FINISHED) {
-            // CRITICAL: For USB-JTAG/OTG, wait for cleanup before showing port selection
+            // For USB-JTAG/OTG, wait for cleanup before showing port selection
             const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
             if (isUsbJtagOrOtg) {
               this._isUsbJtagOrOtgDevice = true;
@@ -2393,14 +2393,13 @@ export class EwtInstallDialog extends LitElement {
       return;
     }
 
-    // Don't create a new ESPLoader - reuse the existing one and just update the port!
-    // This is how esp32tool does it: espStub.port = newPort
+    // Don't create a new ESPLoader - reuse the existing one and just update the port! -> espStub.port = newPort
     this.logger.log(
       "Updating existing ESPLoader with new port for firmware mode...",
     );
 
-    // CRITICAL: Update ALL port references (like esp32tool does)
-    // esp32tool updates: espStub.port, espStub._parent.port, espLoaderBeforeConsole.port
+    // CRITICAL: Update ALL port references!!
+    // Updates: espStub.port, espStub._parent.port, espLoaderBeforeConsole.port
 
     // 1. Update base loader port (CRITICAL - this is what _port getter uses!)
     this.logger.log("Updating base loader port");
@@ -2420,7 +2419,7 @@ export class EwtInstallDialog extends LitElement {
       }
     }
 
-    // 4. Update saved loader if it exists (like esp32tool does)
+    // 4. Update saved loader if it exists
     if ((this as any)._savedLoaderBeforeConsole) {
       this.logger.log("Updating saved loader port");
       (this as any)._savedLoaderBeforeConsole.port = newPort;
@@ -2431,8 +2430,6 @@ export class EwtInstallDialog extends LitElement {
 
     // Wait for device to fully boot into firmware after WDT reset
     // AND for port to be ready for communication
-    // esp32tool: waits 500ms after WDT reset, then opens port, then waits 200ms before console init
-    // Total: ~700ms from WDT reset to console init
     this.logger.log(
       "Waiting 700ms for device to fully boot and port to be ready...",
     );
@@ -2517,7 +2514,7 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log("Calling improvSerial.initialize()...");
       const info = await improvSerial.initialize(timeout);
 
-      // CRITICAL: Wait for firmware to complete WiFi scan and connection with timeout
+      // Wait for firmware to complete WiFi scan and connection
       // Poll for valid IP address (not 0.0.0.0) by requesting current state with timeout
       this.logger.log(
         "Waiting for firmware to get valid IP address (checking every 500ms, max 10 seconds)...",
@@ -2527,7 +2524,7 @@ export class EwtInstallDialog extends LitElement {
       let hasValidIp = false;
 
       while (Date.now() - startTime < maxWaitTime) {
-        // CRITICAL!! Active request current state to get updated URL
+        // Active request current state to get updated URL
         try {
           await improvSerial.requestCurrentState();
           const currentUrl = improvSerial.nextUrl;
