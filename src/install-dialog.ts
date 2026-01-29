@@ -234,9 +234,10 @@ export class EwtInstallDialog extends LitElement {
     if (this.esploader._writer) {
       const writer = this.esploader._writer;
       try {
-        await writer.cancel();
+        // WritableStreamDefaultWriter has abort(), not cancel()
+        await writer.abort();
       } catch (err) {
-        this.logger.log("Writer cancel failed:", err);
+        this.logger.log("Writer abort failed:", err);
       } finally {
         try {
           writer.releaseLock();
