@@ -791,8 +791,7 @@ export class EwtInstallDialog extends LitElement {
                       await this._closeClientWithoutEvents(client);
                       await sleep(100);
                     }
-
-                    // Ensure device is in firmware mode
+                    // Check if device is in bootloader mode
                     const inBootloaderMode = this.esploader.chipFamily !== null;
 
                     if (inBootloaderMode) {
@@ -800,6 +799,25 @@ export class EwtInstallDialog extends LitElement {
                         "Device is in bootloader mode - resetting to firmware for console",
                       );
 
+                      // Set baudrate to 115200 BEFORE reset (while locks are active)
+                      await this._resetBaudrateForConsole();
+
+                      // Release locks
+                      await this._releaseReaderWriter();
+                      this.logger.log("Locks released");
+
+                      // CRITICAL: Reset ESP state
+                      this._espStub = undefined;
+                      this.esploader.IS_STUB = false;
+                      this.esploader.chipFamily = null;
+
+                      // Call hardReset(false)
+                      try {
+                        await this.esploader.hardReset(false);
+                      } catch (err: any) {
+                        this.logger.log("Device reset to firmware mode");
+                      }
+                      await sleep(500);
                       // switch to Firmware mode for Console
                       await this._switchToFirmwareMode("console");
                       // Release any locks
@@ -911,10 +929,42 @@ export class EwtInstallDialog extends LitElement {
                   label="Logs & Console"
                   ?disabled=${this._busy}
                   @click=${async () => {
-                    // Keep client object for dashboard running; connection already closed above.
+                    // Check if device is in bootloader mode
+                    const inBootloaderMode = this.esploader.chipFamily !== null;
 
-                    await this._resetBaudrateForConsole();
-                    await this._resetDeviceAndReleaseLocks();
+                    if (inBootloaderMode) {
+                      this.logger.log(
+                        "Device is in bootloader mode - resetting to firmware for console",
+                      );
+
+                      // Set baudrate to 115200 BEFORE reset (while locks are active)
+                      await this._resetBaudrateForConsole();
+
+                      // Release locks
+                      await this._releaseReaderWriter();
+                      this.logger.log("Locks released");
+
+                      // CRITICAL: Reset ESP state
+                      this._espStub = undefined;
+                      this.esploader.IS_STUB = false;
+                      this.esploader.chipFamily = null;
+
+                      // Call hardReset(false)
+                      try {
+                        await this.esploader.hardReset(false);
+                      } catch (err: any) {
+                        this.logger.log("Device reset to firmware mode");
+                      }
+                      await sleep(500);
+                    } else {
+                      this.logger.log(
+                        "Device already in firmware mode - opening console",
+                      );
+
+                      // Just release locks, no reset needed
+                      await this._releaseReaderWriter();
+                      await sleep(100);
+                    }
 
                     this._state = "LOGS";
                   }}
@@ -1980,7 +2030,7 @@ export class EwtInstallDialog extends LitElement {
       );
     }
 
-    // NEW FLOW: Don't switch to bootloader on initial connect!
+    // Don't switch to bootloader on initial connect!
     // Just test Improv directly - device should now be in firmware mode
     this.logger.log("Testing Improv (device is in firmware mode)");
 
@@ -2042,16 +2092,17 @@ export class EwtInstallDialog extends LitElement {
     const loaderToSave = this._espStub._parent || this._espStub;
     (this as any)._savedLoaderBeforeSwitch = loaderToSave;
 
-    // CRITICAL: Release locks BEFORE calling resetToFirmware()
-    this.logger.log("Releasing reader/writer...");
-    await this._releaseReaderWriter();
-    await sleep(100);
-
     // Check if USB-JTAG/OTG device
     const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
 
     if (isUsbJtagOrOtg) {
       // USB-JTAG/OTG: Need WDT reset and port reconnection
+
+      // CRITICAL: Release locks BEFORE calling resetToFirmware()
+      this.logger.log("Releasing reader/writer...");
+      await this._releaseReaderWriter();
+      await sleep(100);
+
       try {
         // CRITICAL: Forget the old port
         try {
@@ -2102,22 +2153,27 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log("External serial chip - resetting to firmware mode");
 
       try {
+        // CRITICAL: Call hardReset BEFORE releasing locks (so it can communicate)
         this.logger.log("Calling hardReset(false)...");
         await this.esploader.hardReset(false); // false = firmware mode
         this.logger.log("Device reset to firmware mode");
-
-        await sleep(500); // Wait for firmware to start
       } catch (err: any) {
         this.logger.log(
           `Reset worked. Expected slip Timeout read error: ${err.message}`,
         );
-        // Continue - might already be in firmware
-
-        // Reset ESP state
-        this._espStub = undefined;
-        this.esploader.IS_STUB = false;
-        this.esploader.chipFamily = null;
       }
+
+      // Wait for reset to complete
+      await sleep(500);
+
+      // NOW release locks AFTER reset
+      this.logger.log("Releasing reader/writer after reset...");
+      await this._releaseReaderWriter();
+
+      // Reset ESP state
+      this._espStub = undefined;
+      this.esploader.IS_STUB = false;
+      this.esploader.chipFamily = null;
 
       return false; // No port reconnection needed
     }
