@@ -34,7 +34,7 @@ const ERROR_ICON = "⚠️";
 const OK_ICON = "🎉";
 
 export class EwtInstallDialog extends LitElement {
-  public esploader!: any; // ESPLoader instance from tasmota-webserial-esptool v9.2.13
+  public esploader!: any; // ESPLoader instance from tasmota-webserial-esptool
 
   public manifestPath!: string;
 
@@ -179,7 +179,7 @@ export class EwtInstallDialog extends LitElement {
     if (this.baudRate && this.baudRate > 115200) {
       this.logger.log(`Setting baudrate to ${this.baudRate}...`);
       try {
-        // setBaudrate now supports CDC/JTAG on Android (WebUSB) in >=v9.2.13
+        // setBaudrate now supports CDC/JTAG on Android (WebUSB)
         await espStub.setBaudrate(this.baudRate);
         this.logger.log(`Baudrate set to ${this.baudRate}`);
         // Update currentBaudRate to prevent re-setting
@@ -207,7 +207,7 @@ export class EwtInstallDialog extends LitElement {
 
   // Helper to check if device is using USB-JTAG or USB-OTG (not external serial chip)
   private async _isUsbJtagOrOtg(): Promise<boolean> {
-    // Use detectUsbConnectionType from tasmota-webserial-esptool v9.2.13+
+    // Use detectUsbConnectionType from tasmota-webserial-esptool
     const isUsbJtag = await this.esploader.detectUsbConnectionType();
     this.logger.log(`USB-JTAG/OTG detection: ${isUsbJtag ? "YES" : "NO"}`);
     return isUsbJtag;
@@ -264,7 +264,7 @@ export class EwtInstallDialog extends LitElement {
         `Resetting baudrate from ${this._espStub.currentBaudRate} to 115200`,
       );
       try {
-        // Use setBaudrate from tasmota-webserial-esptool >=v9.2.13
+        // Use setBaudrate from tasmota-webserial-esptool
         // This now supports CDC/JTAG baudrate changes on Android (WebUSB)
         await this._espStub.setBaudrate(115200);
         this.logger.log("Baudrate set to 115200 for console");
@@ -318,8 +318,7 @@ export class EwtInstallDialog extends LitElement {
       }
 
       try {
-        // Use new resetToFirmware() method from >=v9.2.13
-        // This will close the port and device will reboot to firmware
+        // Use resetToFirmware() method close the port and device will reboot to firmware
         await this.esploader.resetToFirmware();
         this.logger.log("Device reset to firmware mode - port closed");
       } catch (err: any) {
