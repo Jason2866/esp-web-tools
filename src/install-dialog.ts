@@ -245,7 +245,7 @@ export class EwtInstallDialog extends LitElement {
     if (readerOwner._writer) {
       const writer = readerOwner._writer;
       readerOwner._writer = undefined;
-      
+
       try {
         writer.releaseLock();
         this.logger.log("Writer lock released");
@@ -423,7 +423,9 @@ export class EwtInstallDialog extends LitElement {
           this.esploader._writer = undefined;
           writerReleased = true;
         } catch (err) {
-          this.logger.log(`Writer still locked, attempt ${attempts}/${maxAttempts}`);
+          this.logger.log(
+            `Writer still locked, attempt ${attempts}/${maxAttempts}`,
+          );
         }
       }
 
@@ -857,7 +859,10 @@ export class EwtInstallDialog extends LitElement {
                       );
 
                       // 1. Set baudrate to 115200 BEFORE reset
-                      if (this._espStub && this._espStub.currentBaudRate !== 115200) {
+                      if (
+                        this._espStub &&
+                        this._espStub.currentBaudRate !== 115200
+                      ) {
                         try {
                           await this._espStub.setBaudrate(115200);
                           this.logger.log("Baudrate set to 115200");
@@ -865,7 +870,7 @@ export class EwtInstallDialog extends LitElement {
                           this.logger.log("Baudrate change failed:", err);
                         }
                       }
-                      
+
                       // 2. Call hardReset(false) BEFORE releasing locks
                       // This is critical - hardReset needs the reader/writer to communicate
                       try {
@@ -874,19 +879,19 @@ export class EwtInstallDialog extends LitElement {
                       } catch (err: any) {
                         this.logger.log("Reset failed:", err);
                       }
-                      
+
                       // 3. Wait for reset to complete
                       await sleep(500);
-                      
+
                       // 4. NOW release locks after reset is done
                       await this._releaseReaderWriter();
                       this.logger.log("Locks released after reset");
-                      
+
                       // 5. Reset ESP state
                       this._espStub = undefined;
                       this.esploader.IS_STUB = false;
                       this.esploader.chipFamily = null;
-                      
+
                       this.logger.log("Ready for console");
                     } else {
                       this.logger.log(
