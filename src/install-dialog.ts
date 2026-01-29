@@ -867,7 +867,10 @@ export class EwtInstallDialog extends LitElement {
                       );
 
                       // 1. Set baudrate to 115200 BEFORE reset
-                      if (this._espStub && this._espStub.currentBaudRate !== 115200) {
+                      if (
+                        this._espStub &&
+                        this._espStub.currentBaudRate !== 115200
+                      ) {
                         try {
                           await this._espStub.setBaudrate(115200);
                           this.logger.log("Baudrate set to 115200");
@@ -875,23 +878,25 @@ export class EwtInstallDialog extends LitElement {
                           this.logger.log("Baudrate change failed:", err);
                         }
                       }
-                      
+
                       // 2. Call hardReset(false) BEFORE releasing locks
                       // This is critical - hardReset needs the reader/writer to communicate
                       try {
                         await this.esploader.hardReset(false);
                         this.logger.log("Device reset to firmware mode");
                       } catch (err: any) {
-                        this.logger.log("Slip read error as expected, caused by hardware reset");
+                        this.logger.log(
+                          "Slip read error as expected, caused by hardware reset",
+                        );
                       }
-                      
+
                       // 3. Wait for reset to complete
                       await sleep(500);
-                      
+
                       // 4. NOW release locks after reset is done
                       await this._releaseReaderWriter();
                       this.logger.log("Locks released after reset");
-                      
+
                       // 5. Reset ESP state
                       this._espStub = undefined;
                       this.esploader.IS_STUB = false;
@@ -903,7 +908,7 @@ export class EwtInstallDialog extends LitElement {
                         "Device already in firmware mode - opening console",
                       );
 
-                      await this._resetDeviceAndReleaseLocks()
+                      await this._resetDeviceAndReleaseLocks();
                     }
 
                     this._state = "LOGS";
