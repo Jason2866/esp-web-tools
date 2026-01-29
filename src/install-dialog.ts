@@ -261,7 +261,7 @@ export class EwtInstallDialog extends LitElement {
   private async _resetBaudrateForConsole() {
     if (this._espStub && this._espStub.currentBaudRate !== 115200) {
       this.logger.log(
-        `Resetting baudrate from ${this._espStub.currentBaudRate} to 115200 for console...`,
+        `Resetting baudrate from ${this._espStub.currentBaudRate} to 115200`,
       );
       try {
         // Use setBaudrate from tasmota-webserial-esptool >=v9.2.13
@@ -865,19 +865,6 @@ export class EwtInstallDialog extends LitElement {
                       this.logger.log(
                         "Device is in bootloader mode - resetting to firmware for console",
                       );
-
-                      //                      // Set baudrate to 115200 BEFORE switching
-                      //                      if (
-                      //                        this._espStub &&
-                      //                        this._espStub.currentBaudRate !== 115200
-                      //                      ) {
-                      //                        try {
-                      //                          await this._espStub.setBaudrate(115200);
-                      //                          this.logger.log("Baudrate set to 115200");
-                      //                        } catch (err: any) {
-                      //                          this.logger.log("Baudrate change failed:", err);
-                      //                        }
-                      //                      }
 
                       // switch to Firmware mode for Console
                       await this._switchToFirmwareMode("console");
@@ -2115,14 +2102,7 @@ export class EwtInstallDialog extends LitElement {
     }
 
     // Set baudrate to 115200 BEFORE switching
-    if (this._espStub && this._espStub.currentBaudRate !== 115200) {
-      try {
-        await this._espStub.setBaudrate(115200);
-        this.logger.log("Baudrate set to 115200");
-      } catch (err: any) {
-        this.logger.log("Baudrate change failed:", err);
-      }
-    }
+    await this._espStub._resetBaudrateForConsole();
 
     // CRITICAL: Save parent loader
     const loaderToSave = this._espStub._parent || this._espStub;
