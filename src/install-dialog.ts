@@ -1,5 +1,6 @@
 import { LitElement, html, PropertyValues, css, TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
+import type { EwtTextfield } from "./components/ewt-textfield";
 import "./components/ewt-button";
 import "./components/ewt-checkbox";
 import "./components/ewt-console";
@@ -7,7 +8,6 @@ import "./components/ewt-dialog";
 import "./components/ewt-formfield";
 import "./components/ewt-icon-button";
 import "./components/ewt-textfield";
-import type { EwtTextfield } from "./components/ewt-textfield";
 import "./components/ewt-select";
 import "./components/ewt-list-item";
 import "./components/ewt-littlefs-manager";
@@ -390,6 +390,14 @@ export class EwtInstallDialog extends LitElement {
   // Reset device and release locks - used when returning to dashboard or recovering from errors
   // Reset device to FIRMWARE mode (normal execution)
   private async _resetDeviceAndReleaseLocks() {
+    // CRITICAL: Find the actual object that has the reader/writer
+    // The stub has a _parent pointer, and the reader/writer runs on the parent!
+    let readerOwner = this._espStub || this.esploader;
+    if (readerOwner._parent) {
+      readerOwner = readerOwner._parent;
+      this.logger.log("Using parent loader for reader/writer");
+    }
+
     // Try multiple resets until writer is released
     // This mimics the manual "Reset Device" button behavior
     let writerReleased = false;
@@ -408,19 +416,19 @@ export class EwtInstallDialog extends LitElement {
       }
 
       // Check if writer is now released
-      if (!this.esploader._writer) {
+      if (!readerOwner._writer) {
         this.logger.log("Writer was released by reset");
         writerReleased = true;
         break;
       }
 
       // Try to release writer
-      if (this.esploader._writer) {
-        const writer = this.esploader._writer;
+      if (readerOwner._writer) {
+        const writer = readerOwner._writer;
         try {
           writer.releaseLock();
           this.logger.log("Writer lock released");
-          this.esploader._writer = undefined;
+          readerOwner._writer = undefined;
           writerReleased = true;
         } catch (err) {
           this.logger.log(
@@ -439,8 +447,8 @@ export class EwtInstallDialog extends LitElement {
     }
 
     // Release reader
-    if (this.esploader._reader) {
-      const reader = this.esploader._reader;
+    if (readerOwner._reader) {
+      const reader = readerOwner._reader;
       try {
         await reader.cancel();
       } catch (err) {
@@ -452,7 +460,7 @@ export class EwtInstallDialog extends LitElement {
       } catch (err) {
         this.logger.log("Reader releaseLock failed:", err);
       }
-      this.esploader._reader = undefined;
+      readerOwner._reader = undefined;
     }
 
     this.logger.log("Device reset to firmware mode");
@@ -859,10 +867,7 @@ export class EwtInstallDialog extends LitElement {
                       );
 
                       // 1. Set baudrate to 115200 BEFORE reset
-                      if (
-                        this._espStub &&
-                        this._espStub.currentBaudRate !== 115200
-                      ) {
+                      if (this._espStub && this._espStub.currentBaudRate !== 115200) {
                         try {
                           await this._espStub.setBaudrate(115200);
                           this.logger.log("Baudrate set to 115200");
@@ -870,23 +875,23 @@ export class EwtInstallDialog extends LitElement {
                           this.logger.log("Baudrate change failed:", err);
                         }
                       }
-
+                      
                       // 2. Call hardReset(false) BEFORE releasing locks
                       // This is critical - hardReset needs the reader/writer to communicate
                       try {
                         await this.esploader.hardReset(false);
                         this.logger.log("Device reset to firmware mode");
                       } catch (err: any) {
-                        this.logger.log("Reset failed:", err);
+                        this.logger.log("Slip read error as expected, caused by hardware reset");
                       }
-
+                      
                       // 3. Wait for reset to complete
                       await sleep(500);
-
+                      
                       // 4. NOW release locks after reset is done
                       await this._releaseReaderWriter();
                       this.logger.log("Locks released after reset");
-
+                      
                       // 5. Reset ESP state
                       this._espStub = undefined;
                       this.esploader.IS_STUB = false;
@@ -898,9 +903,7 @@ export class EwtInstallDialog extends LitElement {
                         "Device already in firmware mode - opening console",
                       );
 
-                      // Just release locks, no reset needed
-                      await this._releaseReaderWriter();
-                      await sleep(100);
+                      await this._resetDeviceAndReleaseLocks()
                     }
 
                     this._state = "LOGS";
