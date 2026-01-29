@@ -1078,9 +1078,48 @@ export class EwtInstallDialog extends LitElement {
                           href=${this._client!.nextUrl}
                           class="has-button"
                           target="_blank"
-                          @click=${() => {
+                          @click=${async () => {
                             // Visit Device opens external page - firmware must keep running
-                            // Just close the dialog, don't reset to bootloader
+                            // Check if device is in bootloader mode
+                            const inBootloaderMode =
+                              this.esploader.chipFamily !== null;
+
+                            if (inBootloaderMode) {
+                              this.logger.log(
+                                "Device is in bootloader mode - resetting to firmware for console",
+                              );
+
+                              // Set baudrate to 115200 BEFORE reset (while locks are active)
+                              await this._resetBaudrateForConsole();
+
+                              // Release locks
+                              await this._releaseReaderWriter();
+                              this.logger.log("Locks released");
+
+                              // CRITICAL: Reset ESP state
+                              this._espStub = undefined;
+                              this.esploader.IS_STUB = false;
+                              this.esploader.chipFamily = null;
+
+                              // Call hardReset(false)
+                              try {
+                                await this.esploader.hardReset(false);
+                              } catch (err: any) {
+                                this.logger.log(
+                                  "Device reset to firmware mode",
+                                );
+                              }
+                              await sleep(500);
+                            } else {
+                              this.logger.log(
+                                "Device already in firmware mode - opening console",
+                              );
+
+                              // Just release locks, no reset needed
+                              await this._releaseReaderWriter();
+                              await sleep(100);
+                            }
+
                             this._state = "DASHBOARD";
                           }}
                         >
@@ -1096,9 +1135,47 @@ export class EwtInstallDialog extends LitElement {
                           href=${`https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`}
                           class="has-button"
                           target="_blank"
-                          @click=${() => {
+                          @click=${async () => {
                             // Add to HA opens external page - firmware must keep running
-                            // Just close the dialog, don't reset to bootloader
+                            // Check if device is in bootloader mode
+                            const inBootloaderMode =
+                              this.esploader.chipFamily !== null;
+
+                            if (inBootloaderMode) {
+                              this.logger.log(
+                                "Device is in bootloader mode - resetting to firmware for console",
+                              );
+
+                              // Set baudrate to 115200 BEFORE reset (while locks are active)
+                              await this._resetBaudrateForConsole();
+
+                              // Release locks
+                              await this._releaseReaderWriter();
+                              this.logger.log("Locks released");
+
+                              // CRITICAL: Reset ESP state
+                              this._espStub = undefined;
+                              this.esploader.IS_STUB = false;
+                              this.esploader.chipFamily = null;
+
+                              // Call hardReset(false)
+                              try {
+                                await this.esploader.hardReset(false);
+                              } catch (err: any) {
+                                this.logger.log(
+                                  "Device reset to firmware mode",
+                                );
+                              }
+                              await sleep(500);
+                            } else {
+                              this.logger.log(
+                                "Device already in firmware mode - opening console",
+                              );
+
+                              // Just release locks, no reset needed
+                              await this._releaseReaderWriter();
+                              await sleep(100);
+                            }
                             this._state = "DASHBOARD";
                           }}
                         >
