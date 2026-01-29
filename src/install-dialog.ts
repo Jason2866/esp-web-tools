@@ -1,6 +1,5 @@
 import { LitElement, html, PropertyValues, css, TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
-import type { EwtTextfield } from "./components/ewt-textfield";
 import "./components/ewt-button";
 import "./components/ewt-checkbox";
 import "./components/ewt-console";
@@ -8,6 +7,7 @@ import "./components/ewt-dialog";
 import "./components/ewt-formfield";
 import "./components/ewt-icon-button";
 import "./components/ewt-textfield";
+import type { EwtTextfield } from "./components/ewt-textfield";
 import "./components/ewt-select";
 import "./components/ewt-list-item";
 import "./components/ewt-littlefs-manager";
