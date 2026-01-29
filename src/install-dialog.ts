@@ -234,11 +234,16 @@ export class EwtInstallDialog extends LitElement {
     if (this.esploader._writer) {
       const writer = this.esploader._writer;
       try {
-        writer.releaseLock();
-        this.logger.log("Writer released");
+        await writer.cancel();
       } catch (err) {
-        this.logger.log("Writer releaseLock failed:", err);
+        this.logger.log("Writer cancel failed:", err);
       } finally {
+        try {
+          writer.releaseLock();
+          this.logger.log("Writer released");
+        } catch (err) {
+          this.logger.log("Writer releaseLock failed:", err);
+        }
         this.esploader._writer = undefined;
       }
     }
@@ -796,7 +801,6 @@ export class EwtInstallDialog extends LitElement {
                       );
 
                       await this._resetBaudrateForConsole();
-                      await this._releaseReaderWriter();
                       await this._resetDeviceAndReleaseLocks();
                     } else {
                       this.logger.log(
@@ -915,7 +919,6 @@ export class EwtInstallDialog extends LitElement {
                     // Keep client object for dashboard running; connection already closed above.
 
                     await this._resetBaudrateForConsole();
-                    await this._releaseReaderWriter();
                     await this._resetDeviceAndReleaseLocks();
 
                     this._state = "LOGS";
@@ -1969,15 +1972,7 @@ export class EwtInstallDialog extends LitElement {
         this.logger.log("External serial chip - resetting to firmware mode");
 
         try {
-          await this._releaseReaderWriter();
-          await this.esploader.hardReset(false); // false = firmware mode
-          this.logger.log("Device reset to firmware mode");
-
-          // Reset ESP state
-          this._espStub = undefined;
-          this.esploader.IS_STUB = false;
-          this.esploader.chipFamily = null;
-
+          await this._resetDeviceAndReleaseLocks();
           await sleep(500); // Wait for firmware to start
         } catch (err: any) {
           this.logger.log(`Reset to firmware failed: ${err.message}`);
