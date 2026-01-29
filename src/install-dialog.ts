@@ -19,7 +19,6 @@ import { ImprovSerial, Ssid } from "improv-wifi-serial-sdk/dist/serial";
 import {
   ImprovSerialCurrentState,
   ImprovSerialErrorState,
-  PortNotReady,
 } from "improv-wifi-serial-sdk/dist/const";
 import { flash } from "./flash";
 import { textDownload } from "./util/file-download";
@@ -1998,56 +1997,15 @@ export class EwtInstallDialog extends LitElement {
     // Just test Improv directly - device should now be in firmware mode
     this.logger.log("Testing Improv (device is in firmware mode)");
 
-    // Test Improv immediately
-    this._improvChecked = true;
-    const client = new ImprovSerial(this._port, this.logger);
-    client.addEventListener("state-changed", () => {
-      this.requestUpdate();
-    });
-    client.addEventListener("error-changed", () => this.requestUpdate());
+    // Calculate timeout for Improv test
+    const timeout = !justInstalled
+      ? 1000
+      : this._manifest.new_install_improv_wait_time !== undefined
+        ? this._manifest.new_install_improv_wait_time * 1000
+        : 10000;
 
-    try {
-      // If a device was just installed, give new firmware 10 seconds (overridable) to
-      // format the rest of the flash and do other stuff.
-      const timeout = !justInstalled
-        ? 1000
-        : this._manifest.new_install_improv_wait_time !== undefined
-          ? this._manifest.new_install_improv_wait_time * 1000
-          : 10000;
-      this._info = await client.initialize(timeout);
-      this._client = client;
-      this._improvSupported = true; // Mark Improv as supported
-      client.addEventListener("disconnect", this._handleDisconnect);
-
-      this.logger.log("Improv detected successfully!");
-
-      // Clear busy flag when Improv successful
-      this._busy = false;
-    } catch (err: any) {
-      // Clear old value
-      this._info = undefined;
-
-      // CRITICAL: Close the Improv client to release its reader
-      try {
-        await this._closeClientWithoutEvents(client);
-        this.logger.log("Improv client closed after error");
-      } catch (closeErr) {
-        this.logger.log("Could not close Improv client:", closeErr);
-      }
-
-      if (err instanceof PortNotReady) {
-        this._state = "ERROR";
-        this._error =
-          "Serial port is not ready. Close any other application using it and try again.";
-      } else {
-        this._client = null; // not supported
-        this._improvSupported = false; // Mark Improv as not supported
-        this.logger.log("Improv not detected:", err.message);
-      }
-
-      // Clear busy flag when Improv failed
-      this._busy = false;
-    }
+    // Call _testImprov with timeout and skipReset=true (already in firmware mode)
+    await this._testImprov(timeout, true);
   }
 
   /**
@@ -2527,7 +2485,7 @@ export class EwtInstallDialog extends LitElement {
     await this._testImprov();
   }
 
-  private async _testImprov() {
+  private async _testImprov(timeout = 1000, skipReset = false) {
     // CRITICAL: Mark Improv as checked BEFORE testing to prevent duplicate tests
     this._improvChecked = true;
 
@@ -2543,27 +2501,25 @@ export class EwtInstallDialog extends LitElement {
         `Port info: VID=0x${portInfo.usbVendorId?.toString(16).padStart(4, "0")}, PID=0x${portInfo.usbProductId?.toString(16).padStart(4, "0")}`,
       );
 
-      // CRITICAL: Reset device BEFORE testing Improv
-      this.logger.log("Resetting device for Improv detection...");
+      // CRITICAL: Reset device BEFORE testing Improv (unless skipReset is true)
+      if (!skipReset) {
+        this.logger.log("Resetting device for Improv detection...");
 
-      try {
-        // Release locks before reset
-        await this._releaseReaderWriter();
+        try {
+          // Release locks before reset
+          await this._releaseReaderWriter();
 
-        // Use hardReset(false) - same as "Reset Device" button in console
-        await this.esploader.hardReset(false);
-        this.logger.log("Device reset sent, device is rebooting...");
+          // Use hardReset(false) - same as "Reset Device" button in console
+          await this.esploader.hardReset(false);
+          this.logger.log("Device reset sent, device is rebooting...");
 
-        // Wait device to:
-        // 1. Boot up
-        // 2. Connect to WiFi
-        // 3. Get IP address
-        // 4. Send Improv packets with correct URL
-        this.logger.log("Waiting for device to boot...");
-        await sleep(500);
-      } catch (resetErr: any) {
-        this.logger.log(`Failed to reset device: ${resetErr.message}`);
-        // Continue anyway - maybe device is already in the right state
+          // Wait for device to boot up
+          this.logger.log("Waiting for device to boot...");
+          await sleep(500);
+        } catch (resetErr: any) {
+          this.logger.log(`Failed to reset device: ${resetErr.message}`);
+          // Continue anyway - maybe device is already in the right state
+        }
       }
 
       const improvSerial = new ImprovSerial(this._port, this.logger);
@@ -2576,7 +2532,7 @@ export class EwtInstallDialog extends LitElement {
 
       // Don't set _client until we successfully initialize
       this.logger.log("Calling improvSerial.initialize()...");
-      const info = await improvSerial.initialize();
+      const info = await improvSerial.initialize(timeout);
 
       // CRITICAL: Wait for firmware to complete WiFi scan and connection with timeout
       // Poll for valid IP address (not 0.0.0.0) by requesting current state with timeout
@@ -2613,6 +2569,7 @@ export class EwtInstallDialog extends LitElement {
       this._client = improvSerial;
       this._info = info;
       this._improvSupported = true;
+      improvSerial.addEventListener("disconnect", this._handleDisconnect);
       this.logger.log("Improv Wi-Fi Serial detected");
       this.logger.log(
         `Improv state: ${improvSerial.state}, nextUrl: ${improvSerial.nextUrl || "undefined"}`,
