@@ -341,120 +341,45 @@ saveSetting("console", true);
 
 ### 1. **State Saving**
 - **esp32tool**: Saves `espStub._parent` (the parent loader), not the stub itself
-- **esp-web-tools**: Currently saves `espStub` directly
 
 ### 2. **Baudrate Setting**
 - **esp32tool**: Sets baudrate to 115200 BEFORE calling `enterConsoleMode()`
-- **esp-web-tools**: Sets baudrate AFTER WDT reset (might be too late)
 
 ### 3. **Wait Times**
 - **esp32tool**: Waits 500ms (Desktop) or 1000ms (Android) after WDT reset for USB enumeration
-- **esp-web-tools**: Uses configurable `_additionalBootDelay` (default 4000ms)
 
 ### 4. **Port Updates**
 - **esp32tool**: Updates THREE references after port selection:
   1. `espStub.port = newPort`
   2. `espStub._parent.port = newPort`
   3. `espLoaderBeforeConsole.port = newPort`
-- **esp-web-tools**: Currently updates only `espStub.port` and `espStub._parent.port`
 
 ### 5. **Console Initialization**
 - **esp32tool**: Creates `ESP32ToolConsole` instance with `espStub.port`
-- **esp-web-tools**: Uses Improv test instead of console
 
 ### 6. **Flow Control**
 - **esp32tool**: Uses `return` statement after calling `openConsolePortAndInit()` for USB-JTAG/OTG devices
-- **esp-web-tools**: Continues execution after port selection
 
 ---
 
 ## CRITICAL MISSING PIECES IN esp-web-tools
 
 ### 1. **No stub creation before WDT reset**
-esp32tool creates and saves the stub BEFORE any mode switching. esp-web-tools needs to ensure stub exists and is saved.
+fixed
 
 ### 2. **Baudrate not set before enterConsoleMode()**
-esp32tool sets baudrate to 115200 BEFORE calling `enterConsoleMode()`. This ensures the stub is ready for firmware communication.
+fixed
 
 ### 3. **Parent loader not saved**
-esp32tool saves `espStub._parent`, not the stub itself. This is critical for proper restoration.
+fixed
 
 ### 4. **Saved loader port not updated**
-esp32tool updates `espLoaderBeforeConsole.port` after port selection. esp-web-tools might be missing this.
+fixed
 
 ### 5. **No wait for USB enumeration**
-esp32tool waits 500ms (Desktop) or 1000ms (Android) after WDT reset. esp-web-tools uses 4000ms which might be too long.
+fixed
 
 ### 6. **Improv test timing**
-esp-web-tools tests Improv immediately after port selection, but the firmware might not be fully booted yet. esp32tool waits 200ms before initializing console.
-
+fixed
 ---
 
-## RECOMMENDED FIXES FOR esp-web-tools
-
-### Fix 1: Create and save stub BEFORE mode switching
-```typescript
-// In _initialize() or similar method, BEFORE calling enterConsoleMode():
-if (!this._espStub) {
-  this._espStub = await this.esploader.runStub();
-}
-
-// Save the PARENT loader (not the stub)
-const loaderToSave = this._espStub._parent || this._espStub;
-this._savedLoader = loaderToSave;
-this._savedBaudrate = loaderToSave.currentBaudRate;
-```
-
-### Fix 2: Set baudrate to 115200 BEFORE enterConsoleMode()
-```typescript
-// Set baudrate to 115200 BEFORE calling enterConsoleMode()
-await this._espStub.setBaudrate(115200);
-this.logger.log("Baudrate set to 115200 for firmware mode");
-
-// Now call enterConsoleMode()
-const portWasClosed = await this._espStub.enterConsoleMode();
-```
-
-### Fix 3: Update saved loader port after selection
-```typescript
-// After opening new port:
-this._espStub.port = newPort;
-if (this._espStub._parent) {
-  this._espStub._parent.port = newPort;
-}
-if (this._savedLoader) {
-  this._savedLoader.port = newPort;
-}
-```
-
-### Fix 4: Reduce wait time for USB enumeration
-```typescript
-// After WDT reset:
-const waitTime = 500; // 500ms for Desktop (Android uses 1000ms in esp32tool)
-await sleep(waitTime);
-```
-
-### Fix 5: Wait before Improv test
-```typescript
-// After opening port at 115200:
-await sleep(200); // Wait for firmware to be ready
-
-// Now test Improv
-const client = new ImprovSerial(this._port, this.logger);
-await client.initialize();
-```
-
----
-
-## CONCLUSION
-
-The main issue is that esp-web-tools is not following the exact same flow as esp32tool. The critical missing pieces are:
-
-1. Stub must be created and saved BEFORE mode switching
-2. Baudrate must be set to 115200 BEFORE calling enterConsoleMode()
-3. Parent loader must be saved (not the stub)
-4. Saved loader port must be updated after port selection
-5. Wait time should be reduced (500ms instead of 4000ms)
-6. Improv test should wait 200ms after port opening
-
-These fixes should make esp-web-tools work correctly with USB-JTAG/OTG devices.
