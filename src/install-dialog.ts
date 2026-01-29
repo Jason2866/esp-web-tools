@@ -392,14 +392,26 @@ export class EwtInstallDialog extends LitElement {
   // Reset device and release locks - used when returning to dashboard or recovering from errors
   // Reset device to FIRMWARE mode (normal execution)
   private async _resetDeviceAndReleaseLocks() {
-    // Release esploader reader/writer if locked
-    await this._releaseReaderWriter();
+    // Find the actual object that has the reader/writer
+    let readerOwner = this._espStub || this.esploader;
+    if (readerOwner._parent) {
+      readerOwner = readerOwner._parent;
+      this.logger.log("Using parent loader for reader/writer");
+    }
+
+    // Call hardReset BEFORE releasing locks (so it can communicate)
     try {
       await this.esploader.hardReset(false);
       this.logger.log("Device reset sent");
     } catch (err) {
       this.logger.log("Reset error (expected):", err);
     }
+
+    // Wait for reset to complete
+    await sleep(500);
+
+    // NOW release locks after reset
+    await this._releaseReaderWriter();
     this.logger.log("Device reset to firmware mode");
 
     // Reset ESP state
