@@ -766,6 +766,7 @@ export class EwtInstallDialog extends LitElement {
                     if (this._client) {
                       try {
                         await this._closeClientWithoutEvents(this._client);
+                        await sleep(100);
                       } catch (e) {
                         this.logger.log("Failed to close Improv client:", e);
                       }
@@ -782,6 +783,10 @@ export class EwtInstallDialog extends LitElement {
                     this.logger.log(
                       "Opening console for USB-JTAG/OTG device (in firmware mode)",
                     );
+
+                    // Release any locks before opening console
+                    await this._releaseReaderWriter();
+                    await sleep(100);
 
                     this._state = "LOGS";
                     this._busy = false;
@@ -932,8 +937,8 @@ export class EwtInstallDialog extends LitElement {
           ? html`
               <div>
                 <ewt-button
-                  label="Open Console"
                   ?disabled=${this._busy}
+                  label="Open Console"
                   @click=${async () => {
                     this._busy = true;
 
@@ -941,18 +946,25 @@ export class EwtInstallDialog extends LitElement {
                     if (this._client) {
                       try {
                         await this._closeClientWithoutEvents(this._client);
+                        await sleep(100);
                       } catch (e) {
                         this.logger.log("Failed to close Improv client:", e);
                       }
                     }
 
-                    // For USB-JTAG/OTG: Device is already in firmware mode at 115200 baud
-                    // Just open console directly
+                    // Switch to firmware mode if needed
+                    const needsReconnect =
+                      await this._switchToFirmwareMode("console");
+                    if (needsReconnect) {
+                      return; // Will continue after port reconnection
+                    }
+
+                    // Device is already in firmware mode
                     this.logger.log(
-                      "Opening console for USB-JTAG/OTG device (already in firmware mode)",
+                      "Opening console for USB-JTAG/OTG device (in firmware mode)",
                     );
 
-                    // Release any locks
+                    // Release any locks before opening console
                     await this._releaseReaderWriter();
                     await sleep(100);
 
@@ -969,6 +981,7 @@ export class EwtInstallDialog extends LitElement {
             label="Manage Filesystem"
             ?disabled=${this._busy}
             @click=${async () => {
+              // Filesystem management requires bootloader mode
               // Close Improv client if active (it locks the reader)
               if (this._client) {
                 try {
@@ -979,7 +992,23 @@ export class EwtInstallDialog extends LitElement {
                 // Keep client object for dashboard rendering; connection already closed above.
               }
 
-              // Keep stub and reader/writer - they will be reused
+              // Switch to bootloader mode for filesystem operations
+              this.logger.log(
+                "Preparing device for filesystem operations (switching to bootloader mode)...",
+              );
+
+              try {
+                await this._prepareForFlashOperations();
+                await this._ensureStub();
+              } catch (err: any) {
+                this.logger.log(
+                  `Failed to prepare for filesystem: ${err.message}`,
+                );
+                this._state = "ERROR";
+                this._error = `Failed to enter bootloader mode: ${err.message}`;
+                return;
+              }
+
               this._state = "PARTITIONS";
               this._readPartitionTable();
             }}
@@ -1035,46 +1064,19 @@ export class EwtInstallDialog extends LitElement {
                           class="has-button"
                           target="_blank"
                           @click=${async () => {
-                            // Visit Device opens external page - firmware must keep running
+                            // Visit Device opens external page - firmware must running
                             // Check if device is in bootloader mode
-                            const inBootloaderMode =
-                              this.esploader.chipFamily !== null;
-
-                            if (inBootloaderMode) {
-                              this.logger.log(
-                                "Device is in bootloader mode - resetting to firmware for console",
-                              );
-
-                              // Set baudrate to 115200 BEFORE reset (while locks are active)
-                              await this._resetBaudrateForConsole();
-
-                              // Release locks
-                              await this._releaseReaderWriter();
-                              this.logger.log("Locks released");
-
-                              // CRITICAL: Reset ESP state
-                              this._espStub = undefined;
-                              this.esploader.IS_STUB = false;
-                              this.esploader.chipFamily = null;
-
-                              // Call hardReset(false)
-                              try {
-                                await this.esploader.hardReset(false);
-                              } catch (err: any) {
-                                this.logger.log(
-                                  "Device reset to firmware mode",
-                                );
-                              }
-                              await sleep(500);
-                            } else {
-                              this.logger.log(
-                                "Device already in firmware mode - opening console",
-                              );
-
-                              // Just release locks, no reset needed
-                              await this._releaseReaderWriter();
-                              await sleep(100);
+                            // Switch to firmware mode if needed
+                            const needsReconnect =
+                              await this._switchToFirmwareMode("console");
+                            if (needsReconnect) {
+                              return; // Will continue after port reconnection
                             }
+
+                            // Device is already in firmware mode
+                            this.logger.log(
+                              "Following Link (in firmware mode)",
+                            );
 
                             this._state = "DASHBOARD";
                           }}
@@ -1092,46 +1094,20 @@ export class EwtInstallDialog extends LitElement {
                           class="has-button"
                           target="_blank"
                           @click=${async () => {
-                            // Add to HA opens external page - firmware must keep running
+                            // Add to HA opens external page - firmware must running
                             // Check if device is in bootloader mode
-                            const inBootloaderMode =
-                              this.esploader.chipFamily !== null;
-
-                            if (inBootloaderMode) {
-                              this.logger.log(
-                                "Device is in bootloader mode - resetting to firmware for console",
-                              );
-
-                              // Set baudrate to 115200 BEFORE reset (while locks are active)
-                              await this._resetBaudrateForConsole();
-
-                              // Release locks
-                              await this._releaseReaderWriter();
-                              this.logger.log("Locks released");
-
-                              // CRITICAL: Reset ESP state
-                              this._espStub = undefined;
-                              this.esploader.IS_STUB = false;
-                              this.esploader.chipFamily = null;
-
-                              // Call hardReset(false)
-                              try {
-                                await this.esploader.hardReset(false);
-                              } catch (err: any) {
-                                this.logger.log(
-                                  "Device reset to firmware mode",
-                                );
-                              }
-                              await sleep(500);
-                            } else {
-                              this.logger.log(
-                                "Device already in firmware mode - opening console",
-                              );
-
-                              // Just release locks, no reset needed
-                              await this._releaseReaderWriter();
-                              await sleep(100);
+                            // Switch to firmware mode if needed
+                            const needsReconnect =
+                              await this._switchToFirmwareMode("console");
+                            if (needsReconnect) {
+                              return; // Will continue after port reconnection
                             }
+
+                            // Device is already in firmware mode
+                            this.logger.log(
+                              "Following Link (in firmware mode)",
+                            );
+
                             this._state = "DASHBOARD";
                           }}
                         >
@@ -1145,8 +1121,7 @@ export class EwtInstallDialog extends LitElement {
                   <ewt-button
                     label="Skip"
                     @click=${async () => {
-                      // After WiFi provisioning: Return to bootloader mode for flash operations
-                      // EXCEPTION: USB-JTAG/OTG devices stay in firmware mode
+                      // After WiFi provisioning: Device stays in firmware mode
                       // Close Improv client first
                       if (this._client) {
                         try {
@@ -1159,23 +1134,11 @@ export class EwtInstallDialog extends LitElement {
                         }
                       }
 
-                      // Prepare for flash operations (reset to bootloader, load stub)
-                      if (!this._isUsbJtagOrOtgDevice) {
-                        try {
-                          await this._prepareForFlashOperations();
-                          this.logger.log(
-                            "Device ready for flash operations after provisioning",
-                          );
-                        } catch (err: any) {
-                          this.logger.log(
-                            `Failed to prepare for flash: ${err.message}`,
-                          );
-                        }
-                      } else {
-                        this.logger.log(
-                          "USB-JTAG/OTG: keep firmware mode after provisioning",
-                        );
-                      }
+                      // Release locks and stay in firmware mode
+                      await this._releaseReaderWriter();
+                      this.logger.log(
+                        "Returning to dashboard (device stays in firmware mode)",
+                      );
 
                       this._state = "DASHBOARD";
                     }}
@@ -1188,8 +1151,7 @@ export class EwtInstallDialog extends LitElement {
                 slot="primaryAction"
                 label="Continue"
                 @click=${async () => {
-                  // After WiFi provisioning: Return to bootloader mode for flash operations
-                  // EXCEPTION: USB-JTAG/OTG devices stay in firmware mode
+                  // After WiFi provisioning: Device stays in firmware mode
                   // Close Improv client first
                   if (this._client) {
                     try {
@@ -1202,23 +1164,11 @@ export class EwtInstallDialog extends LitElement {
                     }
                   }
 
-                  // Prepare for flash operations (reset to bootloader, load stub)
-                  if (!this._isUsbJtagOrOtgDevice) {
-                    try {
-                      await this._prepareForFlashOperations();
-                      this.logger.log(
-                        "Device ready for flash operations after provisioning",
-                      );
-                    } catch (err: any) {
-                      this.logger.log(
-                        `Failed to prepare for flash: ${err.message}`,
-                      );
-                    }
-                  } else {
-                    this.logger.log(
-                      "USB-JTAG/OTG: keep firmware mode after provisioning",
-                    );
-                  }
+                  // Release locks and stay in firmware mode
+                  await this._releaseReaderWriter();
+                  this.logger.log(
+                    "Returning to dashboard (device stays in firmware mode)",
+                  );
 
                   this._state = "DASHBOARD";
                 }}
@@ -1303,8 +1253,7 @@ export class EwtInstallDialog extends LitElement {
           slot="secondaryAction"
           .label=${this._installState && this._installErase ? "Skip" : "Back"}
           @click=${async () => {
-            // When going back from provision: Return to bootloader mode
-            // EXCEPTION: USB-JTAG/OTG devices stay in firmware mode
+            // When going back from provision: Device stays in firmware mode
             // Close Improv client first
             if (this._client) {
               try {
@@ -1315,19 +1264,11 @@ export class EwtInstallDialog extends LitElement {
               }
             }
 
-            // Prepare for flash operations (reset to bootloader, load stub)
-            if (!this._isUsbJtagOrOtgDevice) {
-              try {
-                await this._prepareForFlashOperations();
-                this.logger.log("Device ready for flash operations");
-              } catch (err: any) {
-                this.logger.log(`Failed to prepare for flash: ${err.message}`);
-              }
-            } else {
-              this.logger.log(
-                "USB-JTAG/OTG: keep firmware mode when going back",
-              );
-            }
+            // Release locks and stay in firmware mode
+            await this._releaseReaderWriter();
+            this.logger.log(
+              "Returning to dashboard (device stays in firmware mode)",
+            );
 
             this._state = "DASHBOARD";
           }}
@@ -1519,23 +1460,14 @@ export class EwtInstallDialog extends LitElement {
         @click=${async () => {
           await this.shadowRoot!.querySelector("ewt-console")!.disconnect();
 
-          // After console: ESP is in firmware mode
-          // Need to reset to bootloader and reload stub for flash/filesystem operations
-          this.logger.log("Preparing ESP for flash operations...");
-          try {
-            // Reset to BOOTLOADER mode and load stub
-            await this._resetToBootloaderAndReleaseLocks();
+          // After console: ESP stays in firmware mode
+          // Device will only switch to bootloader mode when "Install" or "Manage Filesystem" is clicked
+          this.logger.log(
+            "Returning to dashboard (device stays in firmware mode)",
+          );
 
-            // Wait for bootloader to start
-            await sleep(100);
-
-            // Load stub and restore baudrate
-            await this._ensureStub();
-
-            this.logger.log("ESP ready for flash operations");
-          } catch (err: any) {
-            this.logger.error(`Failed to prepare ESP: ${err.message}`);
-          }
+          // Release any locks
+          await this._releaseReaderWriter();
 
           this._state = "DASHBOARD";
           // Don't reset _improvChecked - console only reads, doesn't change firmware
@@ -2795,17 +2727,12 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _closeClientWithoutEvents(client: ImprovSerial) {
-    // For CDC/USB-JTAG devices: close() must be called BEFORE removeEventListener
-    // For Serial devices: removeEventListener must be called BEFORE close()
-    if (this._isUsbJtagOrOtgDevice) {
-      // CDC: close first, then remove listener
-      await client.close();
-      client.removeEventListener("disconnect", this._handleDisconnect);
-    } else {
-      // Serial: remove listener first, then close (v1000 logic)
-      client.removeEventListener("disconnect", this._handleDisconnect);
-      await client.close();
-    }
+    // CRITICAL: Always remove event listener BEFORE closing
+    // This prevents the disconnect event from firing and showing error dialog
+    client.removeEventListener("disconnect", this._handleDisconnect);
+
+    // Then close the client
+    await client.close();
   }
 
   static styles = [
