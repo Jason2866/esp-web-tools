@@ -2727,17 +2727,12 @@ export class EwtInstallDialog extends LitElement {
   }
 
   private async _closeClientWithoutEvents(client: ImprovSerial) {
-    // For CDC/USB-JTAG devices: close() must be called BEFORE removeEventListener
-    // For Serial devices: removeEventListener must be called BEFORE close()
-    if (this._isUsbJtagOrOtgDevice) {
-      // CDC: close first, then remove listener
-      await client.close();
-      client.removeEventListener("disconnect", this._handleDisconnect);
-    } else {
-      // Serial: remove listener first, then close (v1000 logic)
-      client.removeEventListener("disconnect", this._handleDisconnect);
-      await client.close();
-    }
+    // CRITICAL: Always remove event listener BEFORE closing
+    // This prevents the disconnect event from firing and showing error dialog
+    client.removeEventListener("disconnect", this._handleDisconnect);
+
+    // Then close the client
+    await client.close();
   }
 
   static styles = [
