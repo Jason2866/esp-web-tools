@@ -671,7 +671,14 @@ export class EwtInstallDialog extends LitElement {
                     await this._releaseReaderWriter();
                     await sleep(100);
 
-                    // Device is already in firmware mode - open URL
+                    // Call hardReset(false)
+                    try {
+                        await this.esploader.hardReset(false);
+                    } catch (err: any) {
+                      this.logger.log("Device reset to firmware mode");
+                    }
+
+                    // Device is in firmware mode - open URL
                     if (this._client && this._client.nextUrl) {
                       window.open(this._client.nextUrl, "_blank");
                     }
@@ -737,7 +744,14 @@ export class EwtInstallDialog extends LitElement {
                     await this._releaseReaderWriter();
                     await sleep(100);
 
-                    // Device is already in firmware mode - open HA URL
+                    // Call hardReset(false)
+                    try {
+                        await this.esploader.hardReset(false);
+                    } catch (err: any) {
+                      this.logger.log("Device reset to firmware mode");
+                    }
+
+                    // Device is in firmware mode - open HA URL
                     if (this._manifest.home_assistant_domain) {
                       window.open(
                         `https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`,
@@ -765,24 +779,6 @@ export class EwtInstallDialog extends LitElement {
                       await this._switchToFirmwareMode("wifi");
                     if (needsReconnect) {
                       return; // Will continue after port reconnection
-                    }
-
-                    // Device is already in firmware mode
-                    this.logger.log(
-                      "Device already in firmware mode for Wi-Fi setup",
-                    );
-
-                    // Close Improv client and re-initialize for WiFi setup
-                    if (this._client) {
-                      try {
-                        await this._closeClientWithoutEvents(this._client);
-                      } catch (e) {
-                        this.logger.log("Failed to close Improv client:", e);
-                      }
-                      this._client = undefined;
-
-                      // Wait for port to be ready after closing client
-                      await sleep(200);
                     }
 
                     // Check if device is in bootloader mode
@@ -822,6 +818,31 @@ export class EwtInstallDialog extends LitElement {
                     // Release any locks
                     await this._releaseReaderWriter();
                     await sleep(100);
+
+                    // Call hardReset(false)
+                    try {
+                        await this.esploader.hardReset(false);
+                    } catch (err: any) {
+                      this.logger.log("Device reset to boot in firmware");
+                    }
+
+                    // Device is in firmware mode
+                    this.logger.log(
+                      "Device is running firmware for Wi-Fi setup",
+                    );
+
+                    // Close Improv client and re-initialize for WiFi setup
+                    if (this._client) {
+                      try {
+                        await this._closeClientWithoutEvents(this._client);
+                      } catch (e) {
+                        this.logger.log("Failed to close Improv client:", e);
+                      }
+                      this._client = undefined;
+
+                      // Wait for port to be ready after closing client
+                      await sleep(200);
+                    }
 
                     // Re-create Improv client (firmware is running at 115200 baud)
                     const client = new ImprovSerial(this._port, this.logger);
