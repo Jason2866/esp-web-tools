@@ -709,6 +709,10 @@ export class EwtInstallDialog extends LitElement {
                       await sleep(200);
                     }
 
+                    // Ensure all locks are released before creating new client
+                    await this._releaseReaderWriter();
+                    await sleep(100);
+
                     // Re-create Improv client (firmware is running at 115200 baud)
                     const client = new ImprovSerial(this._port, this.logger);
                     client.addEventListener("state-changed", () => {
@@ -783,10 +787,6 @@ export class EwtInstallDialog extends LitElement {
                     this.logger.log(
                       "Opening console for USB-JTAG/OTG device (in firmware mode)",
                     );
-
-                    // Release any locks before opening console
-                    await this._releaseReaderWriter();
-                    await sleep(100);
 
                     this._state = "LOGS";
                     this._busy = false;
@@ -963,10 +963,6 @@ export class EwtInstallDialog extends LitElement {
                     this.logger.log(
                       "Opening console for USB-JTAG/OTG device (in firmware mode)",
                     );
-
-                    // Release any locks before opening console
-                    await this._releaseReaderWriter();
-                    await sleep(100);
 
                     this._state = "LOGS";
                     this._busy = false;
