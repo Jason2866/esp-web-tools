@@ -661,15 +661,6 @@ export class EwtInstallDialog extends LitElement {
                       return; // Will continue after port reconnection
                     }
 
-                    // todo: Maybe needed to check bootloader mode ?
-                    //                    // Check if device is in bootloader mode
-                    //                    const inBootloaderMode = this.esploader.chipFamily !== null;
-                    //
-                    //                    if (inBootloaderMode) {
-                    //                      this.logger.log(
-                    //                        "Device is in bootloader mode - resetting to firmware for console",
-                    //                      );
-
                     // Device is in firmware mode - open HA URL
                     if (this._manifest.home_assistant_domain) {
                       window.open(
