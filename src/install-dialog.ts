@@ -1475,7 +1475,7 @@ export class EwtInstallDialog extends LitElement {
       <ewt-console
         .port=${this._port}
         .logger=${this.logger}
-        .onReset=${async () => await this._resetDeviceAndReleaseLocks()}
+        .onReset=${async () => await this.esploader.hardReset(false)}
       ></ewt-console>
       <ewt-button
         slot="primaryAction"
