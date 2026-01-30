@@ -2003,6 +2003,15 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log(
         "Device is already in FIRMWARE mode - ready for Improv test",
       );
+
+      // Ensure locks are released and streams are ready
+      // For WebUSB, this also recreates streams
+      try {
+        await this._releaseReaderWriter();
+        this.logger.log("Port ready for Improv test");
+      } catch (err: any) {
+        this.logger.log(`Failed to prepare port: ${err.message}`);
+      }
     }
 
     // Don't switch to bootloader on initial connect!
