@@ -161,7 +161,11 @@ export class EwtConsole extends HTMLElement {
   public async reset() {
     this.logger.debug("Triggering reset.");
     if (this.onReset) {
-      await this.onReset();
+      try {
+        await this.onReset();
+      } catch (err) {
+        this.logger.error("Reset callback failed:", err);
+      }
     }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
