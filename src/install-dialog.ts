@@ -969,6 +969,7 @@ export class EwtInstallDialog extends LitElement {
             label="Manage Filesystem"
             ?disabled=${this._busy}
             @click=${async () => {
+              // Filesystem management requires bootloader mode
               // Close Improv client if active (it locks the reader)
               if (this._client) {
                 try {
@@ -979,7 +980,23 @@ export class EwtInstallDialog extends LitElement {
                 // Keep client object for dashboard rendering; connection already closed above.
               }
 
-              // Keep stub and reader/writer - they will be reused
+              // Switch to bootloader mode for filesystem operations
+              this.logger.log(
+                "Preparing device for filesystem operations (switching to bootloader mode)...",
+              );
+
+              try {
+                await this._prepareForFlashOperations();
+                await this._ensureStub();
+              } catch (err: any) {
+                this.logger.log(
+                  `Failed to prepare for filesystem: ${err.message}`,
+                );
+                this._state = "ERROR";
+                this._error = `Failed to enter bootloader mode: ${err.message}`;
+                return;
+              }
+
               this._state = "PARTITIONS";
               this._readPartitionTable();
             }}
@@ -1145,8 +1162,7 @@ export class EwtInstallDialog extends LitElement {
                   <ewt-button
                     label="Skip"
                     @click=${async () => {
-                      // After WiFi provisioning: Return to bootloader mode for flash operations
-                      // EXCEPTION: USB-JTAG/OTG devices stay in firmware mode
+                      // After WiFi provisioning: Device stays in firmware mode
                       // Close Improv client first
                       if (this._client) {
                         try {
@@ -1159,23 +1175,11 @@ export class EwtInstallDialog extends LitElement {
                         }
                       }
 
-                      // Prepare for flash operations (reset to bootloader, load stub)
-                      if (!this._isUsbJtagOrOtgDevice) {
-                        try {
-                          await this._prepareForFlashOperations();
-                          this.logger.log(
-                            "Device ready for flash operations after provisioning",
-                          );
-                        } catch (err: any) {
-                          this.logger.log(
-                            `Failed to prepare for flash: ${err.message}`,
-                          );
-                        }
-                      } else {
-                        this.logger.log(
-                          "USB-JTAG/OTG: keep firmware mode after provisioning",
-                        );
-                      }
+                      // Release locks and stay in firmware mode
+                      await this._releaseReaderWriter();
+                      this.logger.log(
+                        "Returning to dashboard (device stays in firmware mode)",
+                      );
 
                       this._state = "DASHBOARD";
                     }}
@@ -1188,8 +1192,7 @@ export class EwtInstallDialog extends LitElement {
                 slot="primaryAction"
                 label="Continue"
                 @click=${async () => {
-                  // After WiFi provisioning: Return to bootloader mode for flash operations
-                  // EXCEPTION: USB-JTAG/OTG devices stay in firmware mode
+                  // After WiFi provisioning: Device stays in firmware mode
                   // Close Improv client first
                   if (this._client) {
                     try {
@@ -1202,23 +1205,11 @@ export class EwtInstallDialog extends LitElement {
                     }
                   }
 
-                  // Prepare for flash operations (reset to bootloader, load stub)
-                  if (!this._isUsbJtagOrOtgDevice) {
-                    try {
-                      await this._prepareForFlashOperations();
-                      this.logger.log(
-                        "Device ready for flash operations after provisioning",
-                      );
-                    } catch (err: any) {
-                      this.logger.log(
-                        `Failed to prepare for flash: ${err.message}`,
-                      );
-                    }
-                  } else {
-                    this.logger.log(
-                      "USB-JTAG/OTG: keep firmware mode after provisioning",
-                    );
-                  }
+                  // Release locks and stay in firmware mode
+                  await this._releaseReaderWriter();
+                  this.logger.log(
+                    "Returning to dashboard (device stays in firmware mode)",
+                  );
 
                   this._state = "DASHBOARD";
                 }}
@@ -1303,8 +1294,7 @@ export class EwtInstallDialog extends LitElement {
           slot="secondaryAction"
           .label=${this._installState && this._installErase ? "Skip" : "Back"}
           @click=${async () => {
-            // When going back from provision: Return to bootloader mode
-            // EXCEPTION: USB-JTAG/OTG devices stay in firmware mode
+            // When going back from provision: Device stays in firmware mode
             // Close Improv client first
             if (this._client) {
               try {
@@ -1315,19 +1305,11 @@ export class EwtInstallDialog extends LitElement {
               }
             }
 
-            // Prepare for flash operations (reset to bootloader, load stub)
-            if (!this._isUsbJtagOrOtgDevice) {
-              try {
-                await this._prepareForFlashOperations();
-                this.logger.log("Device ready for flash operations");
-              } catch (err: any) {
-                this.logger.log(`Failed to prepare for flash: ${err.message}`);
-              }
-            } else {
-              this.logger.log(
-                "USB-JTAG/OTG: keep firmware mode when going back",
-              );
-            }
+            // Release locks and stay in firmware mode
+            await this._releaseReaderWriter();
+            this.logger.log(
+              "Returning to dashboard (device stays in firmware mode)",
+            );
 
             this._state = "DASHBOARD";
           }}
@@ -1519,23 +1501,14 @@ export class EwtInstallDialog extends LitElement {
         @click=${async () => {
           await this.shadowRoot!.querySelector("ewt-console")!.disconnect();
 
-          // After console: ESP is in firmware mode
-          // Need to reset to bootloader and reload stub for flash/filesystem operations
-          this.logger.log("Preparing ESP for flash operations...");
-          try {
-            // Reset to BOOTLOADER mode and load stub
-            await this._resetToBootloaderAndReleaseLocks();
+          // After console: ESP stays in firmware mode
+          // Device will only switch to bootloader mode when "Install" or "Manage Filesystem" is clicked
+          this.logger.log(
+            "Returning to dashboard (device stays in firmware mode)",
+          );
 
-            // Wait for bootloader to start
-            await sleep(100);
-
-            // Load stub and restore baudrate
-            await this._ensureStub();
-
-            this.logger.log("ESP ready for flash operations");
-          } catch (err: any) {
-            this.logger.error(`Failed to prepare ESP: ${err.message}`);
-          }
+          // Release any locks
+          await this._releaseReaderWriter();
 
           this._state = "DASHBOARD";
           // Don't reset _improvChecked - console only reads, doesn't change firmware
