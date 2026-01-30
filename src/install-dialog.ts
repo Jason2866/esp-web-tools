@@ -2663,6 +2663,10 @@ export class EwtInstallDialog extends LitElement {
         await sleep(200);
       }
 
+      // Ensure all locks are released before creating new client
+      await this._releaseReaderWriter();
+      await sleep(100);
+
       // Re-create Improv client for Wi-Fi provisioning
       this.logger.log("Re-initializing Improv Serial for Wi-Fi setup");
       const client = new ImprovSerial(this._port, this.logger);
