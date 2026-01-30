@@ -1076,7 +1076,7 @@ export class EwtInstallDialog extends LitElement {
                             // Check if device is in bootloader mode
                             // Switch to firmware mode if needed
                             const needsReconnect =
-                              await this._switchToFirmwareMode("console");
+                              await this._switchToFirmwareMode("visit");
                             if (needsReconnect) {
                               popup?.close();
                               return; // Will continue after port reconnection
@@ -1115,7 +1115,7 @@ export class EwtInstallDialog extends LitElement {
                             // Check if device is in bootloader mode
                             // Switch to firmware mode if needed
                             const needsReconnect =
-                              await this._switchToFirmwareMode("console");
+                              await this._switchToFirmwareMode("homeassistant");
                             if (needsReconnect) {
                               popup?.close();
                               return; // Will continue after port reconnection
