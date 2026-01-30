@@ -1006,7 +1006,7 @@ import{l as e,o as t,_ as i,n as o,B as r,i as n,a,t as s,e as d,b as l,R as c,x
                           href=${this._client.nextUrl}
                           class="has-button"
                           target="_blank"
-                          @click=${async()=>{if(null!==this.esploader.chipFamily){this.logger.log("Device is in bootloader mode - resetting to firmware for console"),await this._resetBaudrateForConsole(),await this._releaseReaderWriter(),this.logger.log("Locks released"),this._espStub=void 0,this.esploader.IS_STUB=!1,this.esploader.chipFamily=null;try{await this.esploader.hardReset(!1)}catch(e){this.logger.log("Device reset to firmware mode")}await ee(500)}else this.logger.log("Device already in firmware mode - opening console"),await this._releaseReaderWriter(),await ee(100);this._state="DASHBOARD"}}
+                          @click=${async()=>{await this._switchToFirmwareMode("console")||(this.logger.log("Following Link (in firmware mode)"),this._state="DASHBOARD")}}
                         >
                           <ewt-button label="Visit Device"></ewt-button>
                         </a>
@@ -1018,7 +1018,7 @@ import{l as e,o as t,_ as i,n as o,B as r,i as n,a,t as s,e as d,b as l,R as c,x
                           href=${`https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`}
                           class="has-button"
                           target="_blank"
-                          @click=${async()=>{if(null!==this.esploader.chipFamily){this.logger.log("Device is in bootloader mode - resetting to firmware for console"),await this._resetBaudrateForConsole(),await this._releaseReaderWriter(),this.logger.log("Locks released"),this._espStub=void 0,this.esploader.IS_STUB=!1,this.esploader.chipFamily=null;try{await this.esploader.hardReset(!1)}catch(e){this.logger.log("Device reset to firmware mode")}await ee(500)}else this.logger.log("Device already in firmware mode - opening console"),await this._releaseReaderWriter(),await ee(100);this._state="DASHBOARD"}}
+                          @click=${async()=>{await this._switchToFirmwareMode("console")||(this.logger.log("Following Link (in firmware mode)"),this._state="DASHBOARD")}}
                         >
                           <ewt-button
                             label="Add to Home Assistant"
