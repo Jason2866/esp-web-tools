@@ -922,19 +922,21 @@ export class EwtInstallDialog extends LitElement {
                   label="Logs & Console"
                   ?disabled=${this._busy}
                   @click=${async () => {
-                    // Switch to firmware mode if needed
+                    this._busy = true;
+                    const client = this._client;
+                    if (client) {
+                      await this._closeClientWithoutEvents(client);
+                    }
+
+                    // switch to Firmware mode for Console
                     const needsReconnect =
                       await this._switchToFirmwareMode("console");
                     if (needsReconnect) {
                       return; // Will continue after port reconnection
                     }
 
-                    // Device is already in firmware mode
-                    this.logger.log(
-                      "Opening console for USB-JTAG/OTG device (in firmware mode)",
-                    );
-
                     this._state = "LOGS";
+                    this._busy = false;
                   }}
                 ></ewt-button>
               </div>
@@ -1065,13 +1067,18 @@ export class EwtInstallDialog extends LitElement {
                           href=${this._client!.nextUrl}
                           class="has-button"
                           target="_blank"
-                          @click=${async () => {
+                          @click=${async (ev: Event) => {
+                            ev.preventDefault();
+                            const url = this._client!.nextUrl!;
+                            // Preserve user gesture for popup blockers
+                            const popup = window.open("about:blank", "_blank");
                             // Visit Device opens external page - firmware must running
                             // Check if device is in bootloader mode
                             // Switch to firmware mode if needed
                             const needsReconnect =
                               await this._switchToFirmwareMode("console");
                             if (needsReconnect) {
+                              popup?.close();
                               return; // Will continue after port reconnection
                             }
 
@@ -1080,6 +1087,11 @@ export class EwtInstallDialog extends LitElement {
                               "Following Link (in firmware mode)",
                             );
 
+                            if (popup) {
+                              popup.location.href = url;
+                            } else {
+                              window.open(url, "_blank");
+                            }
                             this._state = "DASHBOARD";
                           }}
                         >
@@ -1095,13 +1107,17 @@ export class EwtInstallDialog extends LitElement {
                           href=${`https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`}
                           class="has-button"
                           target="_blank"
-                          @click=${async () => {
+                          @click=${async (ev: Event) => {
+                            ev.preventDefault();
+                            const url = `https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`;
+                            const popup = window.open("about:blank", "_blank");
                             // Add to HA opens external page - firmware must running
                             // Check if device is in bootloader mode
                             // Switch to firmware mode if needed
                             const needsReconnect =
                               await this._switchToFirmwareMode("console");
                             if (needsReconnect) {
+                              popup?.close();
                               return; // Will continue after port reconnection
                             }
 
@@ -1110,6 +1126,11 @@ export class EwtInstallDialog extends LitElement {
                               "Following Link (in firmware mode)",
                             );
 
+                            if (popup) {
+                              popup.location.href = url;
+                            } else {
+                              window.open(url, "_blank");
+                            }
                             this._state = "DASHBOARD";
                           }}
                         >
