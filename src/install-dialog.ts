@@ -256,6 +256,18 @@ export class EwtInstallDialog extends LitElement {
         this.logger.log("Writer releaseLock failed:", err);
       }
     }
+
+    // For WebUSB (Android), recreate streams after releasing locks
+    // This is CRITICAL for console to work - WebUSB needs fresh streams
+    if (this.esploader.isWebUSB && this.esploader.isWebUSB()) {
+      try {
+        this.logger.log("WebUSB detected - recreating streams for console");
+        await (this._port as any).recreateStreams();
+        this.logger.log("WebUSB streams recreated successfully");
+      } catch (err: any) {
+        this.logger.log(`Failed to recreate WebUSB streams: ${err.message}`);
+      }
+    }
   }
 
   // Helper to reset baudrate to 115200 for console
@@ -709,6 +721,10 @@ export class EwtInstallDialog extends LitElement {
                       await sleep(200);
                     }
 
+                    // Ensure all locks are released before creating new client
+                    await this._releaseReaderWriter();
+                    await sleep(100);
+
                     // Re-create Improv client (firmware is running at 115200 baud)
                     const client = new ImprovSerial(this._port, this.logger);
                     client.addEventListener("state-changed", () => {
@@ -783,10 +799,6 @@ export class EwtInstallDialog extends LitElement {
                     this.logger.log(
                       "Opening console for USB-JTAG/OTG device (in firmware mode)",
                     );
-
-                    // Release any locks before opening console
-                    await this._releaseReaderWriter();
-                    await sleep(100);
 
                     this._state = "LOGS";
                     this._busy = false;
@@ -963,10 +975,6 @@ export class EwtInstallDialog extends LitElement {
                     this.logger.log(
                       "Opening console for USB-JTAG/OTG device (in firmware mode)",
                     );
-
-                    // Release any locks before opening console
-                    await this._releaseReaderWriter();
-                    await sleep(100);
 
                     this._state = "LOGS";
                     this._busy = false;
@@ -2654,6 +2662,10 @@ export class EwtInstallDialog extends LitElement {
         // Wait for port to be ready after closing client
         await sleep(200);
       }
+
+      // Ensure all locks are released before creating new client
+      await this._releaseReaderWriter();
+      await sleep(100);
 
       // Re-create Improv client for Wi-Fi provisioning
       this.logger.log("Re-initializing Improv Serial for Wi-Fi setup");
