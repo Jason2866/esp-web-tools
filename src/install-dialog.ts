@@ -256,6 +256,18 @@ export class EwtInstallDialog extends LitElement {
         this.logger.log("Writer releaseLock failed:", err);
       }
     }
+
+    // For WebUSB (Android), recreate streams after releasing locks
+    // This is CRITICAL for console to work - WebUSB needs fresh streams
+    if (this.esploader.isWebUSB && this.esploader.isWebUSB()) {
+      try {
+        this.logger.log("WebUSB detected - recreating streams for console");
+        await (this._port as any).recreateStreams();
+        this.logger.log("WebUSB streams recreated successfully");
+      } catch (err: any) {
+        this.logger.log(`Failed to recreate WebUSB streams: ${err.message}`);
+      }
+    }
   }
 
   // Helper to reset baudrate to 115200 for console
