@@ -633,51 +633,6 @@ export class EwtInstallDialog extends LitElement {
                       return; // Will continue after port reconnection
                     }
 
-                    // Check if device is in bootloader mode
-                    const inBootloaderMode = this.esploader.chipFamily !== null;
-
-                    if (inBootloaderMode) {
-                      this.logger.log(
-                        "Device is in bootloader mode - resetting to firmware for console",
-                      );
-
-                      // Set baudrate to 115200 BEFORE reset (while locks are active)
-                      await this._resetBaudrateForConsole();
-
-                      // Release locks
-                      await this._releaseReaderWriter();
-                      this.logger.log("Locks released");
-
-                      // CRITICAL: Reset ESP state
-                      this._espStub = undefined;
-                      this.esploader.IS_STUB = false;
-                      this.esploader.chipFamily = null;
-
-                      // Call hardReset(false)
-                      try {
-                        await this.esploader.hardReset(false);
-                      } catch (err: any) {
-                        this.logger.log("Device reset to firmware mode");
-                      }
-                      await sleep(500);
-                      // switch to Firmware mode for Console
-                      await this._switchToFirmwareMode("console");
-                      // Release any locks
-                      await this._releaseReaderWriter();
-                      await sleep(100);
-                    }
-
-                    // Release any locks
-                    await this._releaseReaderWriter();
-                    await sleep(100);
-
-                    // Call hardReset(false)
-                    try {
-                        await this.esploader.hardReset(false);
-                    } catch (err: any) {
-                      this.logger.log("Device reset to firmware mode");
-                    }
-
                     // Device is in firmware mode - open URL
                     if (this._client && this._client.nextUrl) {
                       window.open(this._client.nextUrl, "_blank");
@@ -706,50 +661,14 @@ export class EwtInstallDialog extends LitElement {
                       return; // Will continue after port reconnection
                     }
 
-                    // Check if device is in bootloader mode
-                    const inBootloaderMode = this.esploader.chipFamily !== null;
-
-                    if (inBootloaderMode) {
-                      this.logger.log(
-                        "Device is in bootloader mode - resetting to firmware for console",
-                      );
-
-                      // Set baudrate to 115200 BEFORE reset (while locks are active)
-                      await this._resetBaudrateForConsole();
-
-                      // Release locks
-                      await this._releaseReaderWriter();
-                      this.logger.log("Locks released");
-
-                      // CRITICAL: Reset ESP state
-                      this._espStub = undefined;
-                      this.esploader.IS_STUB = false;
-                      this.esploader.chipFamily = null;
-
-                      // Call hardReset(false)
-                      try {
-                        await this.esploader.hardReset(false);
-                      } catch (err: any) {
-                        this.logger.log("Device reset to firmware mode");
-                      }
-                      await sleep(500);
-                      // switch to Firmware mode for Console
-                      await this._switchToFirmwareMode("console");
-                      // Release any locks
-                      await this._releaseReaderWriter();
-                      await sleep(100);
-                    }
-
-                    // Release any locks
-                    await this._releaseReaderWriter();
-                    await sleep(100);
-
-                    // Call hardReset(false)
-                    try {
-                        await this.esploader.hardReset(false);
-                    } catch (err: any) {
-                      this.logger.log("Device reset to firmware mode");
-                    }
+                    // todo: Maybe needed to check bootloader mode ?
+                    //                    // Check if device is in bootloader mode
+                    //                    const inBootloaderMode = this.esploader.chipFamily !== null;
+                    //
+                    //                    if (inBootloaderMode) {
+                    //                      this.logger.log(
+                    //                        "Device is in bootloader mode - resetting to firmware for console",
+                    //                      );
 
                     // Device is in firmware mode - open HA URL
                     if (this._manifest.home_assistant_domain) {
@@ -779,51 +698,6 @@ export class EwtInstallDialog extends LitElement {
                       await this._switchToFirmwareMode("wifi");
                     if (needsReconnect) {
                       return; // Will continue after port reconnection
-                    }
-
-                    // Check if device is in bootloader mode
-                    const inBootloaderMode = this.esploader.chipFamily !== null;
-
-                    if (inBootloaderMode) {
-                      this.logger.log(
-                        "Device is in bootloader mode - resetting to firmware for console",
-                      );
-
-                      // Set baudrate to 115200 BEFORE reset (while locks are active)
-                      await this._resetBaudrateForConsole();
-
-                      // Release locks
-                      await this._releaseReaderWriter();
-                      this.logger.log("Locks released");
-
-                      // CRITICAL: Reset ESP state
-                      this._espStub = undefined;
-                      this.esploader.IS_STUB = false;
-                      this.esploader.chipFamily = null;
-
-                      // Call hardReset(false)
-                      try {
-                        await this.esploader.hardReset(false);
-                      } catch (err: any) {
-                        this.logger.log("Device reset to firmware mode");
-                      }
-                      await sleep(500);
-                      // switch to Firmware mode for Console
-                      await this._switchToFirmwareMode("console");
-                      // Release any locks
-                      await this._releaseReaderWriter();
-                      await sleep(100);
-                    }
-
-                    // Release any locks
-                    await this._releaseReaderWriter();
-                    await sleep(100);
-
-                    // Call hardReset(false)
-                    try {
-                        await this.esploader.hardReset(false);
-                    } catch (err: any) {
-                      this.logger.log("Device reset to boot in firmware");
                     }
 
                     // Device is in firmware mode
@@ -918,44 +792,6 @@ export class EwtInstallDialog extends LitElement {
                       "Opening console for USB-JTAG/OTG device (in firmware mode)",
                     );
 
-                    // Check if device is in bootloader mode
-                    const inBootloaderMode = this.esploader.chipFamily !== null;
-
-                    if (inBootloaderMode) {
-                      this.logger.log(
-                        "Device is in bootloader mode - resetting to firmware for console",
-                      );
-
-                      // Set baudrate to 115200 BEFORE reset (while locks are active)
-                      await this._resetBaudrateForConsole();
-
-                      // Release locks
-                      await this._releaseReaderWriter();
-                      this.logger.log("Locks released");
-
-                      // CRITICAL: Reset ESP state
-                      this._espStub = undefined;
-                      this.esploader.IS_STUB = false;
-                      this.esploader.chipFamily = null;
-
-                      // Call hardReset(false)
-                      try {
-                        await this.esploader.hardReset(false);
-                      } catch (err: any) {
-                        this.logger.log("Device reset to firmware mode");
-                      }
-                      await sleep(500);
-                      // switch to Firmware mode for Console
-                      await this._switchToFirmwareMode("console");
-                      // Release any locks
-                      await this._releaseReaderWriter();
-                      await sleep(100);
-                    }
-
-                    // Release any locks
-                    await this._releaseReaderWriter();
-                    await sleep(100);
-
                     this._state = "LOGS";
                     this._busy = false;
                   }}
@@ -975,39 +811,9 @@ export class EwtInstallDialog extends LitElement {
                       await this._closeClientWithoutEvents(client);
                       await sleep(100);
                     }
-                    // Check if device is in bootloader mode
-                    const inBootloaderMode = this.esploader.chipFamily !== null;
 
-                    if (inBootloaderMode) {
-                      this.logger.log(
-                        "Device is in bootloader mode - resetting to firmware for console",
-                      );
-
-                      // Set baudrate to 115200 BEFORE reset (while locks are active)
-                      await this._resetBaudrateForConsole();
-
-                      // Release locks
-                      await this._releaseReaderWriter();
-                      this.logger.log("Locks released");
-
-                      // CRITICAL: Reset ESP state
-                      this._espStub = undefined;
-                      this.esploader.IS_STUB = false;
-                      this.esploader.chipFamily = null;
-
-                      // Call hardReset(false)
-                      try {
-                        await this.esploader.hardReset(false);
-                      } catch (err: any) {
-                        this.logger.log("Device reset to firmware mode");
-                      }
-                      await sleep(500);
-                      // switch to Firmware mode for Console
-                      await this._switchToFirmwareMode("console");
-                      // Release any locks
-                      await this._releaseReaderWriter();
-                      await sleep(100);
-                    }
+                    // switch to Firmware mode for Console
+                    await this._switchToFirmwareMode("console");
 
                     this._state = "LOGS";
                   }}
@@ -1124,44 +930,6 @@ export class EwtInstallDialog extends LitElement {
                     this.logger.log(
                       "Opening console for USB-JTAG/OTG device (in firmware mode)",
                     );
-
-                    // Check if device is in bootloader mode
-                    const inBootloaderMode = this.esploader.chipFamily !== null;
-
-                    if (inBootloaderMode) {
-                      this.logger.log(
-                        "Device is in bootloader mode - resetting to firmware for console",
-                      );
-
-                      // Set baudrate to 115200 BEFORE reset (while locks are active)
-                      await this._resetBaudrateForConsole();
-
-                      // Release locks
-                      await this._releaseReaderWriter();
-                      this.logger.log("Locks released");
-
-                      // CRITICAL: Reset ESP state
-                      this._espStub = undefined;
-                      this.esploader.IS_STUB = false;
-                      this.esploader.chipFamily = null;
-
-                      // Call hardReset(false)
-                      try {
-                        await this.esploader.hardReset(false);
-                      } catch (err: any) {
-                        this.logger.log("Device reset to firmware mode");
-                      }
-                      await sleep(500);
-                      // switch to Firmware mode for Console
-                      await this._switchToFirmwareMode("console");
-                      // Release any locks
-                      await this._releaseReaderWriter();
-                      await sleep(100);
-                    }
-
-                    // Release any locks
-                    await this._releaseReaderWriter();
-                    await sleep(100);
 
                     this._state = "LOGS";
                   }}
@@ -2430,7 +2198,6 @@ export class EwtInstallDialog extends LitElement {
 
       try {
         // CRITICAL: Call hardReset BEFORE releasing locks (so it can communicate)
-        this.logger.log("Calling hardReset(false)...");
         await this.esploader.hardReset(false); // false = firmware mode
         this.logger.log("Device reset to firmware mode");
       } catch (err: any) {
@@ -2450,6 +2217,14 @@ export class EwtInstallDialog extends LitElement {
       this._espStub = undefined;
       this.esploader.IS_STUB = false;
       this.esploader.chipFamily = null;
+
+      try {
+        // Do a hardReset to start firmware
+        await this.esploader.hardReset(false); // false = firmware mode
+        this.logger.log("Device in firmware mode, start firmware with reset");
+      } catch (err: any) {
+        this.logger.log(`Reset error: ${err.message}`);
+      }
 
       return false; // No port reconnection needed
     }
