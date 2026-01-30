@@ -924,7 +924,7 @@ import{l as e,o as t,_ as i,n as o,B as r,i as n,a,t as s,e as d,b as l,R as c,x
                 <ewt-button
                   label="Logs & Console"
                   ?disabled=${this._busy}
-                  @click=${async()=>{await this._switchToFirmwareMode("console")||(this.logger.log("Opening console for USB-JTAG/OTG device (in firmware mode)"),this._state="LOGS")}}
+                  @click=${async()=>{this._busy=!0;const e=this._client;e&&await this._closeClientWithoutEvents(e);await this._switchToFirmwareMode("console")||(this._state="LOGS",this._busy=!1)}}
                 ></ewt-button>
               </div>
             `}
@@ -1006,7 +1006,7 @@ import{l as e,o as t,_ as i,n as o,B as r,i as n,a,t as s,e as d,b as l,R as c,x
                           href=${this._client.nextUrl}
                           class="has-button"
                           target="_blank"
-                          @click=${async()=>{await this._switchToFirmwareMode("console")||(this.logger.log("Following Link (in firmware mode)"),this._state="DASHBOARD")}}
+                          @click=${async e=>{e.preventDefault();const t=this._client.nextUrl,i=window.open("about:blank","_blank");await this._switchToFirmwareMode("console")?null==i||i.close():(this.logger.log("Following Link (in firmware mode)"),i?i.location.href=t:window.open(t,"_blank"),this._state="DASHBOARD")}}
                         >
                           <ewt-button label="Visit Device"></ewt-button>
                         </a>
@@ -1018,7 +1018,7 @@ import{l as e,o as t,_ as i,n as o,B as r,i as n,a,t as s,e as d,b as l,R as c,x
                           href=${`https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`}
                           class="has-button"
                           target="_blank"
-                          @click=${async()=>{await this._switchToFirmwareMode("console")||(this.logger.log("Following Link (in firmware mode)"),this._state="DASHBOARD")}}
+                          @click=${async e=>{e.preventDefault();const t=`https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`,i=window.open("about:blank","_blank");await this._switchToFirmwareMode("console")?null==i||i.close():(this.logger.log("Following Link (in firmware mode)"),i?i.location.href=t:window.open(t,"_blank"),this._state="DASHBOARD")}}
                         >
                           <ewt-button
                             label="Add to Home Assistant"
