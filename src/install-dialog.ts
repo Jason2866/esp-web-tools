@@ -673,7 +673,7 @@ export class EwtInstallDialog extends LitElement {
 
                     // Call hardReset(false)
                     try {
-                        await this.esploader.hardReset(false);
+                      await this.esploader.hardReset(false);
                     } catch (err: any) {
                       this.logger.log("Device reset to firmware mode");
                     }
@@ -746,7 +746,7 @@ export class EwtInstallDialog extends LitElement {
 
                     // Call hardReset(false)
                     try {
-                        await this.esploader.hardReset(false);
+                      await this.esploader.hardReset(false);
                     } catch (err: any) {
                       this.logger.log("Device reset to firmware mode");
                     }
@@ -821,7 +821,7 @@ export class EwtInstallDialog extends LitElement {
 
                     // Call hardReset(false)
                     try {
-                        await this.esploader.hardReset(false);
+                      await this.esploader.hardReset(false);
                     } catch (err: any) {
                       this.logger.log("Device reset to boot in firmware");
                     }
