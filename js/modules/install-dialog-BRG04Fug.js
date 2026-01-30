@@ -866,7 +866,7 @@ import{l as e,o as t,_ as i,n as o,B as r,i as n,a,t as s,e as d,b as l,R as c,x
                 <ewt-button
                   ?disabled=${this._busy}
                   label="Open Console"
-                  @click=${async()=>{if(this._busy=!0,this._client)try{await this._closeClientWithoutEvents(this._client)}catch(e){this.logger.log("Failed to close Improv client:",e)}await this._switchToFirmwareMode("console")||(this.logger.log("Opening console for USB-JTAG/OTG device (in firmware mode)"),this._state="LOGS",this._busy=!1)}}
+                  @click=${async()=>{if(this._busy=!0,this._client)try{await this._closeClientWithoutEvents(this._client),await ee(100)}catch(e){this.logger.log("Failed to close Improv client:",e)}await this._switchToFirmwareMode("console")||(this.logger.log("Opening console for USB-JTAG/OTG device (in firmware mode)"),await this._releaseReaderWriter(),await ee(100),this._state="LOGS",this._busy=!1)}}
                 ></ewt-button>
               </div>
             `:""}
@@ -931,9 +931,9 @@ import{l as e,o as t,_ as i,n as o,B as r,i as n,a,t as s,e as d,b as l,R as c,x
         ${this._isUsbJtagOrOtgDevice?h`
               <div>
                 <ewt-button
-                  label="Open Console"
                   ?disabled=${this._busy}
-                  @click=${async()=>{if(this._busy=!0,this._client)try{await this._closeClientWithoutEvents(this._client)}catch(e){this.logger.log("Failed to close Improv client:",e)}this.logger.log("Opening console for USB-JTAG/OTG device (already in firmware mode)"),await this._releaseReaderWriter(),await ee(100),this._state="LOGS",this._busy=!1}}
+                  label="Open Console"
+                  @click=${async()=>{if(this._busy=!0,this._client)try{await this._closeClientWithoutEvents(this._client),await ee(100)}catch(e){this.logger.log("Failed to close Improv client:",e)}await this._switchToFirmwareMode("console")||(this.logger.log("Opening console for USB-JTAG/OTG device (in firmware mode)"),await this._releaseReaderWriter(),await ee(100),this._state="LOGS",this._busy=!1)}}
                 ></ewt-button>
               </div>
             `:""}
