@@ -766,6 +766,7 @@ export class EwtInstallDialog extends LitElement {
                     if (this._client) {
                       try {
                         await this._closeClientWithoutEvents(this._client);
+                        await sleep(100);
                       } catch (e) {
                         this.logger.log("Failed to close Improv client:", e);
                       }
@@ -782,6 +783,10 @@ export class EwtInstallDialog extends LitElement {
                     this.logger.log(
                       "Opening console for USB-JTAG/OTG device (in firmware mode)",
                     );
+
+                    // Release any locks before opening console
+                    await this._releaseReaderWriter();
+                    await sleep(100);
 
                     this._state = "LOGS";
                     this._busy = false;
@@ -932,8 +937,8 @@ export class EwtInstallDialog extends LitElement {
           ? html`
               <div>
                 <ewt-button
-                  label="Open Console"
                   ?disabled=${this._busy}
+                  label="Open Console"
                   @click=${async () => {
                     this._busy = true;
 
@@ -941,18 +946,25 @@ export class EwtInstallDialog extends LitElement {
                     if (this._client) {
                       try {
                         await this._closeClientWithoutEvents(this._client);
+                        await sleep(100);
                       } catch (e) {
                         this.logger.log("Failed to close Improv client:", e);
                       }
                     }
 
-                    // For USB-JTAG/OTG: Device is already in firmware mode at 115200 baud
-                    // Just open console directly
+                    // Switch to firmware mode if needed
+                    const needsReconnect =
+                      await this._switchToFirmwareMode("console");
+                    if (needsReconnect) {
+                      return; // Will continue after port reconnection
+                    }
+
+                    // Device is already in firmware mode
                     this.logger.log(
-                      "Opening console for USB-JTAG/OTG device (already in firmware mode)",
+                      "Opening console for USB-JTAG/OTG device (in firmware mode)",
                     );
 
-                    // Release any locks
+                    // Release any locks before opening console
                     await this._releaseReaderWriter();
                     await sleep(100);
 
