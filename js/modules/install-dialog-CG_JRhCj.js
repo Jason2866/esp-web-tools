@@ -1112,7 +1112,7 @@ import{l as e,o as t,_ as i,n as o,B as r,i as n,a,t as s,e as d,b as l,R as c,x
       <ewt-console
         .port=${this._port}
         .logger=${this.logger}
-        .onReset=${async()=>await this._resetDeviceAndReleaseLocks()}
+        .onReset=${async()=>await this.esploader.hardReset(!1)}
       ></ewt-console>
       <ewt-button
         slot="primaryAction"
