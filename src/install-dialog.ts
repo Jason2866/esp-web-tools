@@ -2014,6 +2014,10 @@ export class EwtInstallDialog extends LitElement {
         try {
           await this._resetDeviceAndReleaseLocks();
           await sleep(500); // Wait for firmware to start
+
+          // For WebUSB, ensure streams are recreated after reset
+          await this._releaseReaderWriter();
+          this.logger.log("Streams ready after reset");
         } catch (err: any) {
           this.logger.log(`Reset to firmware failed: ${err.message}`);
         }
