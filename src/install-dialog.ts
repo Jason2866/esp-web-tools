@@ -768,20 +768,7 @@ export class EwtInstallDialog extends LitElement {
                       this.requestUpdate(),
                     );
                     try {
-                      // Add extra timeout wrapper to prevent hanging
-                      const initPromise = client.initialize(1000);
-                      const timeoutPromise = new Promise<any>((_, reject) =>
-                        setTimeout(
-                          () =>
-                            reject(new Error("Improv initialization timeout")),
-                          2000,
-                        ),
-                      );
-                      this._info = await Promise.race([
-                        initPromise,
-                        timeoutPromise,
-                      ]);
-
+                      this._info = await client.initialize(1000);
                       this._client = client;
                       client.addEventListener(
                         "disconnect",
@@ -2839,15 +2826,7 @@ export class EwtInstallDialog extends LitElement {
       });
       client.addEventListener("error-changed", () => this.requestUpdate());
       try {
-        // Add extra timeout wrapper to prevent hanging
-        const initPromise = client.initialize(1000);
-        const timeoutPromise = new Promise<any>((_, reject) =>
-          setTimeout(
-            () => reject(new Error("Improv initialization timeout")),
-            2000,
-          ),
-        );
-        this._info = await Promise.race([initPromise, timeoutPromise]);
+        this._info = await client.initialize(1000);
         this._client = client;
         client.addEventListener("disconnect", this._handleDisconnect);
         this.logger.log("Improv client ready for Wi-Fi provisioning");
