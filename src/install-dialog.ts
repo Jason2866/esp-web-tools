@@ -2035,11 +2035,6 @@ export class EwtInstallDialog extends LitElement {
         try {
           await this._resetDeviceAndReleaseLocks();
           await sleep(500); // Wait for firmware to start
-
-          // For WebUSB, ensure streams are recreated after reset
-          await this._releaseReaderWriter();
-          await sleep(200); // Wait for streams to be fully ready
-          this.logger.log("Streams ready after reset");
         } catch (err: any) {
           this.logger.log(`Reset to firmware failed: ${err.message}`);
         }
@@ -2048,16 +2043,16 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log(
         "Device is already in FIRMWARE mode - ready for Improv test",
       );
+    }
 
-      // Ensure locks are released and streams are ready
-      // For WebUSB, this also recreates streams
-      try {
-        await this._releaseReaderWriter();
-        await sleep(200); // Wait for streams to be fully ready
-        this.logger.log("Port ready for Improv test");
-      } catch (err: any) {
-        this.logger.log(`Failed to prepare port: ${err.message}`);
-      }
+    // Ensure streams are ready before Improv test (like Console does)
+    // This is the ONLY place we call _releaseReaderWriter before Improv test
+    try {
+      await this._releaseReaderWriter();
+      await sleep(200);
+      this.logger.log("Streams ready for Improv test");
+    } catch (err: any) {
+      this.logger.log(`Failed to prepare streams: ${err.message}`);
     }
 
     // Don't switch to bootloader on initial connect!
@@ -2067,15 +2062,12 @@ export class EwtInstallDialog extends LitElement {
     // Calculate timeout for Improv test
     // Use longer timeout for initial connect to allow device to get IP address (can take 8+ seconds)
     const timeout = !justInstalled
-      ? 20000
+      ? 10000
       : this._manifest.new_install_improv_wait_time !== undefined
         ? this._manifest.new_install_improv_wait_time * 1000
-        : 20000;
+        : 10000;
 
-    //    // Call Improv test with skipReset=false to ensure device is properly reset
-    //    // This matches the CDC/USB-JTAG flow where hardReset is done right before Improv test
-    //    await this._testImprov(timeout, false);
-    // Call Improv test with timeout and skipReset=true (already in firmware mode)
+    // Call Improv test with skipReset=true (already reset in _resetDeviceAndReleaseLocks)
     await this._testImprov(timeout, true);
   }
 
@@ -2647,7 +2639,7 @@ export class EwtInstallDialog extends LitElement {
         "Waiting for firmware to get valid IP address (checking every 500ms, max 10 seconds)...",
       );
       const startTime = Date.now();
-      const maxWaitTime = 20000; // 10 seconds max
+      const maxWaitTime = 10000; // 10 seconds max
       let hasValidIp = false;
 
       while (Date.now() - startTime < maxWaitTime) {
