@@ -2608,7 +2608,7 @@ export class EwtInstallDialog extends LitElement {
   private async _testImprov(timeout = 1000, skipReset = false) {
     // CRITICAL: Mark Improv as checked BEFORE testing to prevent duplicate tests
     this._improvChecked = true;
-    
+
     // CRITICAL: Set _busy = false to ensure menu is enabled even if something fails
     // This is set early to prevent menu from staying gray if an unexpected error occurs
     this._busy = false;
