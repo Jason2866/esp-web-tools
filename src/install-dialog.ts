@@ -730,9 +730,6 @@ export class EwtInstallDialog extends LitElement {
                       await sleep(200);
                     }
 
-                    // Ensure all locks are released before creating new client
-                    await this._releaseReaderWriter();
-
                     // Hard reset to ensure device is ready for Wi‑Fi setup.
                     // This matches the flow in _testImprov where reset is done before Improv test
                     try {
@@ -749,6 +746,7 @@ export class EwtInstallDialog extends LitElement {
                         this.esploader.chipFamily = this._savedChipFamily;
                       }
 
+                      // Do hardReset FIRST
                       await this.esploader.hardReset(false);
                       this.logger.log("Device reset completed");
                     } catch (err: any) {
@@ -2632,9 +2630,6 @@ export class EwtInstallDialog extends LitElement {
         this.logger.log("Resetting device for Improv detection...");
 
         try {
-          // Release locks before reset
-          await this._releaseReaderWriter();
-
           // Restore chipFamily if it was saved (needed for hardReset to work)
           if (
             this.esploader.chipFamily === null &&
@@ -2646,11 +2641,12 @@ export class EwtInstallDialog extends LitElement {
             this.esploader.chipFamily = this._savedChipFamily;
           }
 
+          // Do hardReset FIRST (before releasing locks)
           await this.esploader.hardReset(false);
           this.logger.log("Device reset sent, device is rebooting...");
 
           // CRITICAL: hardReset consumes the streams
-          // Need to recreate them before Improv can use the port
+          // NOW release locks and recreate streams AFTER reset
           await this._releaseReaderWriter();
           this.logger.log("Streams recreated after reset");
 
@@ -2819,9 +2815,6 @@ export class EwtInstallDialog extends LitElement {
         await sleep(200);
       }
 
-      // Ensure all locks are released before creating new client
-      await this._releaseReaderWriter();
-
       // Hard reset to ensure device is ready for Wi‑Fi setup.
       // This matches the flow in _testImprov where reset is done before Improv test
       try {
@@ -2838,13 +2831,14 @@ export class EwtInstallDialog extends LitElement {
           this.esploader.chipFamily = this._savedChipFamily;
         }
 
+        // Do hardReset FIRST
         await this.esploader.hardReset(false);
         this.logger.log("Device reset completed");
       } catch (err: any) {
         this.logger.log(`Reset error (expected): ${err.message}`);
       }
 
-      // Recreate streams after reset
+      // Recreate streams AFTER reset
       await this._releaseReaderWriter();
 
       // Wait for streams to be fully ready
