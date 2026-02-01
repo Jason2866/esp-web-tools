@@ -748,16 +748,16 @@ export class EwtInstallDialog extends LitElement {
                       // Do hardReset FIRST
                       await this.esploader.hardReset(false);
                       this.logger.log("Device reset completed");
+                      
+                      // NOW recreate streams AFTER reset
+                      await this._releaseReaderWriter();
+                      
+                      // Wait for streams to be fully ready
+                      await sleep(200);
+                      this.logger.log("Port ready for new Improv client");
                     } catch (err: any) {
                       this.logger.log(`Reset error (expected): ${err.message}`);
                     }
-
-                    // Ensure all locks are released before creating new client
-                    await this._releaseReaderWriter();
-
-                    // Wait for streams to be fully ready
-                    await sleep(200);
-                    this.logger.log("Port ready for new Improv client");
 
                     // Re-create Improv client (firmware is running at 115200 baud)
                     const client = new ImprovSerial(this._port, this.logger);
@@ -2818,17 +2818,17 @@ export class EwtInstallDialog extends LitElement {
           // Do hardReset FIRST
           await this.esploader.hardReset(false);
           this.logger.log("Device reset completed");
+          
+          // NOW recreate streams AFTER reset
+          await this._releaseReaderWriter();
+          
+          // Wait for streams to be fully ready
+          await sleep(200);
+          this.logger.log("Port ready for Wi-Fi setup");
         } catch (err: any) {
           this.logger.log(`Reset error (expected): ${err.message}`);
         }
       }
-
-      // Recreate streams AFTER reset
-      await this._releaseReaderWriter();
-
-      // Wait for streams to be fully ready
-      await sleep(200);
-      this.logger.log("Port ready for Wi-Fi setup");
 
       // Re-create Improv client for Wi-Fi provisioning
       this.logger.log("Re-initializing Improv Serial for Wi-Fi setup");
