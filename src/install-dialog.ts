@@ -2067,10 +2067,10 @@ export class EwtInstallDialog extends LitElement {
     // Calculate timeout for Improv test
     // Use longer timeout for initial connect to allow device to get IP address (can take 8+ seconds)
     const timeout = !justInstalled
-      ? 10000
+      ? 20000
       : this._manifest.new_install_improv_wait_time !== undefined
         ? this._manifest.new_install_improv_wait_time * 1000
-        : 10000;
+        : 20000;
 
     //    // Call Improv test with skipReset=false to ensure device is properly reset
     //    // This matches the CDC/USB-JTAG flow where hardReset is done right before Improv test
@@ -2647,7 +2647,7 @@ export class EwtInstallDialog extends LitElement {
         "Waiting for firmware to get valid IP address (checking every 500ms, max 10 seconds)...",
       );
       const startTime = Date.now();
-      const maxWaitTime = 10000; // 10 seconds max
+      const maxWaitTime = 20000; // 10 seconds max
       let hasValidIp = false;
 
       while (Date.now() - startTime < maxWaitTime) {
