@@ -2090,8 +2090,9 @@ export class EwtInstallDialog extends LitElement {
     this.logger.log("Testing Improv (device is in firmware mode)");
 
     // Calculate timeout for Improv test
+    // Use longer timeout for initial connect to allow device to get IP address (can take 8+ seconds)
     const timeout = !justInstalled
-      ? 1000
+      ? 10000
       : this._manifest.new_install_improv_wait_time !== undefined
         ? this._manifest.new_install_improv_wait_time * 1000
         : 10000;
