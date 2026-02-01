@@ -92,6 +92,9 @@ export class EwtInstallDialog extends LitElement {
   @state() private _selectedPartition?: Partition;
   @state() private _espStub?: any;
 
+  // Save chipFamily for use after reset (when chipFamily is set to null)
+  private _savedChipFamily: number | null = null;
+
   // Track if Improv was already checked (to avoid repeated attempts)
   private _improvChecked = false;
 
@@ -428,6 +431,9 @@ export class EwtInstallDialog extends LitElement {
     await this._releaseReaderWriter();
     this.logger.log("Device reset to firmware mode");
 
+    // Save chipFamily before resetting ESP state
+    this._savedChipFamily = this.esploader.chipFamily;
+
     // Reset ESP state
     this._espStub = undefined;
     this.esploader.IS_STUB = false;
@@ -731,6 +737,18 @@ export class EwtInstallDialog extends LitElement {
                     // This matches the flow in _testImprov where reset is done before Improv test
                     try {
                       this.logger.log("Resetting device for Wi-Fi setup...");
+
+                      // Restore chipFamily if it was saved (needed for hardReset to work)
+                      if (
+                        this.esploader.chipFamily === null &&
+                        this._savedChipFamily !== null
+                      ) {
+                        this.logger.log(
+                          `Restoring chipFamily ${this._savedChipFamily} for reset`,
+                        );
+                        this.esploader.chipFamily = this._savedChipFamily;
+                      }
+
                       await this.esploader.hardReset(false);
                       this.logger.log("Device reset completed");
                     } catch (err: any) {
@@ -2600,6 +2618,17 @@ export class EwtInstallDialog extends LitElement {
           // Release locks before reset
           await this._releaseReaderWriter();
 
+          // Restore chipFamily if it was saved (needed for hardReset to work)
+          if (
+            this.esploader.chipFamily === null &&
+            this._savedChipFamily !== null
+          ) {
+            this.logger.log(
+              `Restoring chipFamily ${this._savedChipFamily} for reset`,
+            );
+            this.esploader.chipFamily = this._savedChipFamily;
+          }
+
           await this.esploader.hardReset(false);
           this.logger.log("Device reset sent, device is rebooting...");
 
@@ -2772,6 +2801,18 @@ export class EwtInstallDialog extends LitElement {
       // This matches the flow in _testImprov where reset is done before Improv test
       try {
         this.logger.log("Resetting device for Wi-Fi setup...");
+
+        // Restore chipFamily if it was saved (needed for hardReset to work)
+        if (
+          this.esploader.chipFamily === null &&
+          this._savedChipFamily !== null
+        ) {
+          this.logger.log(
+            `Restoring chipFamily ${this._savedChipFamily} for reset`,
+          );
+          this.esploader.chipFamily = this._savedChipFamily;
+        }
+
         await this.esploader.hardReset(false);
         this.logger.log("Device reset completed");
       } catch (err: any) {
