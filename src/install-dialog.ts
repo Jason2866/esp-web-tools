@@ -727,7 +727,7 @@ export class EwtInstallDialog extends LitElement {
                     // Ensure all locks are released before creating new client
                     await this._releaseReaderWriter();
 
-                    // For WebUSB, do a hardReset to ensure device is ready
+                    // Hard reset to ensure device is ready for Wi‑Fi setup.
                     // This matches the flow in _testImprov where reset is done before Improv test
                     try {
                       this.logger.log("Resetting device for Wi-Fi setup...");
@@ -2768,7 +2768,7 @@ export class EwtInstallDialog extends LitElement {
       // Ensure all locks are released before creating new client
       await this._releaseReaderWriter();
 
-      // For WebUSB, do a hardReset to ensure device is ready
+      // Hard reset to ensure device is ready for Wi‑Fi setup.
       // This matches the flow in _testImprov where reset is done before Improv test
       try {
         this.logger.log("Resetting device for Wi-Fi setup...");
