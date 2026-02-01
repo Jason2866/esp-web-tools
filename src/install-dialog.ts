@@ -95,11 +95,11 @@ export class EwtInstallDialog extends LitElement {
   // Track if Improv was already checked (to avoid repeated attempts)
   private _improvChecked = false;
 
+  // Track if console was already opened once (to avoid repeated resets)
+  private _consoleInitialized = false;
+
   // Track if Improv is supported (separate from active client)
   private _improvSupported = false;
-
-  // Track if console hard reset has been performed
-  private _consoleHardResetDone = false;
 
   // Track if device is using USB-JTAG or USB-OTG (not external serial chip)
   @state() private _isUsbJtagOrOtgDevice = false;
@@ -260,8 +260,9 @@ export class EwtInstallDialog extends LitElement {
       }
     }
 
-    // For WebUSB (Android), recreate streams after releasing locks
+    // For WebUSB (Android), ALWAYS recreate streams
     // This is CRITICAL for console to work - WebUSB needs fresh streams
+    // Even if no locks were held, streams may have been consumed by other operations
     if (this.esploader.isWebUSB && this.esploader.isWebUSB()) {
       try {
         this.logger.log("WebUSB detected - recreating streams");
@@ -794,7 +795,7 @@ export class EwtInstallDialog extends LitElement {
                       return; // Will continue after port reconnection
                     }
 
-                    // Device is in firmware mode
+                    // Device is already in firmware mode
                     this.logger.log(
                       "Opening console for USB-JTAG/OTG device (in firmware mode)",
                     );
@@ -970,7 +971,7 @@ export class EwtInstallDialog extends LitElement {
                       return; // Will continue after port reconnection
                     }
 
-                    // Device is in firmware mode
+                    // Device is already in firmware mode
                     this.logger.log(
                       "Opening console for USB-JTAG/OTG device (in firmware mode)",
                     );
@@ -2067,15 +2068,15 @@ export class EwtInstallDialog extends LitElement {
     if (!inBootloaderMode) {
       this.logger.log("Device already in firmware mode");
 
-      // Perform initial hard reset for console mode to start firmware
-      if (!this._consoleHardResetDone) {
+      // If opening console for the FIRST time, do a reset to ensure device is ready
+      if (actionAfterReconnect === "console" && !this._consoleInitialized) {
+        this.logger.log("First console open - resetting device...");
+        this._consoleInitialized = true;
         try {
-          this.logger.log("Performing initial hard reset to start firmware...");
           await this.esploader.hardReset(false);
-          this._consoleHardResetDone = true;
-          await sleep(500); // Wait for firmware to start
+          this.logger.log("Device reset completed");
         } catch (err: any) {
-          this.logger.log(`Hard reset failed: ${err.message}`);
+          this.logger.log(`Reset error (expected): ${err.message}`);
         }
       }
 
@@ -2542,17 +2543,22 @@ export class EwtInstallDialog extends LitElement {
     this._state = "DASHBOARD";
     this.requestUpdate(); // Force UI update to show progress
 
-    // Continue with Improv test (this is the ONLY place we test Improv after port reconnection)
-    await this._testImprov();
+    // Continue with Improv test
+    // For USB-JTAG/OTG: Device is in firmware mode but firmware not started - need reset
+    // For external serial: Reset ensures device is in clean state
+    await this._testImprov(1000, false);
   }
 
   private async _testImprov(timeout = 1000, skipReset = false) {
     // CRITICAL: Mark Improv as checked BEFORE testing to prevent duplicate tests
     this._improvChecked = true;
 
+    // Declare improvSerial outside try block so it's available in catch
+    let improvSerial: ImprovSerial | undefined;
+
     // Test Improv support
     try {
-      // Use _port getter which returns esploader.port
+      // Use _port getter which returns esploader.port (now updated with new port)
       this.logger.log(
         `Port for Improv: readable=${this._port.readable !== null}, writable=${this._port.writable !== null}`,
       );
@@ -2566,12 +2572,16 @@ export class EwtInstallDialog extends LitElement {
         this.logger.log("Resetting device for Improv detection...");
 
         try {
-          // Use hardReset(false)
+          // Release locks before reset
+          await this._releaseReaderWriter();
+
           await this.esploader.hardReset(false);
           this.logger.log("Device reset sent, device is rebooting...");
 
-          // Release locks
+          // CRITICAL: hardReset consumes the streams
+          // Need to recreate them before Improv can use the port
           await this._releaseReaderWriter();
+          this.logger.log("Streams recreated after reset");
 
           // Wait for device to boot up
           this.logger.log(
@@ -2584,7 +2594,7 @@ export class EwtInstallDialog extends LitElement {
         }
       }
 
-      const improvSerial = new ImprovSerial(this._port, this.logger);
+      improvSerial = new ImprovSerial(this._port, this.logger);
       improvSerial.addEventListener("state-changed", () => {
         this.requestUpdate();
       });
@@ -2631,7 +2641,6 @@ export class EwtInstallDialog extends LitElement {
       this._client = improvSerial;
       this._info = info;
       this._improvSupported = true;
-      this._consoleHardResetDone = false;
       improvSerial.addEventListener("disconnect", this._handleDisconnect);
       this.logger.log("Improv Wi-Fi Serial detected");
       this.logger.log(
@@ -2642,11 +2651,34 @@ export class EwtInstallDialog extends LitElement {
       this._client = null;
       this._info = undefined; // Explicitly clear info
       this._improvSupported = false;
-      this._consoleHardResetDone = false;
       // _improvChecked is already set to true at the beginning of this method
       this.logger.log(
         `State after Improv failure: _client=${this._client}, _info=${this._info}, _improvSupported=${this._improvSupported}, _improvChecked=${this._improvChecked}`,
       );
+
+      // CRITICAL: Close the improvSerial client if it was created
+      // Even if initialize() failed, the client may have opened streams
+      if (improvSerial) {
+        try {
+          this.logger.log("Closing failed Improv client...");
+          await improvSerial.close();
+          this.logger.log("Failed Improv client closed");
+
+          // CRITICAL: Wait for streams to be fully released
+          await sleep(200);
+        } catch (closeErr: any) {
+          this.logger.log(`Failed to close Improv client: ${closeErr.message}`);
+        }
+      }
+
+      // CRITICAL: Improv test consumes streams even on failure
+      // Need to recreate them so console/other features can work
+      try {
+        await this._releaseReaderWriter();
+        this.logger.log("Streams recreated after Improv failure");
+      } catch (releaseErr: any) {
+        this.logger.log(`Failed to recreate streams: ${releaseErr.message}`);
+      }
     }
 
     this._busy = false;
@@ -2664,7 +2696,7 @@ export class EwtInstallDialog extends LitElement {
         } catch (e) {
           this.logger.log("Failed to close Improv client:", e);
         }
-        this._client = null;
+        this._client = undefined;
 
         // Wait for port to be ready after closing client
         await sleep(200);
