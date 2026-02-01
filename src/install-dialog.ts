@@ -714,6 +714,7 @@ export class EwtInstallDialog extends LitElement {
                     if (this._client) {
                       try {
                         await this._closeClientWithoutEvents(this._client);
+                        this.logger.log("Improv client closed for Wi-Fi setup");
                       } catch (e) {
                         this.logger.log("Failed to close Improv client:", e);
                       }
@@ -725,6 +726,10 @@ export class EwtInstallDialog extends LitElement {
 
                     // Ensure all locks are released before creating new client
                     await this._releaseReaderWriter();
+
+                    // Wait for streams to be fully ready
+                    await sleep(200);
+                    this.logger.log("Port ready for new Improv client");
 
                     // Re-create Improv client (firmware is running at 115200 baud)
                     const client = new ImprovSerial(this._port, this.logger);
@@ -2746,6 +2751,10 @@ export class EwtInstallDialog extends LitElement {
 
       // Ensure all locks are released before creating new client
       await this._releaseReaderWriter();
+
+      // Wait for streams to be fully ready
+      await sleep(200);
+      this.logger.log("Port ready for Wi-Fi setup");
 
       // Re-create Improv client for Wi-Fi provisioning
       this.logger.log("Re-initializing Improv Serial for Wi-Fi setup");
