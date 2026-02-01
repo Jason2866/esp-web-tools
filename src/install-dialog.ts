@@ -92,6 +92,9 @@ export class EwtInstallDialog extends LitElement {
   @state() private _selectedPartition?: Partition;
   @state() private _espStub?: any;
 
+  // Save chipFamily for use after reset (when chipFamily is set to null)
+  private _savedChipFamily: number | null = null;
+
   // Track if Improv was already checked (to avoid repeated attempts)
   private _improvChecked = false;
 
@@ -428,6 +431,9 @@ export class EwtInstallDialog extends LitElement {
     await this._releaseReaderWriter();
     this.logger.log("Device reset to firmware mode");
 
+    // Save chipFamily before resetting ESP state
+    this._savedChipFamily = this.esploader.chipFamily;
+
     // Reset ESP state
     this._espStub = undefined;
     this.esploader.IS_STUB = false;
@@ -723,8 +729,35 @@ export class EwtInstallDialog extends LitElement {
                       await sleep(200);
                     }
 
+                    // Hard reset to ensure device is ready for Wi‑Fi setup.
+                    // This matches the flow in _testImprov where reset is done before Improv test
+                    try {
+                      this.logger.log("Resetting device for Wi-Fi setup...");
+
+                      // Restore chipFamily if it was saved (needed for hardReset to work)
+                      if (
+                        this.esploader.chipFamily === null &&
+                        this._savedChipFamily !== null
+                      ) {
+                        this.logger.log(
+                          `Restoring chipFamily ${this._savedChipFamily} for reset`,
+                        );
+                        this.esploader.chipFamily = this._savedChipFamily;
+                      }
+
+                      // Do hardReset FIRST
+                      await this.esploader.hardReset(false);
+                      this.logger.log("Device reset completed");
+                    } catch (err: any) {
+                      this.logger.log(`Reset error (expected): ${err.message}`);
+                    }
+
                     // Ensure all locks are released before creating new client
                     await this._releaseReaderWriter();
+
+                    // Wait for streams to be fully ready
+                    await sleep(200);
+                    this.logger.log("Port ready for new Improv client");
 
                     // Re-create Improv client (firmware is running at 115200 baud)
                     const client = new ImprovSerial(this._port, this.logger);
@@ -735,7 +768,20 @@ export class EwtInstallDialog extends LitElement {
                       this.requestUpdate(),
                     );
                     try {
-                      this._info = await client.initialize(1000);
+                      // Add extra timeout wrapper to prevent hanging
+                      const initPromise = client.initialize(1000);
+                      const timeoutPromise = new Promise<any>((_, reject) =>
+                        setTimeout(
+                          () =>
+                            reject(new Error("Improv initialization timeout")),
+                          2000,
+                        ),
+                      );
+                      this._info = await Promise.race([
+                        initPromise,
+                        timeoutPromise,
+                      ]);
+
                       this._client = client;
                       client.addEventListener(
                         "disconnect",
@@ -2014,6 +2060,11 @@ export class EwtInstallDialog extends LitElement {
         try {
           await this._resetDeviceAndReleaseLocks();
           await sleep(500); // Wait for firmware to start
+
+          // For WebUSB, ensure streams are recreated after reset
+          await this._releaseReaderWriter();
+          await sleep(200); // Wait for streams to be fully ready
+          this.logger.log("Streams ready after reset");
         } catch (err: any) {
           this.logger.log(`Reset to firmware failed: ${err.message}`);
         }
@@ -2027,6 +2078,7 @@ export class EwtInstallDialog extends LitElement {
       // For WebUSB, this also recreates streams
       try {
         await this._releaseReaderWriter();
+        await sleep(200); // Wait for streams to be fully ready
         this.logger.log("Port ready for Improv test");
       } catch (err: any) {
         this.logger.log(`Failed to prepare port: ${err.message}`);
@@ -2044,6 +2096,9 @@ export class EwtInstallDialog extends LitElement {
         ? this._manifest.new_install_improv_wait_time * 1000
         : 10000;
 
+    //    // Call Improv test with skipReset=false to ensure device is properly reset
+    //    // This matches the CDC/USB-JTAG flow where hardReset is done right before Improv test
+    //    await this._testImprov(timeout, false);
     // Call Improv test with timeout and skipReset=true (already in firmware mode)
     await this._testImprov(timeout, true);
   }
@@ -2553,6 +2608,10 @@ export class EwtInstallDialog extends LitElement {
     // CRITICAL: Mark Improv as checked BEFORE testing to prevent duplicate tests
     this._improvChecked = true;
 
+    // CRITICAL: Set _busy = false to ensure menu is enabled even if something fails
+    // This is set early to prevent menu from staying gray if an unexpected error occurs
+    this._busy = false;
+
     // Declare improvSerial outside try block so it's available in catch
     let improvSerial: ImprovSerial | undefined;
 
@@ -2681,8 +2740,6 @@ export class EwtInstallDialog extends LitElement {
       }
     }
 
-    this._busy = false;
-
     // Check if user wanted specific action after reconnect
     if (this._openConsoleAfterReconnect) {
       this.logger.log("Opening console as requested by user");
@@ -2738,10 +2795,37 @@ export class EwtInstallDialog extends LitElement {
 
         // Wait for port to be ready after closing client
         await sleep(200);
+
+        // Hard reset to ensure device is ready for Wi‑Fi setup.
+        // This matches the flow in _testImprov where reset is done before Improv test
+        try {
+          this.logger.log("Resetting device for Wi-Fi setup...");
+
+          // Restore chipFamily if it was saved (needed for hardReset to work)
+          if (
+            this.esploader.chipFamily === null &&
+            this._savedChipFamily !== null
+          ) {
+            this.logger.log(
+              `Restoring chipFamily ${this._savedChipFamily} for reset`,
+            );
+            this.esploader.chipFamily = this._savedChipFamily;
+          }
+
+          // Do hardReset FIRST
+          await this.esploader.hardReset(false);
+          this.logger.log("Device reset completed");
+        } catch (err: any) {
+          this.logger.log(`Reset error (expected): ${err.message}`);
+        }
       }
 
-      // Ensure all locks are released before creating new client
+      // Recreate streams AFTER reset
       await this._releaseReaderWriter();
+
+      // Wait for streams to be fully ready
+      await sleep(200);
+      this.logger.log("Port ready for Wi-Fi setup");
 
       // Re-create Improv client for Wi-Fi provisioning
       this.logger.log("Re-initializing Improv Serial for Wi-Fi setup");
@@ -2751,7 +2835,15 @@ export class EwtInstallDialog extends LitElement {
       });
       client.addEventListener("error-changed", () => this.requestUpdate());
       try {
-        this._info = await client.initialize(1000);
+        // Add extra timeout wrapper to prevent hanging
+        const initPromise = client.initialize(1000);
+        const timeoutPromise = new Promise<any>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Improv initialization timeout")),
+            2000,
+          ),
+        );
+        this._info = await Promise.race([initPromise, timeoutPromise]);
         this._client = client;
         client.addEventListener("disconnect", this._handleDisconnect);
         this.logger.log("Improv client ready for Wi-Fi provisioning");
