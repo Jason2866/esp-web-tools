@@ -748,10 +748,10 @@ export class EwtInstallDialog extends LitElement {
                       // Do hardReset FIRST
                       await this.esploader.hardReset(false);
                       this.logger.log("Device reset completed");
-                      
+
                       // NOW recreate streams AFTER reset
                       await this._releaseReaderWriter();
-                      
+
                       // Wait for streams to be fully ready
                       await sleep(200);
                       this.logger.log("Port ready for new Improv client");
@@ -2818,10 +2818,10 @@ export class EwtInstallDialog extends LitElement {
           // Do hardReset FIRST
           await this.esploader.hardReset(false);
           this.logger.log("Device reset completed");
-          
+
           // NOW recreate streams AFTER reset
           await this._releaseReaderWriter();
-          
+
           // Wait for streams to be fully ready
           await sleep(200);
           this.logger.log("Port ready for Wi-Fi setup");
