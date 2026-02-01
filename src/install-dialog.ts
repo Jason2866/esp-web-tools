@@ -730,7 +730,7 @@ export class EwtInstallDialog extends LitElement {
                     }
 
                     // Hard reset to ensure device is ready for Wi‑Fi setup.
-                    // This matches the flow in _testImprov where reset is done before Improv test
+                    // This matches the flow in test Improv where reset is done before Improv test
                     try {
                       this.logger.log("Resetting device for Wi-Fi setup...");
 
@@ -2801,7 +2801,7 @@ export class EwtInstallDialog extends LitElement {
         await sleep(200);
 
         // Hard reset to ensure device is ready for Wi‑Fi setup.
-        // This matches the flow in _testImprov where reset is done before Improv test
+        // This matches the flow in test Improv where reset is done before Improv test
         try {
           this.logger.log("Resetting device for Wi-Fi setup...");
 
