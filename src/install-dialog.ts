@@ -723,8 +723,29 @@ export class EwtInstallDialog extends LitElement {
                       await sleep(200);
                     }
 
-                    // Ensure all locks are released before creating new client
-                    await this._releaseReaderWriter();
+                    // For WebUSB (Android), do a hardReset to ensure device is ready
+                    // For WebSerial (Desktop), just release locks
+                    if (this.esploader.isWebUSB && this.esploader.isWebUSB()) {
+                      try {
+                        this.logger.log(
+                          "WebUSB: Resetting device for Wi-Fi setup...",
+                        );
+
+                        await this._resetDeviceAndReleaseLocks();
+                        await sleep(200);
+
+                        this.logger.log("Port ready for new Improv client");
+                      } catch (err: any) {
+                        this.logger.log(`Reset error: ${err.message}`);
+                      }
+                    } else {
+                      this.logger.log(
+                        "WebSerial: Releasing locks for Wi-Fi setup",
+                      );
+                      // For WebSerial, just release locks
+                      await this._releaseReaderWriter();
+                      await sleep(200);
+                    }
 
                     // Re-create Improv client (firmware is running at 115200 baud)
                     const client = new ImprovSerial(this._port, this.logger);
@@ -2755,8 +2776,25 @@ export class EwtInstallDialog extends LitElement {
         await sleep(200);
       }
 
-      // Ensure all locks are released before creating new client
-      await this._releaseReaderWriter();
+      // For WebUSB (Android), do a hardReset to ensure device is ready
+      // For WebSerial (Desktop), just release locks
+      if (this.esploader.isWebUSB && this.esploader.isWebUSB()) {
+        try {
+          this.logger.log("WebUSB: Resetting device for Wi-Fi setup...");
+
+          await this._resetDeviceAndReleaseLocks();
+          await sleep(200);
+
+          this.logger.log("Port ready for new Improv client");
+        } catch (err: any) {
+          this.logger.log(`Reset error: ${err.message}`);
+        }
+      } else {
+        this.logger.log("WebSerial: Releasing locks for Wi-Fi setup");
+        // For WebSerial, just release locks
+        await this._releaseReaderWriter();
+        await sleep(200);
+      }
 
       // Re-create Improv client for Wi-Fi provisioning
       this.logger.log("Re-initializing Improv Serial for Wi-Fi setup");
