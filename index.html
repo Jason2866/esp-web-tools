@@ -129,10 +129,6 @@
         }
       }
     </style>
-    <script
-      type="module"
-      src="https://unpkg.com/@justinribeiro/lite-youtube@1.4.0/lite-youtube.js"
-    ></script>
     <script module>
       import(
         // We import locally for this test repo setup. For use in real scenarios, use with the commented line!
@@ -145,7 +141,7 @@
   </head>
   <body>
     <div class="content">
-      <h1>ESP Web Tools</h1>
+      <h1>ESP Web Tools next generation</h1>
       <p>
         User friendly tools to manage ESP8266 and ESP32 devices in the browser on <strong>Desktop and Android</strong>:
       </p>
@@ -155,19 +151,14 @@
         <li>Visit the device's hosted web interface</li>
         <li>Access logs and send terminal commands</li>
         <li>
-          <strong>🆕 Manage LittleFS filesystems</strong> - Upload, download, and organize files
-        </li>
-        <li>
           Add devices to
           <a href="https://www.home-assistant.io">Home Assistant</a>
         </li>
+        <li>
+          <strong>🆕 Manage LittleFS filesystems</strong> - Upload, download, and organize files
+        </li>
+        <li>Flashing from Android mobile devices</li>
       </ul>
-      <div class="videoWrapper">
-        <lite-youtube
-          videoid="E8bdATqXM8c"
-          videotitle="ESP Web Tools in action"
-        ></lite-youtube>
-      </div>
 
       <h2 id="demo">Try a live demo</h2>
       <p>
@@ -203,12 +194,6 @@
 
       <h2 id="used-by">Products using ESP Web Tools</h2>
       <div class="projects">
-        <a href="https://install.wled.me" target="_blank" class="project">
-          <div class="logo">
-            <img src="static/logos/wled.png" alt="WLED logo" />
-          </div>
-          <div class="name">WLED</div>
-        </a>
         <a
           href="https://arendst.github.io/Tasmota-firmware/"
           target="_blank"
@@ -225,6 +210,12 @@
           </div>
           <div class="name">ESPEasy</div>
         </a>
+        <a href="https://install.wled.me" target="_blank" class="project">
+          <div class="logo">
+            <img src="static/logos/wled.png" alt="WLED logo" />
+          </div>
+          <div class="name">WLED</div>
+        </a>
         <a
           href="https://canair.io/installer.html"
           target="_blank"
@@ -234,12 +225,6 @@
             <img src="static/logos/canairio.png" alt="CanAirIO logo" />
           </div>
           <div class="name">CanAirIO</div>
-        </a>
-        <a href="https://web.esphome.io" target="_blank" class="project">
-          <div class="logo">
-            <img src="static/logos/esphome.svg" alt="ESPHome logo" />
-          </div>
-          <div class="name">ESPHome</div>
         </a>
         <a
           href="https://sle118.github.io/squeezelite-esp32-installer/"
@@ -282,6 +267,12 @@
             />
           </div>
           <div class="name">Luciferin</div>
+        </a>
+        <a href="https://web.esphome.io" target="_blank" class="project">
+          <div class="logo">
+            <img src="static/logos/esphome.svg" alt="ESPHome logo" />
+          </div>
+          <div class="name">ESPHome</div>
         </a>
       </div>
 
