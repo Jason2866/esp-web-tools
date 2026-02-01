@@ -2022,6 +2022,7 @@ export class EwtInstallDialog extends LitElement {
 
           // For WebUSB, ensure streams are recreated after reset
           await this._releaseReaderWriter();
+          await sleep(200); // Wait for streams to be fully ready
           this.logger.log("Streams ready after reset");
         } catch (err: any) {
           this.logger.log(`Reset to firmware failed: ${err.message}`);
@@ -2036,6 +2037,7 @@ export class EwtInstallDialog extends LitElement {
       // For WebUSB, this also recreates streams
       try {
         await this._releaseReaderWriter();
+        await sleep(200); // Wait for streams to be fully ready
         this.logger.log("Port ready for Improv test");
       } catch (err: any) {
         this.logger.log(`Failed to prepare port: ${err.message}`);
@@ -2053,8 +2055,9 @@ export class EwtInstallDialog extends LitElement {
         ? this._manifest.new_install_improv_wait_time * 1000
         : 10000;
 
-    // Call Improv test with timeout and skipReset=true (already in firmware mode)
-    await this._testImprov(timeout, true);
+    // Call Improv test with skipReset=false to ensure device is properly reset
+    // This matches the CDC/USB-JTAG flow where hardReset is done right before Improv test
+    await this._testImprov(timeout, false);
   }
 
   /**
