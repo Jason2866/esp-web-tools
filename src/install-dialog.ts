@@ -2610,7 +2610,7 @@ export class EwtInstallDialog extends LitElement {
 
     // CRITICAL: Set _busy = false to ensure menu is enabled even if something fails
     // This is set early to prevent menu from staying gray if an unexpected error occurs
-    this._busy = false;
+    //    this._busy = false;
 
     // Declare improvSerial outside try block so it's available in catch
     let improvSerial: ImprovSerial | undefined;
@@ -2739,6 +2739,9 @@ export class EwtInstallDialog extends LitElement {
         this.logger.log(`Failed to recreate streams: ${releaseErr.message}`);
       }
     }
+
+    // Disable Menu as long improv check is done
+    this._busy = false;
 
     // Check if user wanted specific action after reconnect
     if (this._openConsoleAfterReconnect) {
