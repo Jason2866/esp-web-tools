@@ -771,7 +771,20 @@ export class EwtInstallDialog extends LitElement {
                       this.requestUpdate(),
                     );
                     try {
-                      this._info = await client.initialize(1000);
+                      // Add extra timeout wrapper to prevent hanging
+                      const initPromise = client.initialize(1000);
+                      const timeoutPromise = new Promise<any>((_, reject) =>
+                        setTimeout(
+                          () =>
+                            reject(new Error("Improv initialization timeout")),
+                          2000,
+                        ),
+                      );
+                      this._info = await Promise.race([
+                        initPromise,
+                        timeoutPromise,
+                      ]);
+
                       this._client = client;
                       client.addEventListener(
                         "disconnect",
@@ -2658,7 +2671,17 @@ export class EwtInstallDialog extends LitElement {
 
       // Don't set _client until we successfully initialize
       this.logger.log("Calling improvSerial.initialize()...");
-      const info = await improvSerial.initialize(timeout);
+
+      // Add extra timeout wrapper to prevent hanging
+      const initPromise = improvSerial.initialize(timeout);
+      const timeoutPromise = new Promise<any>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Improv initialization timeout")),
+          timeout + 1000,
+        ),
+      );
+
+      const info = await Promise.race([initPromise, timeoutPromise]);
 
       // Wait for firmware to complete WiFi scan and connection
       // Poll for valid IP address (not 0.0.0.0) by requesting current state with timeout
@@ -2834,7 +2857,15 @@ export class EwtInstallDialog extends LitElement {
       });
       client.addEventListener("error-changed", () => this.requestUpdate());
       try {
-        this._info = await client.initialize(1000);
+        // Add extra timeout wrapper to prevent hanging
+        const initPromise = client.initialize(1000);
+        const timeoutPromise = new Promise<any>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Improv initialization timeout")),
+            2000,
+          ),
+        );
+        this._info = await Promise.race([initPromise, timeoutPromise]);
         this._client = client;
         client.addEventListener("disconnect", this._handleDisconnect);
         this.logger.log("Improv client ready for Wi-Fi provisioning");
