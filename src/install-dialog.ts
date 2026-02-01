@@ -730,10 +730,15 @@ export class EwtInstallDialog extends LitElement {
                         this.logger.log(
                           "WebUSB: Resetting device for Wi-Fi setup...",
                         );
-
-                        await this._resetDeviceAndReleaseLocks();
+                        // Do hardReset FIRST
+                        await this.esploader.hardReset(false);
                         await sleep(200);
 
+                        // NOW recreate streams AFTER reset
+                        await this._releaseReaderWriter();
+
+                        // Wait for streams to be fully ready
+                        await sleep(200);
                         this.logger.log("Port ready for new Improv client");
                       } catch (err: any) {
                         this.logger.log(`Reset error: ${err.message}`);
@@ -2773,10 +2778,17 @@ export class EwtInstallDialog extends LitElement {
       if (this.esploader.isWebUSB && this.esploader.isWebUSB()) {
         try {
           this.logger.log("WebUSB: Resetting device for Wi-Fi setup...");
+          // Hard reset to ensure device is ready for Wi‑Fi setup.
 
-          await this._resetDeviceAndReleaseLocks();
+          // Do hardReset FIRST
+          await this.esploader.hardReset(false);
           await sleep(200);
 
+          // NOW recreate streams AFTER reset
+          await this._releaseReaderWriter();
+
+          // Wait for streams to be fully ready
+          await sleep(200);
           this.logger.log("Port ready for new Improv client");
         } catch (err: any) {
           this.logger.log(`Reset error: ${err.message}`);
