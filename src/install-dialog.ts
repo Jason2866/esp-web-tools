@@ -726,18 +726,19 @@ export class EwtInstallDialog extends LitElement {
                     if (this._client) {
                       try {
                         await this._closeClientWithoutEvents(this._client);
+                        this.logger.log("Improv client closed");
                       } catch (e) {
                         this.logger.log("Failed to close Improv client:", e);
                       }
                       this._client = undefined;
 
-                      // Wait for port to be ready after closing client
-                      await sleep(200);
+                      // Wait longer for port to be fully released
+                      await sleep(500);
                     }
 
                     // Different handling for different device types:
                     // - WebSerial: Just release locks
-                    // - WebUSB CDC: Do hardReset + release locks
+                    // - WebUSB CDC: Release locks, hardReset, release locks again
                     // - WebUSB external serial: Just release locks
                     const isWebUsbExternal =
                       await this._isWebUsbWithExternalSerial();
@@ -747,20 +748,28 @@ export class EwtInstallDialog extends LitElement {
                       !isWebUsbExternal;
 
                     if (isWebUsbCdc) {
-                      // WebUSB CDC needs hardReset
+                      // WebUSB CDC needs hardReset to ensure firmware is running
                       this.logger.log(
                         "WebUSB CDC: Resetting device for Wi-Fi setup...",
                       );
 
                       try {
+                        // Release locks BEFORE reset
+                        await this._releaseReaderWriter();
+
+                        // Reset device
                         await this.esploader.hardReset(false);
                         this.logger.log("Device reset completed");
+
+                        // CRITICAL: hardReset consumes streams, recreate them
+                        await this._releaseReaderWriter();
+                        this.logger.log("Streams recreated after reset");
+
+                        // Wait for device to boot
+                        await sleep(500);
                       } catch (err: any) {
                         this.logger.log(`Reset error: ${err.message}`);
                       }
-
-                      await this._releaseReaderWriter();
-                      await sleep(200);
                     } else {
                       // WebSerial or WebUSB external serial: Just release locks
                       if (isWebUsbExternal) {
@@ -774,10 +783,18 @@ export class EwtInstallDialog extends LitElement {
                       }
 
                       await this._releaseReaderWriter();
-                      await sleep(200);
+                      await sleep(500);
                     }
 
                     this.logger.log("Port ready for new Improv client");
+
+                    // CRITICAL: Recreate streams one more time to flush any buffered firmware output
+                    // Firmware debug messages can interfere with Improv protocol
+                    this.logger.log(
+                      "Flushing serial buffer before Improv init...",
+                    );
+                    await this._releaseReaderWriter();
+                    await sleep(100);
 
                     // Re-create Improv client (firmware is running at 115200 baud)
                     const client = new ImprovSerial(this._port, this.logger);
@@ -807,6 +824,19 @@ export class EwtInstallDialog extends LitElement {
                           closeErr,
                         );
                       }
+
+                      // CRITICAL: Recreate streams after failed Improv init
+                      try {
+                        await this._releaseReaderWriter();
+                        this.logger.log(
+                          "Streams recreated after Improv failure",
+                        );
+                      } catch (releaseErr: any) {
+                        this.logger.log(
+                          `Failed to recreate streams: ${releaseErr.message}`,
+                        );
+                      }
+
                       this.logger.log(
                         `Improv initialization failed: ${improvErr.message}`,
                       );
@@ -2653,6 +2683,12 @@ export class EwtInstallDialog extends LitElement {
           // Continue anyway
         }
       }
+
+      // CRITICAL: Recreate streams one more time to flush any buffered firmware output
+      // Firmware debug messages can interfere with Improv protocol
+      this.logger.log("Flushing serial buffer before Improv init...");
+      await this._releaseReaderWriter();
+      await sleep(100);
 
       improvSerial = new ImprovSerial(this._port, this.logger);
       improvSerial.addEventListener("state-changed", () => {
