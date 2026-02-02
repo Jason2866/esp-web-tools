@@ -219,6 +219,18 @@ export class EwtInstallDialog extends LitElement {
     return isUsbJtag;
   }
 
+  // Helper to check if device is WebUSB with external serial chip
+  private async _isWebUsbWithExternalSerial(): Promise<boolean> {
+    const isWebUsb = this.esploader.isWebUSB && this.esploader.isWebUSB();
+    if (!isWebUsb) {
+      return false;
+    }
+    const isUsbJtag = await this._isUsbJtagOrOtg();
+    const result = !isUsbJtag; // WebUSB but NOT USB-JTAG = external serial
+    this.logger.log(`WebUSB with external serial: ${result ? "YES" : "NO"}`);
+    return result;
+  }
+
   // Helper to release reader/writer locks (used by multiple methods)
   private async _releaseReaderWriter() {
     // CRITICAL: Find the actual object that has the reader
@@ -723,8 +735,49 @@ export class EwtInstallDialog extends LitElement {
                       await sleep(200);
                     }
 
-                    // Ensure all locks are released before creating new client
-                    await this._releaseReaderWriter();
+                    // Different handling for different device types:
+                    // - WebSerial: Just release locks
+                    // - WebUSB CDC: Do hardReset + release locks
+                    // - WebUSB external serial: Just release locks
+                    const isWebUsbExternal =
+                      await this._isWebUsbWithExternalSerial();
+                    const isWebUsbCdc =
+                      this.esploader.isWebUSB &&
+                      this.esploader.isWebUSB() &&
+                      !isWebUsbExternal;
+
+                    if (isWebUsbCdc) {
+                      // WebUSB CDC needs hardReset
+                      this.logger.log(
+                        "WebUSB CDC: Resetting device for Wi-Fi setup...",
+                      );
+
+                      try {
+                        await this.esploader.hardReset(false);
+                        this.logger.log("Device reset completed");
+                      } catch (err: any) {
+                        this.logger.log(`Reset error: ${err.message}`);
+                      }
+
+                      await this._releaseReaderWriter();
+                      await sleep(200);
+                    } else {
+                      // WebSerial or WebUSB external serial: Just release locks
+                      if (isWebUsbExternal) {
+                        this.logger.log(
+                          "WebUSB external serial: Preparing port for Wi-Fi setup...",
+                        );
+                      } else {
+                        this.logger.log(
+                          "WebSerial: Preparing port for Wi-Fi setup...",
+                        );
+                      }
+
+                      await this._releaseReaderWriter();
+                      await sleep(200);
+                    }
+
+                    this.logger.log("Port ready for new Improv client");
 
                     // Re-create Improv client (firmware is running at 115200 baud)
                     const client = new ImprovSerial(this._port, this.logger);
@@ -735,7 +788,8 @@ export class EwtInstallDialog extends LitElement {
                       this.requestUpdate(),
                     );
                     try {
-                      this._info = await client.initialize(1000);
+                      // Use 10 second timeout to allow device to get IP address
+                      this._info = await client.initialize(10000);
                       this._client = client;
                       client.addEventListener(
                         "disconnect",
@@ -2014,11 +2068,6 @@ export class EwtInstallDialog extends LitElement {
         try {
           await this._resetDeviceAndReleaseLocks();
           await sleep(500); // Wait for firmware to start
-
-          // For WebUSB, ensure streams are recreated after reset
-          await this._releaseReaderWriter();
-          await sleep(200); // Wait for streams to be fully ready
-          this.logger.log("Streams ready after reset");
         } catch (err: any) {
           this.logger.log(`Reset to firmware failed: ${err.message}`);
         }
@@ -2027,16 +2076,16 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log(
         "Device is already in FIRMWARE mode - ready for Improv test",
       );
+    }
 
-      // Ensure locks are released and streams are ready
-      // For WebUSB, this also recreates streams
-      try {
-        await this._releaseReaderWriter();
-        await sleep(200); // Wait for streams to be fully ready
-        this.logger.log("Port ready for Improv test");
-      } catch (err: any) {
-        this.logger.log(`Failed to prepare port: ${err.message}`);
-      }
+    // Ensure streams are ready before Improv test (like Console does)
+    // This is the ONLY place we call _releaseReaderWriter before Improv test
+    try {
+      await this._releaseReaderWriter();
+      await sleep(200);
+      this.logger.log("Streams ready for Improv test");
+    } catch (err: any) {
+      this.logger.log(`Failed to prepare streams: ${err.message}`);
     }
 
     // Don't switch to bootloader on initial connect!
@@ -2051,10 +2100,7 @@ export class EwtInstallDialog extends LitElement {
         ? this._manifest.new_install_improv_wait_time * 1000
         : 10000;
 
-    //    // Call Improv test with skipReset=false to ensure device is properly reset
-    //    // This matches the CDC/USB-JTAG flow where hardReset is done right before Improv test
-    //    await this._testImprov(timeout, false);
-    // Call Improv test with timeout and skipReset=true (already in firmware mode)
+    // Call Improv test with skipReset=true (already reset in _resetDeviceAndReleaseLocks)
     await this._testImprov(timeout, true);
   }
 
@@ -2755,8 +2801,44 @@ export class EwtInstallDialog extends LitElement {
         await sleep(200);
       }
 
-      // Ensure all locks are released before creating new client
-      await this._releaseReaderWriter();
+      // Different handling for different device types:
+      // - WebSerial: Just release locks
+      // - WebUSB CDC: Do hardReset + release locks
+      // - WebUSB external serial: Just release locks
+      const isWebUsbExternal = await this._isWebUsbWithExternalSerial();
+      const isWebUsbCdc =
+        this.esploader.isWebUSB &&
+        this.esploader.isWebUSB() &&
+        !isWebUsbExternal;
+
+      if (isWebUsbCdc) {
+        // WebUSB CDC needs hardReset
+        this.logger.log("WebUSB CDC: Resetting device for Wi-Fi setup...");
+
+        try {
+          await this.esploader.hardReset(false);
+          this.logger.log("Device reset completed");
+        } catch (err: any) {
+          this.logger.log(`Reset error: ${err.message}`);
+        }
+
+        await this._releaseReaderWriter();
+        await sleep(200);
+      } else {
+        // WebSerial or WebUSB external serial: Just release locks
+        if (isWebUsbExternal) {
+          this.logger.log(
+            "WebUSB external serial: Preparing port for Wi-Fi setup...",
+          );
+        } else {
+          this.logger.log("WebSerial: Preparing port for Wi-Fi setup...");
+        }
+
+        await this._releaseReaderWriter();
+        await sleep(200);
+      }
+
+      this.logger.log("Port ready for Wi-Fi setup");
 
       // Re-create Improv client for Wi-Fi provisioning
       this.logger.log("Re-initializing Improv Serial for Wi-Fi setup");
@@ -2766,7 +2848,8 @@ export class EwtInstallDialog extends LitElement {
       });
       client.addEventListener("error-changed", () => this.requestUpdate());
       try {
-        this._info = await client.initialize(1000);
+        // Use 10 second timeout to allow device to get IP address
+        this._info = await client.initialize(10000);
         this._client = client;
         client.addEventListener("disconnect", this._handleDisconnect);
         this.logger.log("Improv client ready for Wi-Fi provisioning");
