@@ -2876,6 +2876,12 @@ export class EwtInstallDialog extends LitElement {
 
       this.logger.log("Port ready for Wi-Fi setup");
 
+      // CRITICAL: Recreate streams one more time to flush any buffered firmware output
+      // Firmware debug messages can interfere with Improv protocol
+      this.logger.log("Flushing serial buffer before Improv init...");
+      await this._releaseReaderWriter();
+      await sleep(100);
+
       // Re-create Improv client for Wi-Fi provisioning
       this.logger.log("Re-initializing Improv Serial for Wi-Fi setup");
       const client = new ImprovSerial(this._port, this.logger);
