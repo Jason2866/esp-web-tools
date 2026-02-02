@@ -141,4 +141,4 @@ Available baud rates: `230400`, `460800`, `921600`, `1500000`, `2000000`
 
 ## Development
 
-Run `script/develop`. This starts a server. Open it on http://localhost:5001.
+Run `script/develop`. This starts a server. Open it on http://localhost:5004.
