@@ -139,8 +139,6 @@ You can customize the baud rate using the `baud-rate` attribute:
 
 Available baud rates: `230400`, `460800`, `921600`, `1500000`, `2000000`
 
-**Note**: Higher baud rates work with all modern ESP chips except ESP8266.
-
 ## Development
 
 Run `script/develop`. This starts a server. Open it on http://localhost:5001.
