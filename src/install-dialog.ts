@@ -1989,6 +1989,46 @@ export class EwtInstallDialog extends LitElement {
     const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
     this._isUsbJtagOrOtgDevice = isUsbJtagOrOtg; // Update state for UI
 
+    // For WebUSB with external serial, ensure we're in firmware mode before Improv test
+    const isWebUsbExternal = await this._isWebUsbWithExternalSerial();
+    if (isWebUsbExternal) {
+      this.logger.log(
+        "WebUSB external serial: Ensuring device is in firmware mode...",
+      );
+
+      // Check if in bootloader mode
+      const inBootloaderMode = this.esploader.chipFamily !== null;
+
+      if (inBootloaderMode) {
+        this.logger.log("Device in bootloader - switching to firmware mode");
+        try {
+          await this._resetDeviceAndReleaseLocks();
+          await sleep(500);
+          this.logger.log("Device now in firmware mode");
+        } catch (err: any) {
+          this.logger.log(`Failed to switch to firmware: ${err.message}`);
+        }
+      } else {
+        this.logger.log("Device already in firmware mode");
+      }
+
+      // Ensure streams are ready
+      await this._releaseReaderWriter();
+      await sleep(200);
+      this.logger.log("Streams ready for Improv test");
+
+      // Calculate timeout and test Improv
+      const timeout = !justInstalled
+        ? 10000
+        : this._manifest.new_install_improv_wait_time !== undefined
+          ? this._manifest.new_install_improv_wait_time * 1000
+          : 10000;
+
+      await this._testImprov(timeout, true);
+      return;
+    }
+
+    // For other device types, continue with normal flow
     // Check if device is in bootloader mode
     // If yes, switch to firmware mode first (needed for Improv)
     const inBootloaderMode = this.esploader.chipFamily !== null;
