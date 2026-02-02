@@ -129,10 +129,10 @@ You can customize the baud rate using the `baud-rate` attribute:
   <button slot="activate">Install</button>
 </esp-web-install-button>
 
-<!-- Safe: 921600 baud (~8x faster, works with older USB-Serial chips) -->
+<!-- Safe: 460800 baud (~4x faster, works with older USB-Serial chips like CH340) -->
 <esp-web-install-button 
   manifest="manifest.json"
-  baud-rate="921600">
+  baud-rate="460800">
   <button slot="activate">Install</button>
 </esp-web-install-button>
 ```
