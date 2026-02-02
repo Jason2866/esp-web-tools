@@ -2815,14 +2815,6 @@ export class EwtInstallDialog extends LitElement {
         // WebUSB CDC needs hardReset
         this.logger.log("WebUSB CDC: Resetting device for Wi-Fi setup...");
 
-        //        // Restore chipFamily if needed
-        //        if (
-        //          this.esploader.chipFamily === null &&
-        //          this._savedChipFamily !== null
-        //        ) {
-        //          this.esploader.chipFamily = this._savedChipFamily;
-        //        }
-
         try {
           await this.esploader.hardReset(false);
           this.logger.log("Device reset completed");
