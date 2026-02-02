@@ -788,7 +788,8 @@ export class EwtInstallDialog extends LitElement {
                       this.requestUpdate(),
                     );
                     try {
-                      this._info = await client.initialize(1000);
+                      // Use 10 second timeout to allow device to get IP address
+                      this._info = await client.initialize(10000);
                       this._client = client;
                       client.addEventListener(
                         "disconnect",
@@ -2855,7 +2856,8 @@ export class EwtInstallDialog extends LitElement {
       });
       client.addEventListener("error-changed", () => this.requestUpdate());
       try {
-        this._info = await client.initialize(1000);
+        // Use 10 second timeout to allow device to get IP address
+        this._info = await client.initialize(10000);
         this._client = client;
         client.addEventListener("disconnect", this._handleDisconnect);
         this.logger.log("Improv client ready for Wi-Fi provisioning");
