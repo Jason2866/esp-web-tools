@@ -95,9 +95,6 @@ export class EwtInstallDialog extends LitElement {
   // Track if Improv was already checked (to avoid repeated attempts)
   private _improvChecked = false;
 
-  // Track if console was already opened once (to avoid repeated resets)
-  private _consoleInitialized = false;
-
   // Track if Improv is supported (separate from active client)
   private _improvSupported = false;
 
@@ -290,22 +287,6 @@ export class EwtInstallDialog extends LitElement {
   // Helper to reset baudrate to 115200 for console
   // The ESP stub might be at higher baudrate (e.g., 460800) for flashing
   // Firmware console always runs at 115200
-  private async _resetBaudrateForConsole() {
-    if (this._espStub && this._espStub.currentBaudRate !== 115200) {
-      this.logger.log(
-        `Resetting baudrate from ${this._espStub.currentBaudRate} to 115200`,
-      );
-      try {
-        // Use setBaudrate from tasmota-webserial-esptool
-        // This now supports CDC/JTAG baudrate changes on Android (WebUSB)
-        await this._espStub.setBaudrate(115200);
-        this.logger.log("Baudrate set to 115200 for console");
-      } catch (baudErr: any) {
-        this.logger.log(`Failed to set baudrate to 115200: ${baudErr.message}`);
-      }
-    }
-  }
-
   // Helper to prepare ESP for flash operations after Improv check
   // Resets to bootloader mode and loads stub
   private async _prepareForFlashOperations() {
@@ -872,18 +853,91 @@ export class EwtInstallDialog extends LitElement {
                       }
                     }
 
-                    // Switch to firmware mode if needed
-                    const needsReconnect =
-                      await this._switchToFirmwareMode("console");
-                    if (needsReconnect) {
-                      return; // Will continue after port reconnection
+                    // IMPLEMENTATION FROM esp32tool:
+                    // We are in BOOTLOADER mode, need to switch to FIRMWARE mode
+                    // The button click IS the user gesture!
+                    // 1. Release reader/writer locks
+                    // 2. Use enterConsoleMode() which does watchdog reset
+                    // 3. Port will be closed and device re-enumerates
+                    // 4. Request NEW port immediately (we have user gesture!)
+                    // 5. Open new port at 115200 baud for console
+
+                    this.logger.log("Entering console mode for USB-JTAG/OTG device...");
+
+                    try {
+                      // CRITICAL: Release locks BEFORE enterConsoleMode
+                      this.logger.log("Releasing reader/writer locks...");
+                      await this._releaseReaderWriter();
+                      
+                      // Call enterConsoleMode() - returns true if port was closed
+                      const portWasClosed = await this.esploader.enterConsoleMode();
+
+                      if (portWasClosed) {
+                        // USB-JTAG/OTG: Port was closed after watchdog reset
+                        this.logger.log("Device reset to firmware mode (port closed)");
+
+                        // Clear old port references
+                        this.esploader.port = null;
+                        this.esploader.connected = false;
+
+                        // Wait for device to boot and USB to enumerate
+                        const isWebUSB = this.esploader.isWebUSB && this.esploader.isWebUSB();
+                        const waitTime = isWebUSB ? 1000 : 500;
+                        this.logger.log(`Waiting ${waitTime}ms for USB enumeration...`);
+                        await sleep(waitTime);
+
+                        // NOW request new port - we still have the user gesture from button click!
+                        this.logger.log("Requesting new port for console...");
+                        
+                        let newPort: SerialPort;
+                        if (isWebUSB) {
+                          // WebUSB
+                          const WebUSBSerial = (globalThis as any).WebUSBSerial;
+                          if (!WebUSBSerial) {
+                            throw new Error("WebUSBSerial not available");
+                          }
+                          newPort = await WebUSBSerial.requestPort(this.logger);
+                        } else {
+                          // Web Serial
+                          newPort = await navigator.serial.requestPort();
+                        }
+
+                        this.logger.log("New port selected, opening at 115200 baud...");
+
+                        // Open port at 115200 baud (firmware default)
+                        await newPort.open({ baudRate: 115200 });
+                        
+                        // Update port references
+                        this.esploader.port = newPort;
+                        this.esploader.connected = true;
+                        
+                        if (this.esploader._parent) {
+                          this.esploader._parent.port = newPort;
+                        }
+
+                        this.logger.log("Port opened successfully for console");
+
+                        // Release locks and prepare for console
+                        await this._releaseReaderWriter();
+                        await sleep(200);
+
+                        // Open console
+                        this._state = "LOGS";
+                        this._busy = false;
+                        return;
+                      } else {
+                        // External serial chip: Port stays open (shouldn't happen for USB-JTAG)
+                        this.logger.log("Device reset to firmware mode (port open)");
+                      }
+                    } catch (err: any) {
+                      this.logger.error(`Failed to enter console mode: ${err.message}`);
+                      this._error = `Failed to enter console mode: ${err.message}`;
+                      this._state = "ERROR";
+                      this._busy = false;
+                      return;
                     }
 
-                    // Device is already in firmware mode
-                    this.logger.log(
-                      "Opening console for USB-JTAG/OTG device (in firmware mode)",
-                    );
-
+                    // Open console
                     this._state = "LOGS";
                     this._busy = false;
                   }}
@@ -1048,17 +1102,11 @@ export class EwtInstallDialog extends LitElement {
                       }
                     }
 
-                    // Switch to firmware mode if needed
-                    const needsReconnect =
-                      await this._switchToFirmwareMode("console");
+                    // Switch to firmware mode for console
+                    const needsReconnect = await this._switchToFirmwareMode("console");
                     if (needsReconnect) {
                       return; // Will continue after port reconnection
                     }
-
-                    // Device is already in firmware mode
-                    this.logger.log(
-                      "Opening console for USB-JTAG/OTG device (in firmware mode)",
-                    );
 
                     this._state = "LOGS";
                     this._busy = false;
@@ -2136,8 +2184,9 @@ export class EwtInstallDialog extends LitElement {
 
   /**
    * Switch device from bootloader mode to firmware mode.
-   * For USB-JTAG/OTG devices: Requires port reconnection (sets REQUEST_PORT_SELECTION state).
-   * For external serial: Resets device without port change.
+   * Uses esp32tool flow with enterConsoleMode() for USB-JTAG/OTG devices.
+   * For USB-JTAG/OTG: Sets REQUEST_PORT_SELECTION state and returns true.
+   * For external serial: Resets device without port change and returns false.
    *
    * @param actionAfterReconnect - Action to perform after reconnect: 'console', 'visit', 'homeassistant', 'wifi', or null
    */
@@ -2154,18 +2203,6 @@ export class EwtInstallDialog extends LitElement {
     if (!inBootloaderMode) {
       this.logger.log("Device already in firmware mode");
 
-      // If opening console for the FIRST time, do a reset to ensure device is ready
-      if (actionAfterReconnect === "console" && !this._consoleInitialized) {
-        this.logger.log("First console open - resetting device...");
-        this._consoleInitialized = true;
-        try {
-          await this.esploader.hardReset(false);
-          this.logger.log("Device reset completed");
-        } catch (err: any) {
-          this.logger.log(`Reset error (expected): ${err.message}`);
-        }
-      }
-
       // Even if already in firmware mode, ensure streams are ready
       // This is needed for WebUSB after closing Improv client
       await this._releaseReaderWriter();
@@ -2177,117 +2214,75 @@ export class EwtInstallDialog extends LitElement {
       `Device is in bootloader mode - switching to firmware for ${actionAfterReconnect || "operation"}`,
     );
 
-    // CRITICAL: Ensure chipFamily is set
-    if (!this.esploader.chipFamily) {
-      this.logger.log("Detecting chip type...");
-      await this.esploader.initialize();
-      this.logger.log(`Chip detected: ${this.esploader.chipFamily}`);
-    }
-
-    // CRITICAL: Create stub before reset
-    if (!this._espStub) {
-      this.logger.log("Creating stub for firmware mode switch...");
-      this._espStub = await this.esploader.runStub();
-      this.logger.log(`Stub created: IS_STUB=${this._espStub.IS_STUB}`);
-    }
-
-    // CRITICAL: Set baudrate to 115200 BEFORE switching
-    await this._resetBaudrateForConsole();
-
-    // CRITICAL: Save parent loader
-    const loaderToSave = this._espStub._parent || this._espStub;
-    (this as any)._savedLoaderBeforeSwitch = loaderToSave;
-
-    // Check if USB-JTAG/OTG device
-    const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
-
-    if (isUsbJtagOrOtg) {
-      // USB-JTAG/OTG: Need WDT reset and port reconnection
-
-      // CRITICAL: Release locks BEFORE calling resetToFirmware()
-      this.logger.log("Releasing reader/writer...");
+    try {
+      // CRITICAL: Release locks BEFORE enterConsoleMode
+      this.logger.log("Releasing reader/writer locks...");
       await this._releaseReaderWriter();
+      
+      // Call enterConsoleMode() - uses watchdog reset for USB-JTAG/OTG
+      const portWasClosed = await this.esploader.enterConsoleMode();
 
-      try {
-        // CRITICAL: Forget the old port
-        try {
-          await this._port.forget();
-          this.logger.log("Old port forgotten");
-        } catch (forgetErr: any) {
-          this.logger.log(`Port forget failed: ${forgetErr.message}`);
+      if (portWasClosed) {
+        // USB-JTAG/OTG: Port was closed after watchdog reset
+        this.logger.log("Device reset to firmware mode (port closed)");
+        
+        // Clear old port references
+        this.esploader.port = null;
+        this.esploader.connected = false;
+
+        // Reset ESP state
+        this._espStub = undefined;
+        this.esploader.IS_STUB = false;
+        this.esploader.chipFamily = null;
+        this._improvChecked = false;
+        this._client = null;
+        this._improvSupported = false;
+        this.esploader._reader = undefined;
+
+        // Wait for USB enumeration
+        const isWebUSB = this.esploader.isWebUSB && this.esploader.isWebUSB();
+        const waitTime = isWebUSB ? 1000 : 500;
+        this.logger.log(`Waiting ${waitTime}ms for USB enumeration...`);
+        await sleep(waitTime);
+
+        // Set flag for action after reconnect
+        if (actionAfterReconnect === "console") {
+          this._openConsoleAfterReconnect = true;
+        } else if (actionAfterReconnect === "visit") {
+          this._visitDeviceAfterReconnect = true;
+        } else if (actionAfterReconnect === "homeassistant") {
+          this._addToHAAfterReconnect = true;
+        } else if (actionAfterReconnect === "wifi") {
+          this._changeWiFiAfterReconnect = true;
         }
 
-        // Use resetToFirmware() for CDC this is doing a WDT reset
-        await this.esploader.resetToFirmware();
-        this.logger.log("Device reset to firmware mode - port closed");
-      } catch (err: any) {
-        this.logger.debug(`Reset to firmware error (expected): ${err.message}`);
+        this.logger.log("Waiting for user to select new port");
+
+        // Show port selection UI - user gesture required for requestPort()
+        this._state = "REQUEST_PORT_SELECTION";
+        this._error = "";
+        this._busy = false;
+        return true; // Port reconnection needed
+      } else {
+        // External serial chip: Port stays open
+        this.logger.log("Device reset to firmware mode (port open)");
+
+        // Reset ESP state
+        this._espStub = undefined;
+        this.esploader.IS_STUB = false;
+        this.esploader.chipFamily = null;
+
+        // Ensure streams are ready
+        await this._releaseReaderWriter();
+
+        return false; // No port reconnection needed
       }
-
-      // Reset ESP state
-      await sleep(100);
-
-      this._espStub = undefined;
-      this.esploader.IS_STUB = false;
-      this.esploader.chipFamily = null;
-      this._improvChecked = false;
-      this._client = null;
-      this._improvSupported = false;
-      this.esploader._reader = undefined;
-
-      // Set flag for action after reconnect
-      if (actionAfterReconnect === "console") {
-        this._openConsoleAfterReconnect = true;
-      } else if (actionAfterReconnect === "visit") {
-        this._visitDeviceAfterReconnect = true;
-      } else if (actionAfterReconnect === "homeassistant") {
-        this._addToHAAfterReconnect = true;
-      } else if (actionAfterReconnect === "wifi") {
-        this._changeWiFiAfterReconnect = true;
-      }
-
-      this.logger.log("Waiting for user to select new port");
-
-      // Show port selection UI
-      this._state = "REQUEST_PORT_SELECTION";
-      this._error = "";
+    } catch (err: any) {
+      this.logger.error(`Failed to switch to firmware mode: ${err.message}`);
+      this._error = `Failed to switch to firmware mode: ${err.message}`;
+      this._state = "ERROR";
       this._busy = false;
-      return true; // Port reconnection needed
-    } else {
-      // External serial chip: Can reset to firmware without port change
-      this.logger.log("External serial chip - resetting to firmware mode");
-
-      try {
-        // CRITICAL: Call hardReset BEFORE releasing locks (so it can communicate)
-        await this.esploader.hardReset(false); // false = firmware mode
-        this.logger.log("Device reset to firmware mode");
-      } catch (err: any) {
-        this.logger.log(
-          `Reset worked. Expected slip Timeout read error: ${err.message}`,
-        );
-      }
-
-      // Wait for reset to complete
-      await sleep(500);
-
-      // NOW release locks AFTER reset
-      this.logger.log("Releasing reader/writer after reset...");
-      await this._releaseReaderWriter();
-
-      // Reset ESP state
-      this._espStub = undefined;
-      this.esploader.IS_STUB = false;
-      this.esploader.chipFamily = null;
-
-      try {
-        // Do a hardReset to start firmware
-        await this.esploader.hardReset(false); // false = firmware mode
-        this.logger.log("Device in firmware mode, start firmware with reset");
-      } catch (err: any) {
-        this.logger.log(`Reset error: ${err.message}`);
-      }
-
-      return false; // No port reconnection needed
+      throw err;
     }
   }
 
@@ -2528,22 +2523,62 @@ export class EwtInstallDialog extends LitElement {
     }
 
     // Open port at 115200 baud (firmware mode default)
-    // Port should be closed by resetToFirmware(), but check first
     this.logger.log("Opening port at 115200 baud for firmware mode...");
     this.logger.log(
       `Dialog in DOM before opening port: ${this.parentNode ? "yes" : "no"}`,
     );
+    this.logger.log(
+      `Port state: readable=${newPort.readable !== null}, writable=${newPort.writable !== null}, readable.locked=${newPort.readable?.locked}, writable.locked=${newPort.writable?.locked}`,
+    );
 
-    // Check if port is already open (shouldn't be, but just in case)
-    if (newPort.readable !== null || newPort.writable !== null) {
-      this.logger.log("WARNING: Port appears to be open, closing it first...");
+    // After enterConsoleMode() and USB re-enumeration, the port should be completely fresh
+    // If it appears open or locked, it means we got the OLD port object somehow
+    // In that case, we need to close it properly first
+    
+    // CRITICAL: If port has locks, release them first
+    if (newPort.readable?.locked || newPort.writable?.locked) {
+      this.logger.log("ERROR: New port has locks! This shouldn't happen after USB reset.");
+      this.logger.log("Attempting to release locks...");
+      
+      // The port object might be stale - try to close it completely
+      try {
+        // Force close by releasing any streams
+        if (newPort.readable?.locked) {
+          const reader = newPort.readable.getReader();
+          reader.releaseLock();
+          this.logger.log("Released readable lock");
+        }
+      } catch (e: any) {
+        this.logger.log(`Failed to release readable: ${e.message}`);
+      }
+      
+      try {
+        if (newPort.writable?.locked) {
+          const writer = newPort.writable.getWriter();
+          writer.releaseLock();
+          this.logger.log("Released writable lock");
+        }
+      } catch (e: any) {
+        this.logger.log(`Failed to release writable: ${e.message}`);
+      }
+      
+      // Now try to close the port
       try {
         await newPort.close();
-        await sleep(200); // Wait for port to fully close
+        await sleep(200);
+        this.logger.log("Port closed after releasing locks");
+      } catch (closeErr: any) {
+        this.logger.log(`Port close failed: ${closeErr.message}`);
+      }
+    } else if (newPort.readable !== null || newPort.writable !== null) {
+      // Port is open but not locked - just close it
+      this.logger.log("Port is open but not locked, closing...");
+      try {
+        await newPort.close();
+        await sleep(200);
         this.logger.log("Port closed successfully");
       } catch (closeErr: any) {
         this.logger.log(`Port close failed: ${closeErr.message}`);
-        // Continue anyway - maybe it wasn't really open
       }
     }
 
@@ -2621,6 +2656,27 @@ export class EwtInstallDialog extends LitElement {
     }
 
     this.logger.log("Device should be ready now");
+
+    // Check if we need to perform a specific action after reconnect
+    if (this._openConsoleAfterReconnect) {
+      this.logger.log("Opening console after reconnect...");
+      this._openConsoleAfterReconnect = false;
+      this._busy = false;
+      this._state = "LOGS";
+      return;
+    } else if (this._visitDeviceAfterReconnect) {
+      this.logger.log("Visiting device after reconnect...");
+      this._visitDeviceAfterReconnect = false;
+      // Visit device logic will happen after Improv test
+    } else if (this._addToHAAfterReconnect) {
+      this.logger.log("Adding to Home Assistant after reconnect...");
+      this._addToHAAfterReconnect = false;
+      // Add to HA logic will happen after Improv test
+    } else if (this._changeWiFiAfterReconnect) {
+      this.logger.log("Changing WiFi after reconnect...");
+      this._changeWiFiAfterReconnect = false;
+      // WiFi change will happen after Improv test
+    }
 
     // Now test Improv at 115200 baud
     this.logger.log("Testing Improv at 115200 baud...");
