@@ -314,6 +314,23 @@ export class EwtInstallDialog extends LitElement {
   // Helper to prepare ESP for flash operations after Improv check
   // Resets to bootloader mode and loads stub
   private async _prepareForFlashOperations(): Promise<boolean> {
+    // Check if device is already in bootloader mode
+    const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
+    const alreadyInBootloader = this.esploader.chipFamily !== null;
+    
+    if (alreadyInBootloader && isUsbJtagOrOtg) {
+      // CDC/JTAG device already in bootloader mode - no need to reset
+      this.logger.log(
+        "CDC/JTAG device already in bootloader mode - skipping reset",
+      );
+      
+      // Ensure stub is initialized
+      await this._ensureStub();
+      
+      this.logger.log("Stub loaded - ready for flash operations");
+      return true; // Ready for flash operations
+    }
+    
     // Reset ESP to BOOTLOADER mode for flash operations
     const resetSuccess = await this._resetToBootloaderAndReleaseLocks();
 
@@ -1373,8 +1390,19 @@ export class EwtInstallDialog extends LitElement {
     let content: TemplateResult;
     let hideActions = true;
     let allowClosing = true;
+    
+    const isInBootloaderMode = this.esploader.chipFamily !== null;
+    const deviceModeMessage = isInBootloaderMode 
+      ? "Device is in bootloader mode - ready for flash operations"
+      : "Device connected";
 
     content = html`
+      <div class="dashboard-info">
+        <p>${deviceModeMessage}</p>
+        ${isInBootloaderMode && this._isUsbJtagOrOtgDevice
+          ? html`<p class="info-note">CDC/JTAG device will stay in bootloader mode until manually switched</p>`
+          : ""}
+      </div>
       <div class="dashboard-buttons">
         <div>
           <ewt-button
@@ -2424,76 +2452,30 @@ export class EwtInstallDialog extends LitElement {
     );
 
     if (inBootloaderMode) {
-      this.logger.log(
-        "Device is in BOOTLOADER mode - switching to FIRMWARE mode for Improv test",
-      );
-
       if (isUsbJtagOrOtg) {
-        // USB-JTAG/OTG: Need WDT reset → port closes → user must select new port
+        // CDC/JTAG device in bootloader mode - DO NOT switch automatically
+        // Keep device in bootloader mode, skip Improv test
         this.logger.log(
-          "USB-JTAG/OTG device - need to switch to firmware mode",
+          "CDC/JTAG device is in BOOTLOADER mode - keeping current mode (no automatic switch)",
         );
-
-        try {
-          // CRITICAL: Ensure chipFamily is set before calling resetToFirmware()
-          if (!this.esploader.chipFamily) {
-            this.logger.log("Detecting chip type...");
-            await this.esploader.initialize();
-            this.logger.log(`Chip detected: ${this.esploader.chipFamily}`);
-          }
-
-          // CRITICAL: Create stub before reset
-          if (!this._espStub) {
-            this.logger.log("Creating stub for firmware mode switch...");
-            this._espStub = await this.esploader.runStub();
-            this.logger.log(`Stub created: IS_STUB=${this._espStub.IS_STUB}`);
-          }
-
-          // CRITICAL: Save parent loader
-          const loaderToSave = this._espStub._parent || this._espStub;
-          (this as any)._savedLoaderBeforeConsole = loaderToSave;
-
-          // CRITICAL: Release locks BEFORE calling resetToFirmware()
-          await this._releaseReaderWriter();
-
-          // CRITICAL: Forget the old port so browser doesn't show it in selection
-          try {
-            await this._port.forget();
-            this.logger.log("Old port forgotten");
-          } catch (forgetErr: any) {
-            this.logger.log(`Port forget failed: ${forgetErr.message}`);
-          }
-
-          // Use resetToFirmware() which handles WDT reset and port close
-          await this.esploader.resetToFirmware();
-          this.logger.log("Device reset to firmware mode - port closed");
-        } catch (err: any) {
-          this.logger.debug(
-            `Reset to firmware error (expected): ${err.message}`,
-          );
-        }
-
-        // Reset ESP state (port is already closed by resetToFirmware)
-        await sleep(100);
-
-        this._espStub = undefined;
-        this.esploader.IS_STUB = false;
-        this.esploader.chipFamily = null;
-        this._improvChecked = false; // Will check after user reconnects
-        this._client = undefined;
+        this.logger.log(
+          "Improv test skipped (requires firmware mode). Device ready for flash operations.",
+        );
+        
+        // Mark Improv as checked (but not supported in bootloader mode)
+        this._improvChecked = true;
         this._improvSupported = false;
-        this.esploader._reader = undefined;
-
-        this.logger.log("Waiting for user to select new port");
-
-        // Show port selection UI
-        this._state = "REQUEST_PORT_SELECTION";
-        this._error = "";
+        this._client = null;
+        
+        // Device is ready for flash operations (already in bootloader mode)
         this._busy = false;
+        this.requestUpdate();
         return;
       } else {
-        // External serial chip: Can reset to firmware without port change
-        this.logger.log("External serial chip - resetting to firmware mode");
+        // External serial chip in bootloader mode - switch to firmware mode for Improv
+        this.logger.log(
+          "External serial chip is in BOOTLOADER mode - switching to FIRMWARE mode for Improv test",
+        );
 
         try {
           await this._resetDeviceAndReleaseLocks();
