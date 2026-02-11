@@ -98,6 +98,11 @@ export class EwtInstallDialog extends LitElement {
   // Track if console was already opened once (to avoid repeated resets)
   private _consoleInitialized = false;
 
+  // Track target mode after port reconnection for USB-JTAG/OTG devices
+  // When port disconnects during reset, we need to know what mode to enter after user selects new port
+  private _targetModeAfterPortReconnection: "bootloader" | "firmware" | null =
+    null;
+
   // Track if Improv is supported (separate from active client)
   private _improvSupported = false;
 
@@ -308,9 +313,18 @@ export class EwtInstallDialog extends LitElement {
 
   // Helper to prepare ESP for flash operations after Improv check
   // Resets to bootloader mode and loads stub
-  private async _prepareForFlashOperations() {
+  private async _prepareForFlashOperations(): Promise<boolean> {
     // Reset ESP to BOOTLOADER mode for flash operations
-    await this._resetToBootloaderAndReleaseLocks();
+    const resetSuccess = await this._resetToBootloaderAndReleaseLocks();
+
+    // If reset returns false, it means we need port reconnection (USB-JTAG/OTG case)
+    // The state has already been set to REQUEST_PORT_SELECTION
+    if (!resetSuccess) {
+      this.logger.log(
+        "USB-JTAG/OTG device needs port reconnection - waiting for user to select new port",
+      );
+      return false; // Not ready for flash operations, need port reconnection
+    }
 
     // Wait for ESP to enter bootloader mode
     await sleep(100);
@@ -323,6 +337,7 @@ export class EwtInstallDialog extends LitElement {
     await this._ensureStub();
 
     this.logger.log("ESP reset, stub loaded - ready for flash operations");
+    return true; // Ready for flash operations
   }
 
   // Helper to handle post-flash cleanup and Improv re-initialization
@@ -660,7 +675,9 @@ export class EwtInstallDialog extends LitElement {
 
   // Reset device to BOOTLOADER mode (for flashing)
   // Uses ESPLoader's reconnectToBootloader() to properly close/reopen port
-  private async _resetToBootloaderAndReleaseLocks() {
+  private async _resetToBootloaderAndReleaseLocks(
+    maxRetries: number = 2,
+  ): Promise<boolean> {
     // Use ESPLoader's reconnectToBootloader() - it handles:
     // - Closing port completely (releases all locks)
     // - Reopening port at 115200 baud
@@ -668,25 +685,85 @@ export class EwtInstallDialog extends LitElement {
     // - Reset strategies to enter bootloader (connectWithResetStrategies)
     // - Chip detection
     // - WebUSB vs WebSerial detection and appropriate reset methods
-    try {
-      this.logger.log("Resetting ESP to bootloader mode...");
-      await this.esploader.reconnectToBootloader();
-      this.logger.log(
-        `ESP in bootloader mode: ${getChipFamilyName(this.esploader)}`,
-      );
-    } catch (err: any) {
-      this.logger.error(`Failed to reset ESP to bootloader: ${err.message}`);
-      throw err;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        this.logger.log(
+          `Resetting ESP to bootloader mode (attempt ${attempt}/${maxRetries})...`,
+        );
+        await this.esploader.reconnectToBootloader();
+        this.logger.log(
+          `ESP in bootloader mode: ${getChipFamilyName(this.esploader)}`,
+        );
+
+        // Reset stub state (chipFamily is preserved by reconnectToBootloader)
+        this._espStub = undefined;
+        this.esploader.IS_STUB = false;
+
+        // Sync internal state
+        this.esploader.chipFamily = this.esploader.chipFamily || "detected";
+        this.esploader.IS_STUB = false;
+        this._espStub = undefined;
+
+        return true; // Success
+      } catch (err: any) {
+        // Special handling for ESP32-S2 Native USB and other USB-JTAG/OTG devices
+        // Sometimes reconnectToBootloader() fails with "Failed to execute 'setSignals' on 'SerialPort'"
+        // This happens when the port disconnects during reset - which is EXPECTED for USB-JTAG/OTG!
+        const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
+        if (isUsbJtagOrOtg && err.message.includes("setSignals")) {
+          this.logger.log(
+            "USB-JTAG/OTG device - port disconnected during reset (expected)",
+          );
+          this.logger.log(
+            "Device has reset and port changed. Need user to select new port.",
+          );
+
+          // For USB-JTAG/OTG, when resetting to bootloader mode:
+          // 1. Device resets
+          // 2. Port disconnects (setSignals fails)
+          // 3. User needs to select new port
+          // 4. Then we can continue with bootloader mode
+
+          // Reset ESP state
+          this._espStub = undefined;
+          this.esploader.IS_STUB = false;
+          this.esploader.chipFamily = null;
+          this._improvChecked = false;
+          this._client = null;
+          this._improvSupported = false;
+
+          // Show port selection UI
+          this._state = "REQUEST_PORT_SELECTION";
+          this._error = "";
+          this._busy = false;
+
+          // Track that we're trying to enter bootloader mode after port reconnection
+          this._targetModeAfterPortReconnection = "bootloader";
+
+          return false; // Not an error, just need port reconnection
+        }
+
+        // For non-USB-JTAG/OTG devices, retry if not last attempt
+        if (attempt < maxRetries) {
+          this.logger.log(
+            `Failed to reset ESP to bootloader (attempt ${attempt}): ${err.message}`,
+          );
+          this.logger.log(`Retrying in 500ms...`);
+          await sleep(500);
+          continue;
+        }
+
+        // Last attempt failed
+        this.logger.error(
+          `Failed to reset ESP to bootloader after ${maxRetries} attempts: ${err.message}`,
+        );
+        throw err; // Re-throw for caller to handle
+      }
     }
 
-    // Reset stub state (chipFamily is preserved by reconnectToBootloader)
-    this._espStub = undefined;
-    this.esploader.IS_STUB = false;
-
-    // Sync internal state
-    this.esploader.chipFamily = this.esploader.chipFamily || "detected";
-    this.esploader.IS_STUB = false;
-    this._espStub = undefined;
+    // Should never reach here (return or throw happens in loop)
+    return false;
   }
 
   protected render() {
@@ -1150,7 +1227,11 @@ export class EwtInstallDialog extends LitElement {
               );
 
               try {
-                await this._prepareForFlashOperations();
+                const ready = await this._prepareForFlashOperations();
+                if (!ready) {
+                  // USB-JTAG/OTG needs port reconnection, state already set to REQUEST_PORT_SELECTION
+                  return;
+                }
                 await this._ensureStub();
               } catch (err: any) {
                 this.logger.log(
@@ -1307,7 +1388,11 @@ export class EwtInstallDialog extends LitElement {
               );
 
               try {
-                await this._prepareForFlashOperations();
+                const ready = await this._prepareForFlashOperations();
+                if (!ready) {
+                  // USB-JTAG/OTG needs port reconnection, state already set to REQUEST_PORT_SELECTION
+                  return;
+                }
                 await this._ensureStub();
               } catch (err: any) {
                 this.logger.log(
@@ -2537,6 +2622,10 @@ export class EwtInstallDialog extends LitElement {
     this._state = "REQUEST_PORT_SELECTION";
     this._error = "";
     this._busy = false;
+
+    // Track that we're trying to enter firmware mode after port reconnection
+    this._targetModeAfterPortReconnection = "firmware";
+
     return true; // Port reconnection needed
   }
 
@@ -2645,7 +2734,11 @@ export class EwtInstallDialog extends LitElement {
     );
 
     try {
-      await this._prepareForFlashOperations();
+      const ready = await this._prepareForFlashOperations();
+      if (!ready) {
+        // USB-JTAG/OTG needs port reconnection, state already set to REQUEST_PORT_SELECTION
+        return;
+      }
     } catch (err: any) {
       this.logger.log(`Failed to prepare for flash: ${err.message}`);
       this._state = "ERROR";
@@ -2859,9 +2952,20 @@ export class EwtInstallDialog extends LitElement {
       return;
     }
 
-    // Open port at 115200 baud (firmware mode default)
-    // Port should be closed by resetToFirmware(), but check first
-    this.logger.log("Opening port at 115200 baud for firmware mode...");
+    // Check what mode we need to enter after port reconnection
+    const targetMode = this._targetModeAfterPortReconnection;
+    this.logger.log(
+      `Target mode after port reconnection: ${targetMode || "firmware (default)"}`,
+    );
+
+    // Reset the target mode tracker
+    this._targetModeAfterPortReconnection = null;
+
+    // Open port with appropriate baud rate based on target mode
+    const baudRate = targetMode === "bootloader" ? 115200 : 115200; // Same baud for now, but could differ
+    this.logger.log(
+      `Opening port at ${baudRate} baud for ${targetMode || "firmware"} mode...`,
+    );
     this.logger.log(
       `Dialog in DOM before opening port: ${this.parentNode ? "yes" : "no"}`,
     );
@@ -2880,8 +2984,8 @@ export class EwtInstallDialog extends LitElement {
     }
 
     try {
-      await newPort.open({ baudRate: 115200 });
-      this.logger.log("Port opened successfully at 115200 baud");
+      await newPort.open({ baudRate });
+      this.logger.log(`Port opened successfully at ${baudRate} baud`);
       this.logger.log(
         `Dialog in DOM after opening port: ${this.parentNode ? "yes" : "no"}`,
       );
@@ -2895,7 +2999,7 @@ export class EwtInstallDialog extends LitElement {
 
     // Don't create a new ESPLoader - reuse the existing one and just update the port! -> espStub.port = newPort
     this.logger.log(
-      "Updating existing ESPLoader with new port for firmware mode...",
+      `Updating existing ESPLoader with new port for ${targetMode || "firmware"} mode...`,
     );
 
     // CRITICAL: Update ALL port references!!
@@ -2925,14 +3029,11 @@ export class EwtInstallDialog extends LitElement {
       (this as any)._savedLoaderBeforeConsole.port = newPort;
     }
     this.logger.log(
-      "ESPLoader port updated for firmware mode (no bootloader sync)",
+      `ESPLoader port updated for ${targetMode || "firmware"} mode`,
     );
 
-    // Wait for device to fully boot into firmware after WDT reset
-    // AND for port to be ready for communication
-    this.logger.log(
-      "Waiting 700ms for device to fully boot and port to be ready...",
-    );
+    // Wait for device to be ready
+    this.logger.log("Waiting 700ms for device to be ready...");
     await sleep(700);
 
     // CRITICAL: Verify port is actually open and ready
@@ -2940,31 +3041,58 @@ export class EwtInstallDialog extends LitElement {
       `Port state check: readable=${this._port.readable !== null}, writable=${this._port.writable !== null}`,
     );
 
-    // CRITICAL: Check if there are any reader/writer locks that could interfere with Improv
+    // CRITICAL: Check if there are any reader/writer locks that could interfere with operations
     this.logger.log(
       `Checking for locks: reader=${this.esploader._reader ? "LOCKED" : "free"}, writer=${this.esploader._writer ? "LOCKED" : "free"}`,
     );
     if (this.esploader._reader || this.esploader._writer) {
-      this.logger.log(
-        "WARNING: Port has active locks! Releasing them before Improv test...",
-      );
+      this.logger.log("WARNING: Port has active locks! Releasing them...");
       await this._releaseReaderWriter();
       this.logger.log("Locks released");
     }
 
     this.logger.log("Device should be ready now");
 
-    // Now test Improv at 115200 baud
-    this.logger.log("Testing Improv at 115200 baud...");
+    if (targetMode === "bootloader") {
+      // We were trying to enter bootloader mode for flash operations
+      // Device should already be in bootloader mode after reset
+      this.logger.log(
+        "Continuing with bootloader mode for flash operations...",
+      );
 
-    // Show progress while testing Improv
-    this._state = "DASHBOARD";
-    this.requestUpdate(); // Force UI update to show progress
+      // Set chipFamily to indicate we're in bootloader mode
+      // This is needed for _prepareForFlashOperations() to continue
+      this.esploader.chipFamily = "detected";
+      this.esploader.IS_STUB = false;
+      this._espStub = undefined;
 
-    // Continue with Improv test
-    // For USB-JTAG/OTG: Device is in firmware mode but firmware not started - need reset
-    // For external serial: Reset ensures device is in clean state
-    await this._testImprov(1000, false);
+      // Continue with the flash operation that was interrupted
+      // This will be handled by the caller (e.g., _prepareForFlashOperations() returned early)
+      // We need to trigger the next step
+      this._busy = false;
+
+      // If we were in the middle of a flash operation, we need to continue it
+      // For now, just return to dashboard and let user retry
+      this._state = "DASHBOARD";
+      this.requestUpdate();
+
+      // Show message to user
+      this.logger.log(
+        "USB-JTAG/OTG device reconnected in bootloader mode - ready for flash operations",
+      );
+    } else {
+      // Default: firmware mode (for console, dashboard, etc.)
+      this.logger.log("Testing Improv at 115200 baud...");
+
+      // Show progress while testing Improv
+      this._state = "DASHBOARD";
+      this.requestUpdate(); // Force UI update to show progress
+
+      // Continue with Improv test
+      // For USB-JTAG/OTG: Device is in firmware mode but firmware not started - need reset
+      // For external serial: Reset ensures device is in clean state
+      await this._testImprov(1000, false);
+    }
   }
 
   private async _testImprov(timeout = 1000, skipReset = false) {
