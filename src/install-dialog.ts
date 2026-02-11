@@ -632,18 +632,40 @@ export class EwtInstallDialog extends LitElement {
       /Chip is.*ESP/i, // ESP chip detection messages
     ];
 
-    const { foundExpected } = await this._readSerialOutputAndCheck(
+    const { output, foundExpected } = await this._readSerialOutputAndCheck(
       1500, // 1.5 second timeout
       bootloaderPatterns,
       [],
     );
 
-    const inBootloaderMode =
-      foundExpected || this.esploader.chipFamily !== null;
+    // If chipFamily is set, device is definitely in bootloader mode
+    if (this.esploader.chipFamily !== null) {
+      this.logger.log("chipFamily is set - device IS in bootloader mode");
+      return true;
+    }
+
+    // If we found expected bootloader patterns, device is in bootloader mode
+    if (foundExpected) {
+      this.logger.log(
+        "Found bootloader strings - device IS in bootloader mode",
+      );
+      return true;
+    }
+
+    // If we received some output but no bootloader patterns, device is NOT in bootloader mode
+    if (output.length > 0) {
+      this.logger.log(
+        "Received output but no bootloader strings - device is NOT in bootloader mode",
+      );
+      return false;
+    }
+
+    // No output received and chipFamily is null - can't determine
+    // Device might be in bootloader mode but not outputting, or not responding
     this.logger.log(
-      `Device ${inBootloaderMode ? "IS" : "IS NOT"} in bootloader mode`,
+      "No output received and chipFamily not set - cannot determine bootloader mode",
     );
-    return inBootloaderMode;
+    return false; // Assume NOT in bootloader mode if we can't tell
   }
 
   // Check if device is in firmware mode (no bootloader strings)
@@ -659,18 +681,87 @@ export class EwtInstallDialog extends LitElement {
       /ready for flashing/i,
     ];
 
-    const { foundForbidden } = await this._readSerialOutputAndCheck(
+    const { output, foundForbidden } = await this._readSerialOutputAndCheck(
       1500, // 1.5 second timeout
       [],
       forbiddenBootloaderPatterns,
     );
 
-    const inFirmwareMode =
-      !foundForbidden && this.esploader.chipFamily === null;
+    // If we found forbidden patterns, device is NOT in firmware mode
+    if (foundForbidden) {
+      this.logger.log(
+        "Found bootloader strings - device is NOT in firmware mode",
+      );
+      return false;
+    }
+
+    // If we received some output (even if not bootloader patterns), device is likely in firmware mode
+    if (output.length > 0) {
+      this.logger.log(
+        "Received serial output with no bootloader strings - device IS in firmware mode",
+      );
+      return true;
+    }
+
+    // If no output received at all, we can't be sure
+    // Reset device and check if bootloader messages appear
     this.logger.log(
-      `Device ${inFirmwareMode ? "IS" : "IS NOT"} in firmware mode`,
+      "No serial output received - resetting device to check mode...",
     );
-    return inFirmwareMode;
+
+    try {
+      // Try to reset the device (soft reset to stay in current mode)
+      await this.esploader.hardReset(false); // false = firmware mode (soft reset)
+      this.logger.log("Device reset sent, waiting for boot...");
+
+      // Wait for device to reboot (longer wait since it's a full reboot)
+      await sleep(1000);
+
+      // Check again, this time looking for bootloader patterns
+      // If device was in bootloader mode, reset might make it output bootloader messages
+      // If device was in firmware mode, reset will make it boot firmware (no bootloader messages)
+      const bootloaderPatterns = [
+        /waiting for download/i,
+        /waiting for firmware/i,
+        /download mode/i,
+        /bootloader/i,
+        /ready for flashing/i,
+        /Chip is.*ESP/i, // ESP chip detection messages
+      ];
+
+      const { output: outputAfterReset, foundExpected } =
+        await this._readSerialOutputAndCheck(
+          2000, // Longer timeout after reset
+          bootloaderPatterns,
+          [],
+        );
+
+      if (foundExpected) {
+        // Bootloader messages appeared after reset - device was in (or entered) bootloader mode
+        this.logger.log(
+          "Bootloader messages appeared after reset - device is NOT in firmware mode",
+        );
+        return false;
+      }
+
+      if (outputAfterReset.length > 0) {
+        // Some output after reset but no bootloader messages
+        // Device booted into firmware mode (or was already in firmware mode)
+        this.logger.log(
+          "Received output after reset but no bootloader strings - device IS in firmware mode",
+        );
+        return true;
+      }
+
+      // Still no output after reset - device might not be responding or in a bad state
+      this.logger.log("No output after reset - device may not be responding");
+      // Fallback: check chipFamily - if null, assume not in bootloader mode
+      return this.esploader.chipFamily === null;
+    } catch (resetErr: any) {
+      this.logger.log(`Reset failed: ${resetErr.message} - cannot verify mode`);
+      // Fallback: check chipFamily - if null, assume not in bootloader mode
+      return this.esploader.chipFamily === null;
+    }
   }
 
   // Reset device to BOOTLOADER mode (for flashing)
