@@ -446,6 +446,222 @@ export class EwtInstallDialog extends LitElement {
     this.esploader.chipFamily = null;
   }
 
+  // Helper to read serial output and check for patterns
+  // This is a SIMPLE approach that reads directly from port.readable
+  // but with EXTREMELY careful cleanup to try to preserve the stream for console
+  private async _readSerialOutputAndCheck(
+    timeoutMs: number = 1500,
+    expectedPatterns: RegExp[] = [],
+    forbiddenPatterns: RegExp[] = [],
+  ): Promise<{
+    output: string;
+    foundExpected: boolean;
+    foundForbidden: boolean;
+  }> {
+    const output: string[] = [];
+    let foundExpected = false;
+    let foundForbidden = false;
+
+    this.logger.log("Starting serial output check (simple approach)...");
+
+    // Check if port is readable
+    if (!this._port.readable) {
+      this.logger.log("Port is not readable, cannot check output");
+      return { output: "", foundExpected: false, foundForbidden: false };
+    }
+
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+    const startTime = Date.now();
+
+    try {
+      // Create reader - this locks the stream!
+      reader = this._port.readable.getReader();
+      this.logger.log("Created reader for verification");
+
+      // Read until timeout or patterns found
+      while (Date.now() - startTime < timeoutMs) {
+        try {
+          // Read with a reasonable timeout
+          const readPromise = reader.read();
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(
+              () => reject(new Error("Read timeout")),
+              timeoutMs - (Date.now() - startTime),
+            );
+          });
+
+          const { value, done } = await Promise.race([
+            readPromise,
+            timeoutPromise,
+          ]);
+
+          if (done) {
+            this.logger.log("Reader done (stream ended)");
+            break;
+          }
+
+          if (value) {
+            const text = new TextDecoder().decode(value);
+            output.push(text);
+
+            // Check patterns
+            const combinedOutput = output.join("");
+            for (const pattern of expectedPatterns) {
+              if (pattern.test(combinedOutput)) {
+                foundExpected = true;
+                this.logger.log(`Found expected pattern: ${pattern}`);
+                break;
+              }
+            }
+            for (const pattern of forbiddenPatterns) {
+              if (pattern.test(combinedOutput)) {
+                foundForbidden = true;
+                this.logger.log(`Found forbidden pattern: ${pattern}`);
+                break;
+              }
+            }
+
+            if (foundExpected || foundForbidden) {
+              break;
+            }
+          }
+        } catch (readErr: any) {
+          if (readErr.message === "Read timeout") {
+            // Timeout reached
+            this.logger.log("Verification timeout reached");
+            break;
+          }
+          this.logger.log(`Read error: ${readErr.message}`);
+          break;
+        }
+      }
+    } catch (err: any) {
+      this.logger.log(`Verification setup error: ${err.message}`);
+    } finally {
+      // CRITICAL: We must clean up EXTREMELY carefully to allow console to work
+      if (reader) {
+        try {
+          // First, try to cancel the reader gently
+          this.logger.log("Cancelling reader...");
+          await reader.cancel().catch(() => {
+            this.logger.log("Reader cancel failed (expected)");
+          });
+
+          // Then release the lock
+          this.logger.log("Releasing reader lock...");
+          reader.releaseLock();
+          this.logger.log("Reader lock released");
+        } catch (releaseErr: any) {
+          this.logger.log(`Failed to release reader: ${releaseErr.message}`);
+          // Try one more time with different approach
+          try {
+            // If releaseLock failed, the reader might be in a bad state
+            // Create a new reader and release it to try to reset things
+            const newReader = this._port.readable?.getReader();
+            if (newReader) {
+              await newReader.cancel().catch(() => {});
+              newReader.releaseLock();
+              this.logger.log(
+                "Created and released new reader to try to reset stream",
+              );
+            }
+          } catch (e) {
+            this.logger.log("Could not reset stream with new reader");
+          }
+        }
+      }
+
+      // Additional cleanup: release any other locks
+      await this._releaseReaderWriter();
+
+      // For WebUSB, recreate streams
+      if (this.esploader.isWebUSB && this.esploader.isWebUSB()) {
+        try {
+          this.logger.log("WebUSB: recreating streams after verification");
+          await (this._port as any).recreateStreams();
+          await sleep(200);
+          this.logger.log("WebUSB streams recreated");
+        } catch (err: any) {
+          this.logger.log(`Failed to recreate WebUSB streams: ${err.message}`);
+        }
+      } else {
+        // For WebSerial, we can't recreate streams
+        // We've released all locks, now we need to wait a bit
+        this.logger.log("WebSerial: waiting for stream to settle...");
+        await sleep(200);
+      }
+    }
+
+    const combinedOutput = output.join("");
+    if (combinedOutput.length > 0) {
+      this.logger.log(
+        `Serial output (${combinedOutput.length} chars): ${combinedOutput.substring(0, 200)}${combinedOutput.length > 200 ? "..." : ""}`,
+      );
+    } else {
+      this.logger.log("No serial output received during verification");
+    }
+
+    this.logger.log(
+      `Verification result: foundExpected=${foundExpected}, foundForbidden=${foundForbidden}`,
+    );
+    return { output: combinedOutput, foundExpected, foundForbidden };
+  }
+
+  // Check if device is in bootloader mode by looking for "waiting for download" strings
+  private async _checkBootloaderMode(): Promise<boolean> {
+    this.logger.log("Checking if device is in bootloader mode...");
+
+    // Common bootloader mode indicators across ESP models
+    const bootloaderPatterns = [
+      /waiting for download/i,
+      /waiting for firmware/i,
+      /download mode/i,
+      /bootloader/i,
+      /ready for flashing/i,
+      /Chip is.*ESP/i, // ESP chip detection messages
+    ];
+
+    const { foundExpected } = await this._readSerialOutputAndCheck(
+      1500, // 1.5 second timeout
+      bootloaderPatterns,
+      [],
+    );
+
+    const inBootloaderMode =
+      foundExpected || this.esploader.chipFamily !== null;
+    this.logger.log(
+      `Device ${inBootloaderMode ? "IS" : "IS NOT"} in bootloader mode`,
+    );
+    return inBootloaderMode;
+  }
+
+  // Check if device is in firmware mode (no bootloader strings)
+  private async _checkFirmwareMode(): Promise<boolean> {
+    this.logger.log("Checking if device is in firmware mode...");
+
+    // Patterns that should NOT be present in firmware mode
+    const forbiddenBootloaderPatterns = [
+      /waiting for download/i,
+      /waiting for firmware/i,
+      /download mode/i,
+      /bootloader/i,
+      /ready for flashing/i,
+    ];
+
+    const { foundForbidden } = await this._readSerialOutputAndCheck(
+      1500, // 1.5 second timeout
+      [],
+      forbiddenBootloaderPatterns,
+    );
+
+    const inFirmwareMode =
+      !foundForbidden && this.esploader.chipFamily === null;
+    this.logger.log(
+      `Device ${inFirmwareMode ? "IS" : "IS NOT"} in firmware mode`,
+    );
+    return inFirmwareMode;
+  }
+
   // Reset device to BOOTLOADER mode (for flashing)
   // Uses ESPLoader's reconnectToBootloader() to properly close/reopen port
   private async _resetToBootloaderAndReleaseLocks() {
@@ -470,6 +686,52 @@ export class EwtInstallDialog extends LitElement {
     // Reset stub state (chipFamily is preserved by reconnectToBootloader)
     this._espStub = undefined;
     this.esploader.IS_STUB = false;
+
+    // Check if bootloader mode switch worked by looking for "waiting for download" strings
+    await this._verifyBootloaderMode();
+  }
+
+  // Verify bootloader mode by checking output for "waiting for download" strings
+  private async _verifyBootloaderMode(
+    maxRetries: number = 2,
+  ): Promise<boolean> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      this.logger.log(
+        `Verifying bootloader mode (attempt ${attempt}/${maxRetries})...`,
+      );
+
+      const inBootloaderMode = await this._checkBootloaderMode();
+
+      if (inBootloaderMode) {
+        this.logger.log("Bootloader mode verified successfully");
+        // Sync internal known state
+        this.esploader.chipFamily = this.esploader.chipFamily || "detected";
+        this.esploader.IS_STUB = false;
+        this._espStub = undefined;
+
+        // CRITICAL: After reading serial output, we must ensure streams are ready for other operations
+        await this._releaseReaderWriter();
+
+        return true;
+      }
+
+      if (attempt < maxRetries) {
+        this.logger.log(`Bootloader mode not detected, retrying in 500ms...`);
+        await sleep(500);
+
+        // Try to reset again
+        try {
+          await this.esploader.reconnectToBootloader();
+        } catch (err: any) {
+          this.logger.log(`Retry reset failed: ${err.message}`);
+        }
+      }
+    }
+
+    this.logger.log("Failed to verify bootloader mode after retries");
+    // Still try to release streams even if verification failed
+    await this._releaseReaderWriter();
+    return false;
   }
 
   protected render() {
@@ -2021,7 +2283,14 @@ export class EwtInstallDialog extends LitElement {
 
     // Check if device is in bootloader mode
     // If yes, switch to firmware mode first (needed for Improv)
-    const inBootloaderMode = this.esploader.chipFamily !== null;
+    // Use both chipFamily check and serial output check for more reliable detection
+    const chipFamilyCheck = this.esploader.chipFamily !== null;
+    const outputCheck = await this._checkBootloaderMode();
+    const inBootloaderMode = chipFamilyCheck || outputCheck;
+
+    this.logger.log(
+      `Bootloader mode detection: chipFamily=${chipFamilyCheck ? "set" : "null"}, outputCheck=${outputCheck}`,
+    );
 
     if (inBootloaderMode) {
       this.logger.log(
@@ -2170,6 +2439,9 @@ export class EwtInstallDialog extends LitElement {
       // This is needed for WebUSB after closing Improv client
       await this._releaseReaderWriter();
 
+      // Verify firmware mode - ensure no "waiting for download" strings
+      await this._verifyFirmwareMode();
+
       return false; // No switch needed
     }
 
@@ -2177,118 +2449,223 @@ export class EwtInstallDialog extends LitElement {
       `Device is in bootloader mode - switching to firmware for ${actionAfterReconnect || "operation"}`,
     );
 
-    // CRITICAL: Ensure chipFamily is set
-    if (!this.esploader.chipFamily) {
-      this.logger.log("Detecting chip type...");
-      await this.esploader.initialize();
-      this.logger.log(`Chip detected: ${this.esploader.chipFamily}`);
+    // Try switching to firmware mode with retries
+    const success = await this._performFirmwareModeSwitch(actionAfterReconnect);
+
+    if (!success) {
+      this.logger.log("Firmware mode switch failed after retries");
+      // Don't throw error here - let caller handle it
+      return false;
     }
 
-    // CRITICAL: Create stub before reset
-    if (!this._espStub) {
-      this.logger.log("Creating stub for firmware mode switch...");
-      this._espStub = await this.esploader.runStub();
-      this.logger.log(`Stub created: IS_STUB=${this._espStub.IS_STUB}`);
-    }
+    // Verify firmware mode - ensure no "waiting for download" strings
+    await this._verifyFirmwareMode();
 
-    // CRITICAL: Set baudrate to 115200 BEFORE switching
-    await this._resetBaudrateForConsole();
+    return actionAfterReconnect !== null; // Return true if port reconnection needed for USB-JTAG/OTG
+  }
 
-    // CRITICAL: Save parent loader
-    const loaderToSave = this._espStub._parent || this._espStub;
-    (this as any)._savedLoaderBeforeSwitch = loaderToSave;
+  // Perform the actual firmware mode switch with retry logic
+  private async _performFirmwareModeSwitch(
+    actionAfterReconnect:
+      | "console"
+      | "visit"
+      | "homeassistant"
+      | "wifi"
+      | null = null,
+    maxRetries: number = 2,
+  ): Promise<boolean> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      this.logger.log(
+        `Switching to firmware mode (attempt ${attempt}/${maxRetries})...`,
+      );
 
-    // Check if USB-JTAG/OTG device
-    const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
+      // CRITICAL: Ensure chipFamily is set
+      if (!this.esploader.chipFamily) {
+        this.logger.log("Detecting chip type...");
+        await this.esploader.initialize();
+        this.logger.log(`Chip detected: ${this.esploader.chipFamily}`);
+      }
 
-    if (isUsbJtagOrOtg) {
-      // USB-JTAG/OTG: Need WDT reset and port reconnection
+      // CRITICAL: Create stub before reset
+      if (!this._espStub) {
+        this.logger.log("Creating stub for firmware mode switch...");
+        this._espStub = await this.esploader.runStub();
+        this.logger.log(`Stub created: IS_STUB=${this._espStub.IS_STUB}`);
+      }
 
-      // CRITICAL: Release locks BEFORE calling resetToFirmware()
-      this.logger.log("Releasing reader/writer...");
-      await this._releaseReaderWriter();
+      // CRITICAL: Set baudrate to 115200 BEFORE switching
+      await this._resetBaudrateForConsole();
 
-      try {
-        // CRITICAL: Forget the old port
-        try {
-          await this._port.forget();
-          this.logger.log("Old port forgotten");
-        } catch (forgetErr: any) {
-          this.logger.log(`Port forget failed: ${forgetErr.message}`);
+      // CRITICAL: Save parent loader
+      const loaderToSave = this._espStub._parent || this._espStub;
+      (this as any)._savedLoaderBeforeSwitch = loaderToSave;
+
+      // Check if USB-JTAG/OTG device
+      const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
+
+      if (isUsbJtagOrOtg) {
+        // USB-JTAG/OTG: Need WDT reset and port reconnection
+        return await this._switchUsbJtagToFirmwareMode(actionAfterReconnect);
+      } else {
+        // External serial chip: Can reset to firmware without port change
+        const success = await this._switchExternalSerialToFirmwareMode();
+        if (success) {
+          return true;
         }
 
-        // Use resetToFirmware() for CDC this is doing a WDT reset
-        await this.esploader.resetToFirmware();
-        this.logger.log("Device reset to firmware mode - port closed");
-      } catch (err: any) {
-        this.logger.debug(`Reset to firmware error (expected): ${err.message}`);
+        if (attempt < maxRetries) {
+          this.logger.log(`Firmware mode switch failed, retrying in 500ms...`);
+          await sleep(500);
+        }
       }
-
-      // Reset ESP state
-      await sleep(100);
-
-      this._espStub = undefined;
-      this.esploader.IS_STUB = false;
-      this.esploader.chipFamily = null;
-      this._improvChecked = false;
-      this._client = null;
-      this._improvSupported = false;
-      this.esploader._reader = undefined;
-
-      // Set flag for action after reconnect
-      if (actionAfterReconnect === "console") {
-        this._openConsoleAfterReconnect = true;
-      } else if (actionAfterReconnect === "visit") {
-        this._visitDeviceAfterReconnect = true;
-      } else if (actionAfterReconnect === "homeassistant") {
-        this._addToHAAfterReconnect = true;
-      } else if (actionAfterReconnect === "wifi") {
-        this._changeWiFiAfterReconnect = true;
-      }
-
-      this.logger.log("Waiting for user to select new port");
-
-      // Show port selection UI
-      this._state = "REQUEST_PORT_SELECTION";
-      this._error = "";
-      this._busy = false;
-      return true; // Port reconnection needed
-    } else {
-      // External serial chip: Can reset to firmware without port change
-      this.logger.log("External serial chip - resetting to firmware mode");
-
-      try {
-        // CRITICAL: Call hardReset BEFORE releasing locks (so it can communicate)
-        await this.esploader.hardReset(false); // false = firmware mode
-        this.logger.log("Device reset to firmware mode");
-      } catch (err: any) {
-        this.logger.log(
-          `Reset worked. Expected slip Timeout read error: ${err.message}`,
-        );
-      }
-
-      // Wait for reset to complete
-      await sleep(500);
-
-      // NOW release locks AFTER reset
-      this.logger.log("Releasing reader/writer after reset...");
-      await this._releaseReaderWriter();
-
-      // Reset ESP state
-      this._espStub = undefined;
-      this.esploader.IS_STUB = false;
-      this.esploader.chipFamily = null;
-
-      try {
-        // Do a hardReset to start firmware
-        await this.esploader.hardReset(false); // false = firmware mode
-        this.logger.log("Device in firmware mode, start firmware with reset");
-      } catch (err: any) {
-        this.logger.log(`Reset error: ${err.message}`);
-      }
-
-      return false; // No port reconnection needed
     }
+
+    return false; // All retries failed
+  }
+
+  // Switch USB-JTAG/OTG device to firmware mode
+  private async _switchUsbJtagToFirmwareMode(
+    actionAfterReconnect:
+      | "console"
+      | "visit"
+      | "homeassistant"
+      | "wifi"
+      | null = null,
+  ): Promise<boolean> {
+    this.logger.log("USB-JTAG/OTG device - switching to firmware mode");
+
+    // CRITICAL: Release locks BEFORE calling resetToFirmware()
+    this.logger.log("Releasing reader/writer...");
+    await this._releaseReaderWriter();
+
+    try {
+      // CRITICAL: Forget the old port
+      try {
+        await this._port.forget();
+        this.logger.log("Old port forgotten");
+      } catch (forgetErr: any) {
+        this.logger.log(`Port forget failed: ${forgetErr.message}`);
+      }
+
+      // Use resetToFirmware() for CDC this is doing a WDT reset
+      await this.esploader.resetToFirmware();
+      this.logger.log("Device reset to firmware mode - port closed");
+    } catch (err: any) {
+      this.logger.debug(`Reset to firmware error (expected): ${err.message}`);
+    }
+
+    // Reset ESP state
+    await sleep(100);
+
+    this._espStub = undefined;
+    this.esploader.IS_STUB = false;
+    this.esploader.chipFamily = null;
+    this._improvChecked = false;
+    this._client = null;
+    this._improvSupported = false;
+    this.esploader._reader = undefined;
+
+    // Set flag for action after reconnect
+    if (actionAfterReconnect === "console") {
+      this._openConsoleAfterReconnect = true;
+    } else if (actionAfterReconnect === "visit") {
+      this._visitDeviceAfterReconnect = true;
+    } else if (actionAfterReconnect === "homeassistant") {
+      this._addToHAAfterReconnect = true;
+    } else if (actionAfterReconnect === "wifi") {
+      this._changeWiFiAfterReconnect = true;
+    }
+
+    this.logger.log("Waiting for user to select new port");
+
+    // Show port selection UI
+    this._state = "REQUEST_PORT_SELECTION";
+    this._error = "";
+    this._busy = false;
+    return true; // Port reconnection needed
+  }
+
+  // Switch external serial chip to firmware mode
+  private async _switchExternalSerialToFirmwareMode(): Promise<boolean> {
+    this.logger.log("External serial chip - resetting to firmware mode");
+
+    try {
+      // CRITICAL: Call hardReset BEFORE releasing locks (so it can communicate)
+      await this.esploader.hardReset(false); // false = firmware mode
+      this.logger.log("Device reset to firmware mode");
+    } catch (err: any) {
+      this.logger.log(
+        `Reset worked. Expected slip Timeout read error: ${err.message}`,
+      );
+    }
+
+    // Wait for reset to complete
+    await sleep(500);
+
+    // NOW release locks AFTER reset
+    this.logger.log("Releasing reader/writer after reset...");
+    await this._releaseReaderWriter();
+
+    // Reset ESP state
+    this._espStub = undefined;
+    this.esploader.IS_STUB = false;
+    this.esploader.chipFamily = null;
+
+    try {
+      // Do a hardReset to start firmware
+      await this.esploader.hardReset(false); // false = firmware mode
+      this.logger.log("Device in firmware mode, start firmware with reset");
+    } catch (err: any) {
+      this.logger.log(`Reset error: ${err.message}`);
+    }
+
+    return true; // Switch successful
+  }
+
+  // Verify firmware mode by checking that no "waiting for download" strings are present
+  private async _verifyFirmwareMode(maxRetries: number = 2): Promise<boolean> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      this.logger.log(
+        `Verifying firmware mode (attempt ${attempt}/${maxRetries})...`,
+      );
+
+      const inFirmwareMode = await this._checkFirmwareMode();
+
+      if (inFirmwareMode) {
+        this.logger.log(
+          "Firmware mode verified successfully - no bootloader strings detected",
+        );
+        // Sync internal known state
+        this.esploader.chipFamily = null;
+        this.esploader.IS_STUB = false;
+        this._espStub = undefined;
+
+        // CRITICAL: After reading serial output, we must ensure streams are ready for other operations
+        // This is especially important for console which uses pipeThrough()
+        await this._releaseReaderWriter();
+
+        return true;
+      }
+
+      if (attempt < maxRetries) {
+        this.logger.log(`Firmware mode not verified, retrying in 500ms...`);
+        await sleep(500);
+
+        // Try to reset again
+        try {
+          await this.esploader.hardReset(false);
+        } catch (err: any) {
+          this.logger.log(`Retry reset failed: ${err.message}`);
+        }
+      }
+    }
+
+    this.logger.log(
+      "Failed to verify firmware mode after retries - bootloader strings may still be present",
+    );
+    // Still try to release streams even if verification failed
+    await this._releaseReaderWriter();
+    return false;
   }
 
   private _startInstall(erase: boolean) {
