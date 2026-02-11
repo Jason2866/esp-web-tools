@@ -571,24 +571,20 @@ export class EwtInstallDialog extends LitElement {
         }
       }
 
-      // Additional cleanup: release any other locks
-      await this._releaseReaderWriter();
-
-      // For WebUSB, recreate streams
+      // For WebUSB, recreate streams if needed
       if (this.esploader.isWebUSB && this.esploader.isWebUSB()) {
         try {
-          this.logger.log("WebUSB: recreating streams after verification");
-          await (this._port as any).recreateStreams();
-          await sleep(200);
-          this.logger.log("WebUSB streams recreated");
+          this.logger.log(
+            "WebUSB: ensuring streams are ready after verification",
+          );
+          await sleep(100);
         } catch (err: any) {
-          this.logger.log(`Failed to recreate WebUSB streams: ${err.message}`);
+          this.logger.log(`WebUSB stream check failed: ${err.message}`);
         }
       } else {
-        // For WebSerial, we can't recreate streams
-        // We've released all locks, now we need to wait a bit
+        // For WebSerial, wait a bit for stream to settle
         this.logger.log("WebSerial: waiting for stream to settle...");
-        await sleep(200);
+        await sleep(100);
       }
     }
 
@@ -687,51 +683,10 @@ export class EwtInstallDialog extends LitElement {
     this._espStub = undefined;
     this.esploader.IS_STUB = false;
 
-    // Check if bootloader mode switch worked by looking for "waiting for download" strings
-    await this._verifyBootloaderMode();
-  }
-
-  // Verify bootloader mode by checking output for "waiting for download" strings
-  private async _verifyBootloaderMode(
-    maxRetries: number = 2,
-  ): Promise<boolean> {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      this.logger.log(
-        `Verifying bootloader mode (attempt ${attempt}/${maxRetries})...`,
-      );
-
-      const inBootloaderMode = await this._checkBootloaderMode();
-
-      if (inBootloaderMode) {
-        this.logger.log("Bootloader mode verified successfully");
-        // Sync internal known state
-        this.esploader.chipFamily = this.esploader.chipFamily || "detected";
-        this.esploader.IS_STUB = false;
-        this._espStub = undefined;
-
-        // CRITICAL: After reading serial output, we must ensure streams are ready for other operations
-        await this._releaseReaderWriter();
-
-        return true;
-      }
-
-      if (attempt < maxRetries) {
-        this.logger.log(`Bootloader mode not detected, retrying in 500ms...`);
-        await sleep(500);
-
-        // Try to reset again
-        try {
-          await this.esploader.reconnectToBootloader();
-        } catch (err: any) {
-          this.logger.log(`Retry reset failed: ${err.message}`);
-        }
-      }
-    }
-
-    this.logger.log("Failed to verify bootloader mode after retries");
-    // Still try to release streams even if verification failed
-    await this._releaseReaderWriter();
-    return false;
+    // Sync internal state
+    this.esploader.chipFamily = this.esploader.chipFamily || "detected";
+    this.esploader.IS_STUB = false;
+    this._espStub = undefined;
   }
 
   protected render() {
