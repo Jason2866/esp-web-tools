@@ -34,8 +34,13 @@ export const corsProxyFetch = async (
   options?: RequestInit,
 ): Promise<Response> => {
   if (needsCorsProxy(url)) {
-    const proxiedUrl = `${CORS_PROXY}/${url}`;
-    return fetch(proxiedUrl, options);
+    try {
+      return await fetch(url, options);
+    } catch {
+      // Direct fetch failed (likely CORS), try proxy
+      const proxiedUrl = `${CORS_PROXY}/${url}`;
+      return fetch(proxiedUrl, options);
+    }
   }
 
   return fetch(url, options);

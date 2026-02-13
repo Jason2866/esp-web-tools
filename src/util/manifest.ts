@@ -4,6 +4,9 @@ import { corsProxyFetch } from "./cors-proxy";
 export const downloadManifest = async (manifestPath: string) => {
   const manifestURL = new URL(manifestPath, location.toString()).toString();
   const resp = await corsProxyFetch(manifestURL);
+  if (!resp.ok) {
+    throw new Error(`Failed to fetch manifest: ${resp.status}`);
+  }
   const manifest: Manifest = await resp.json();
 
   if ("new_install_skip_erase" in manifest) {
