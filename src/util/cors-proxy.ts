@@ -39,7 +39,9 @@ export const corsProxyFetch = async (
     } catch {
       // Direct fetch failed (likely CORS), try proxy
       const proxiedUrl = `${CORS_PROXY}/${url}`;
-      return fetch(proxiedUrl, options);
+      // Don't forward potentially sensitive headers to the proxy
+      const { headers, credentials, ...safeOptions } = options ?? {};
+      return fetch(proxiedUrl, safeOptions);
     }
   }
 
