@@ -8,6 +8,7 @@ import {
 } from "./const";
 import { getChipFamilyName } from "./util/chip-family-name";
 import { sleep } from "./util/sleep";
+import { corsProxyFetch } from "./util/cors-proxy";
 
 export const flash = async (
   onEvent: (state: FlashState) => void,
@@ -39,7 +40,7 @@ export const flash = async (
     manifestProm = JSON.parse(manifestPath);
   } catch {
     manifestURL = new URL(manifestPath, location.toString()).toString();
-    manifestProm = fetch(manifestURL).then(
+    manifestProm = corsProxyFetch(manifestURL).then(
       (resp): Promise<Manifest> => resp.json(),
     );
   }
@@ -160,7 +161,7 @@ export const flash = async (
       part.path,
       manifestURL || location.toString(),
     ).toString();
-    const resp = await fetch(url);
+    const resp = await corsProxyFetch(url);
     if (!resp.ok) {
       throw new Error(
         `Downlading firmware ${part.path} failed: ${resp.status}`,
