@@ -33,6 +33,9 @@ export const corsProxyFetch = async (
   url: string,
   options?: RequestInit,
 ): Promise<Response> => {
+  // Clean the URL - remove whitespace and newlines
+  url = url.trim();
+
   if (needsCorsProxy(url)) {
     // Try direct fetch first
     try {

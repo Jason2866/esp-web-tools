@@ -1,6 +1,6 @@
 {
   "name": "tasmota-esp-web-tools",
-  "version": "11.1.6",
+  "version": "11.1.7",
   "description": "Web tools for ESP devices",
   "main": "dist/install-button.js",
   "repository": {
