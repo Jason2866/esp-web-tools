@@ -1,6 +1,10 @@
 import type { FlashState } from "./const";
 import type { EwtInstallDialog } from "./install-dialog";
 import { connect } from "./connect";
+import { corsProxyFetch } from "./util/cors-proxy";
+
+// Expose corsProxyFetch globally for external scripts
+(window as any).espWebToolsCorsProxyFetch = corsProxyFetch;
 
 export class InstallButton extends HTMLElement {
   public static isSupported = "serial" in navigator || "usb" in navigator;
