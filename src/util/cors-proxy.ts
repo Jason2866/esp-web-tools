@@ -34,11 +34,21 @@ export const corsProxyFetch = async (
   options?: RequestInit,
 ): Promise<Response> => {
   if (needsCorsProxy(url)) {
-    // Use proxy with correct query parameter format
-    const proxiedUrl = `${CORS_PROXY}/?url=${encodeURIComponent(url)}`;
-    // Don't forward potentially sensitive headers to the proxy
-    const { headers, credentials, ...safeOptions } = options ?? {};
-    return fetch(proxiedUrl, safeOptions);
+    // Try direct fetch first
+    try {
+      const response = await fetch(url, options);
+      return response;
+    } catch (directError) {
+      // Direct fetch failed, try proxy
+      try {
+        const proxiedUrl = `${CORS_PROXY}/?url=${encodeURIComponent(url)}`;
+        const { headers, credentials, ...safeOptions } = options ?? {};
+        return await fetch(proxiedUrl, safeOptions);
+      } catch (proxyError) {
+        // Both failed, throw the original error
+        throw directError;
+      }
+    }
   }
 
   return fetch(url, options);
