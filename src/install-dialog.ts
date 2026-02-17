@@ -11,6 +11,7 @@ import type { EwtTextfield } from "./components/ewt-textfield";
 import "./components/ewt-select";
 import "./components/ewt-list-item";
 import "./components/ewt-littlefs-manager";
+import "./components/ewt-s2-modal";
 import "./pages/ewt-page-progress";
 import "./pages/ewt-page-message";
 import { chipIcon, closeIcon, firmwareIcon } from "./components/svg";
@@ -28,7 +29,16 @@ import { downloadManifest } from "./util/manifest";
 import { dialogStyles } from "./styles";
 import { parsePartitionTable, type Partition } from "./partition.js";
 import { detectFilesystemType } from "./util/partition.js";
-import { getChipFamilyName } from "./util/chip-family-name";
+import {
+  exitConsoleMode,
+  releaseReaderWriter,
+  hardResetToFirmware,
+  prepareForImprovProvisioning,
+  prepareForImprovTest,
+  switchToFirmwareMode,
+  prepareStreamsForOperation,
+  ensureStubForFlash,
+} from "./mode-switching";
 
 const ERROR_ICON = "⚠️";
 const OK_ICON = "🎉";
@@ -110,105 +120,23 @@ export class EwtInstallDialog extends LitElement {
   private _addToHAAfterReconnect = false;
   private _changeWiFiAfterReconnect = false;
 
-  // Ensure stub is initialized (called before any operation that needs it)
-  private async _ensureStub(): Promise<any> {
-    if (this._espStub && this._espStub.IS_STUB) {
-      this.logger.log(
-        `Existing stub: IS_STUB=${this._espStub.IS_STUB}, chipFamily=${getChipFamilyName(this._espStub)}`,
-      );
-
-      // Ensure baudrate is set even if stub already exists
-      if (this.baudRate && this.baudRate > 115200) {
-        const currentBaud = this._espStub.currentBaudRate || 115200;
-        if (currentBaud !== this.baudRate) {
-          this.logger.log(
-            `Adjusting baudrate from ${currentBaud} to ${this.baudRate}...`,
-          );
-          try {
-            await this._espStub.setBaudrate(this.baudRate);
-            this.logger.log(`Baudrate set to ${this.baudRate}`);
-            // Update currentBaudRate to prevent re-setting
-            this._espStub.currentBaudRate = this.baudRate;
-          } catch (baudErr: any) {
-            this.logger.log(
-              `Failed to set baudrate: ${baudErr.message}, continuing with current`,
-            );
-            // Assume baudrate is already correct if setBaudrate fails
-            this._espStub.currentBaudRate = this.baudRate;
-          }
-        } else {
-          this.logger.log(`Baudrate already at ${this.baudRate}, skipping`);
-        }
-      }
-
-      return this._espStub;
-    }
-
-    // Initialize if not already done
-    if (!this.esploader.chipFamily) {
-      this.logger.log("Initializing ESP loader...");
-
-      // Try twice before giving up
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-          if (attempt > 1) {
-            this.logger.log(`Retry attempt ${attempt}/2...`);
-            await sleep(500); // Wait before retry
-          }
-          await this.esploader.initialize();
-          this.logger.log(`Found ${getChipFamilyName(this.esploader)}`);
-          break; // Success!
-        } catch (err: any) {
-          this.logger.error(
-            `Connection failed to stub (attempt ${attempt}/2): ${err.message}`,
-          );
-          if (attempt === 2) {
-            // Both attempts failed - show error to user
-            this._state = "ERROR";
-            this._error = `Failed to connect to ESP after 2 attempts: ${err.message}`;
-            throw err;
-          }
-        }
-      }
-    }
-
-    // Run stub - chip properties are now automatically inherited from parent
-    this.logger.log("Running stub...");
-    const espStub = await this.esploader.runStub();
-
-    this.logger.log(
-      `Stub created: IS_STUB=${espStub.IS_STUB}, chipFamily=${getChipFamilyName(espStub)}`,
-    );
-    this._espStub = espStub;
-
-    // Set baudrate BEFORE any operations (use user-selected baudrate if available)
-    if (this.baudRate && this.baudRate > 115200) {
-      this.logger.log(`Setting baudrate to ${this.baudRate}...`);
-      try {
-        // setBaudrate now supports CDC/JTAG on Android (WebUSB)
-        await espStub.setBaudrate(this.baudRate);
-        this.logger.log(`Baudrate set to ${this.baudRate}`);
-        // Update currentBaudRate to prevent re-setting
-        espStub.currentBaudRate = this.baudRate;
-      } catch (baudErr: any) {
-        this.logger.error(
-          `[DEBUG] setBaudrate() threw error: ${baudErr.message}`,
-        );
-        this.logger.log(
-          `Failed to set baudrate: ${baudErr.message}, continuing with default`,
-        );
-      }
-    }
-
-    this.logger.log(
-      `Returning stub: IS_STUB=${this._espStub.IS_STUB}, chipFamily=${getChipFamilyName(this._espStub)}`,
-    );
-    return this._espStub;
-  }
-
   // Helper to get port from esploader
   private get _port(): SerialPort {
     return this.esploader.port;
+  }
+
+  // Helper to ensure stub for flash operations (wrapper for mode-switching function)
+  private async _ensureStub(): Promise<any> {
+    this._espStub = await ensureStubForFlash(
+      this.esploader,
+      this._espStub,
+      this.baudRate,
+      {
+        onLog: (msg) => this.logger.log(msg),
+        onError: (msg) => this.logger.error(msg),
+      },
+    );
+    return this._espStub;
   }
 
   // Helper to check if device is using USB-JTAG or USB-OTG (not external serial chip)
@@ -219,98 +147,30 @@ export class EwtInstallDialog extends LitElement {
     return isUsbJtag;
   }
 
-  // Helper to check if device is WebUSB with external serial chip
-  private async _isWebUsbWithExternalSerial(): Promise<boolean> {
-    const isWebUsb = this.esploader.isWebUSB && this.esploader.isWebUSB();
-    if (!isWebUsb) {
-      return false;
-    }
-    const isUsbJtag = await this._isUsbJtagOrOtg();
-    const result = !isUsbJtag; // WebUSB but NOT USB-JTAG = external serial
-    this.logger.log(`WebUSB with external serial: ${result ? "YES" : "NO"}`);
-    return result;
-  }
-
-  // Helper to release reader/writer locks (used by multiple methods)
+  // Helper to release reader/writer locks (wrapper for mode-switching function)
   private async _releaseReaderWriter() {
-    // CRITICAL: Find the actual object that has the reader
-    // The stub has a _parent pointer, and the reader runs on the parent!
-    let readerOwner = this._espStub || this.esploader;
-    if (readerOwner._parent) {
-      readerOwner = readerOwner._parent;
-      this.logger.log("Using parent loader for reader/writer");
-    }
-
-    // Cancel the reader on the correct object
-    if (readerOwner._reader) {
-      const reader = readerOwner._reader;
-      try {
-        await reader.cancel();
-        this.logger.log("Reader cancelled on correct object");
-      } catch (err) {
-        this.logger.log("Reader cancel failed:", err);
-      }
-      try {
-        reader.releaseLock();
-        this.logger.log("Reader released");
-      } catch (err) {
-        this.logger.log("Reader releaseLock failed:", err);
-      }
-      readerOwner._reader = undefined;
-    }
-
-    // Release the writer on the correct object
-    if (readerOwner._writer) {
-      const writer = readerOwner._writer;
-      readerOwner._writer = undefined;
-
-      try {
-        writer.releaseLock();
-        this.logger.log("Writer lock released");
-      } catch (err) {
-        this.logger.log("Writer releaseLock failed:", err);
-      }
-    }
-
-    // For WebUSB (Android), ALWAYS recreate streams
-    // This is CRITICAL for console to work - WebUSB needs fresh streams
-    // Even if no locks were held, streams may have been consumed by other operations
-    if (this.esploader.isWebUSB && this.esploader.isWebUSB()) {
-      try {
-        this.logger.log("WebUSB detected - recreating streams");
-        await (this._port as any).recreateStreams();
-        await sleep(200);
-        this.logger.log("WebUSB streams recreated and ready");
-      } catch (err: any) {
-        this.logger.log(`Failed to recreate WebUSB streams: ${err.message}`);
-      }
-    }
-  }
-
-  // Helper to reset baudrate to 115200 for console
-  // The ESP stub might be at higher baudrate (e.g., 460800) for flashing
-  // Firmware console always runs at 115200
-  private async _resetBaudrateForConsole() {
-    if (this._espStub && this._espStub.currentBaudRate !== 115200) {
-      this.logger.log(
-        `Resetting baudrate from ${this._espStub.currentBaudRate} to 115200`,
-      );
-      try {
-        // Use setBaudrate from tasmota-webserial-esptool
-        // This now supports CDC/JTAG baudrate changes on Android (WebUSB)
-        await this._espStub.setBaudrate(115200);
-        this.logger.log("Baudrate set to 115200 for console");
-      } catch (baudErr: any) {
-        this.logger.log(`Failed to set baudrate to 115200: ${baudErr.message}`);
-      }
-    }
+    await releaseReaderWriter(this.esploader, this._espStub, {
+      onLog: (msg) => this.logger.log(msg),
+      onError: (msg) => this.logger.log(msg),
+    });
   }
 
   // Helper to prepare ESP for flash operations after Improv check
   // Resets to bootloader mode and loads stub
   private async _prepareForFlashOperations() {
     // Reset ESP to BOOTLOADER mode for flash operations
-    await this._resetToBootloaderAndReleaseLocks();
+    const needsReconnect = await exitConsoleMode(this.esploader, {
+      onLog: (msg) => this.logger.log(msg),
+      onError: (msg) => this.logger.error(msg),
+    });
+
+    if (needsReconnect) {
+      this.logger.log("Console mode exited with port change");
+    }
+    
+    // Reset ESP state after exiting console
+    this._espStub = undefined;
+    this.esploader.IS_STUB = false;
 
     // Wait for ESP to enter bootloader mode
     await sleep(100);
@@ -319,8 +179,16 @@ export class EwtInstallDialog extends LitElement {
     this._espStub = undefined;
     this.esploader.IS_STUB = false;
 
-    // Ensure stub is initialized
-    await this._ensureStub();
+    // Ensure stub is initialized for flash operations
+    this._espStub = await ensureStubForFlash(
+      this.esploader,
+      this._espStub,
+      this.baudRate,
+      {
+        onLog: (msg) => this.logger.log(msg),
+        onError: (msg) => this.logger.error(msg),
+      },
+    );
 
     this.logger.log("ESP reset, stub loaded - ready for flash operations");
   }
@@ -401,10 +269,16 @@ export class EwtInstallDialog extends LitElement {
         this.logger.log(`Reconnect failed: ${reconnectErr.message}`);
       }
 
-      // Reset device and release locks to ensure clean state for new firmware
-      // Uses chip-specific reset methods (S2/S3/C3 with USB-JTAG use watchdog)
+      // Reset device to firmware mode for new firmware
       this.logger.log("Performing hardware reset to start new firmware...");
-      await this._resetDeviceAndReleaseLocks();
+      try {
+        await hardResetToFirmware(this.esploader, {
+          onLog: (msg) => this.logger.log(msg),
+          onError: (msg) => this.logger.error(msg),
+        });
+      } catch (err: any) {
+        this.logger.log(`Reset to firmware failed: ${err.message}`);
+      }
     } catch (resetErr: any) {
       this.logger.log(`Hard reset failed: ${resetErr.message}`);
     }
@@ -413,63 +287,6 @@ export class EwtInstallDialog extends LitElement {
     await this._initialize(true);
 
     this.requestUpdate();
-  }
-
-  // Reset device and release locks - used when returning to dashboard or recovering from errors
-  // Reset device to FIRMWARE mode (normal execution)
-  private async _resetDeviceAndReleaseLocks() {
-    // Find the actual object that has the reader/writer
-    let readerOwner = this._espStub || this.esploader;
-    if (readerOwner._parent) {
-      readerOwner = readerOwner._parent;
-      this.logger.log("Using parent loader for reader/writer");
-    }
-
-    // Call hardReset BEFORE releasing locks (so it can communicate)
-    try {
-      await this.esploader.hardReset(false);
-      this.logger.log("Device reset sent");
-    } catch (err) {
-      this.logger.log("Reset error (expected):", err);
-    }
-
-    // Wait for reset to complete
-    await sleep(500);
-
-    // NOW release locks after reset
-    await this._releaseReaderWriter();
-    this.logger.log("Device reset to firmware mode");
-
-    // Reset ESP state
-    this._espStub = undefined;
-    this.esploader.IS_STUB = false;
-    this.esploader.chipFamily = null;
-  }
-
-  // Reset device to BOOTLOADER mode (for flashing)
-  // Uses ESPLoader's reconnectToBootloader() to properly close/reopen port
-  private async _resetToBootloaderAndReleaseLocks() {
-    // Use ESPLoader's reconnectToBootloader() - it handles:
-    // - Closing port completely (releases all locks)
-    // - Reopening port at 115200 baud
-    // - Restarting readLoop()
-    // - Reset strategies to enter bootloader (connectWithResetStrategies)
-    // - Chip detection
-    // - WebUSB vs WebSerial detection and appropriate reset methods
-    try {
-      this.logger.log("Resetting ESP to bootloader mode...");
-      await this.esploader.reconnectToBootloader();
-      this.logger.log(
-        `ESP in bootloader mode: ${getChipFamilyName(this.esploader)}`,
-      );
-    } catch (err: any) {
-      this.logger.error(`Failed to reset ESP to bootloader: ${err.message}`);
-      throw err;
-    }
-
-    // Reset stub state (chipFamily is preserved by reconnectToBootloader)
-    this._espStub = undefined;
-    this.esploader.IS_STUB = false;
   }
 
   protected render() {
@@ -561,6 +378,12 @@ export class EwtInstallDialog extends LitElement {
           : ""}
         ${content!}
       </ewt-dialog>
+      
+      <!-- ESP32-S2 Modal for port selection during mode switching -->
+      <ewt-s2-modal
+        title="Port Selection Required"
+        message="The device has changed USB modes. Please select the new serial port."
+      ></ewt-s2-modal>
     `;
   }
 
@@ -736,65 +559,16 @@ export class EwtInstallDialog extends LitElement {
                       await sleep(500);
                     }
 
-                    // Different handling for different device types:
-                    // - WebSerial: Just release locks
-                    // - WebUSB CDC: Release locks, hardReset, release locks again
-                    // - WebUSB external serial: Just release locks
-                    const isWebUsbExternal =
-                      await this._isWebUsbWithExternalSerial();
-                    const isWebUsbCdc =
-                      this.esploader.isWebUSB &&
-                      this.esploader.isWebUSB() &&
-                      !isWebUsbExternal;
-
-                    if (isWebUsbCdc) {
-                      // WebUSB CDC needs hardReset to ensure firmware is running
-                      this.logger.log(
-                        "WebUSB CDC: Resetting device for Wi-Fi setup...",
-                      );
-
-                      try {
-                        // Release locks BEFORE reset
-                        await this._releaseReaderWriter();
-
-                        // Reset device
-                        await this.esploader.hardReset(false);
-                        this.logger.log("Device reset completed");
-
-                        // CRITICAL: hardReset consumes streams, recreate them
-                        await this._releaseReaderWriter();
-                        this.logger.log("Streams recreated after reset");
-
-                        // Wait for device to boot
-                        await sleep(500);
-                      } catch (err: any) {
-                        this.logger.log(`Reset error: ${err.message}`);
-                      }
-                    } else {
-                      // WebSerial or WebUSB external serial: Just release locks
-                      if (isWebUsbExternal) {
-                        this.logger.log(
-                          "WebUSB external serial: Preparing port for Wi-Fi setup...",
-                        );
-                      } else {
-                        this.logger.log(
-                          "WebSerial: Preparing port for Wi-Fi setup...",
-                        );
-                      }
-
-                      await this._releaseReaderWriter();
-                      await sleep(500);
-                    }
-
-                    this.logger.log("Port ready for new Improv client");
-
-                    // CRITICAL: Recreate streams one more time to flush any buffered firmware output
-                    // Firmware debug messages can interfere with Improv protocol
-                    this.logger.log(
-                      "Flushing serial buffer before Improv init...",
+                    // Prepare device for Improv WiFi provisioning
+                    // This handles all device types and stream management
+                    await prepareForImprovProvisioning(
+                      this.esploader,
+                      this._espStub,
+                      {
+                        onLog: (msg) => this.logger.log(msg),
+                        onError: (msg) => this.logger.error(msg),
+                      },
                     );
-                    await this._releaseReaderWriter();
-                    await sleep(100);
 
                     // Re-create Improv client (firmware is running at 115200 baud)
                     const client = new ImprovSerial(this._port, this.logger);
@@ -1563,7 +1337,12 @@ export class EwtInstallDialog extends LitElement {
       <ewt-console
         .port=${this._port}
         .logger=${this.logger}
-        .onReset=${async () => await this.esploader.hardReset(false)}
+        .onReset=${async () => {
+          await hardResetToFirmware(this.esploader, {
+            onLog: (msg) => this.logger.log(msg),
+            onError: (msg) => this.logger.log(msg),
+          });
+        }}
       ></ewt-console>
       <ewt-button
         slot="primaryAction"
@@ -2053,50 +1832,50 @@ export class EwtInstallDialog extends LitElement {
           const loaderToSave = this._espStub._parent || this._espStub;
           (this as any)._savedLoaderBeforeConsole = loaderToSave;
 
-          // CRITICAL: Release locks BEFORE calling resetToFirmware()
-          await this._releaseReaderWriter();
+          // Switch to firmware mode (handles all reset and port management)
+          const portClosed = await switchToFirmwareMode(
+            this.esploader,
+            this._espStub,
+            {
+              onLog: (msg) => this.logger.log(msg),
+              onError: (msg) => this.logger.error(msg),
+            },
+          );
 
-          // CRITICAL: Forget the old port so browser doesn't show it in selection
-          try {
-            await this._port.forget();
-            this.logger.log("Old port forgotten");
-          } catch (forgetErr: any) {
-            this.logger.log(`Port forget failed: ${forgetErr.message}`);
+          if (portClosed) {
+            // Reset ESP state (port is already closed by switchToFirmwareMode)
+            await sleep(100);
+
+            this._espStub = undefined;
+            this.esploader.IS_STUB = false;
+            this.esploader.chipFamily = null;
+            this._improvChecked = false; // Will check after user reconnects
+            this._client = undefined;
+            this._improvSupported = false;
+            this.esploader._reader = undefined;
+
+            this.logger.log("Waiting for user to select new port");
+
+            // Show port selection UI
+            this._state = "REQUEST_PORT_SELECTION";
+            this._error = "";
+            this._busy = false;
+            return;
           }
-
-          // Use resetToFirmware() which handles WDT reset and port close
-          await this.esploader.resetToFirmware();
-          this.logger.log("Device reset to firmware mode - port closed");
         } catch (err: any) {
           this.logger.debug(
             `Reset to firmware error (expected): ${err.message}`,
           );
         }
-
-        // Reset ESP state (port is already closed by resetToFirmware)
-        await sleep(100);
-
-        this._espStub = undefined;
-        this.esploader.IS_STUB = false;
-        this.esploader.chipFamily = null;
-        this._improvChecked = false; // Will check after user reconnects
-        this._client = undefined;
-        this._improvSupported = false;
-        this.esploader._reader = undefined;
-
-        this.logger.log("Waiting for user to select new port");
-
-        // Show port selection UI
-        this._state = "REQUEST_PORT_SELECTION";
-        this._error = "";
-        this._busy = false;
-        return;
       } else {
         // External serial chip: Can reset to firmware without port change
         this.logger.log("External serial chip - resetting to firmware mode");
 
         try {
-          await this._resetDeviceAndReleaseLocks();
+          await hardResetToFirmware(this.esploader, {
+            onLog: (msg) => this.logger.log(msg),
+            onError: (msg) => this.logger.error(msg),
+          });
           await sleep(500); // Wait for firmware to start
         } catch (err: any) {
           this.logger.log(`Reset to firmware failed: ${err.message}`);
@@ -2108,15 +1887,11 @@ export class EwtInstallDialog extends LitElement {
       );
     }
 
-    // Ensure streams are ready before Improv test (like Console does)
-    // This is the ONLY place we call _releaseReaderWriter before Improv test
-    try {
-      await this._releaseReaderWriter();
-      await sleep(200);
-      this.logger.log("Streams ready for Improv test");
-    } catch (err: any) {
-      this.logger.log(`Failed to prepare streams: ${err.message}`);
-    }
+    // Prepare streams for Improv test
+    await prepareStreamsForOperation(this.esploader, this._espStub, {
+      onLog: (msg) => this.logger.log(msg),
+      onError: (msg) => this.logger.error(msg),
+    });
 
     // Don't switch to bootloader on initial connect!
     // Just test Improv directly - device should now be in firmware mode
@@ -2130,7 +1905,7 @@ export class EwtInstallDialog extends LitElement {
         ? this._manifest.new_install_improv_wait_time * 1000
         : 10000;
 
-    // Call Improv test with skipReset=true (already reset in _resetDeviceAndReleaseLocks)
+    // Call Improv test with skipReset=true (already reset in _enterConsoleMode)
     await this._testImprov(timeout, true);
   }
 
@@ -2158,17 +1933,17 @@ export class EwtInstallDialog extends LitElement {
       if (actionAfterReconnect === "console" && !this._consoleInitialized) {
         this.logger.log("First console open - resetting device...");
         this._consoleInitialized = true;
-        try {
-          await this.esploader.hardReset(false);
-          this.logger.log("Device reset completed");
-        } catch (err: any) {
-          this.logger.log(`Reset error (expected): ${err.message}`);
-        }
+        await hardResetToFirmware(this.esploader, {
+          onLog: (msg) => this.logger.log(msg),
+          onError: (msg) => this.logger.log(msg),
+        });
       }
 
       // Even if already in firmware mode, ensure streams are ready
-      // This is needed for WebUSB after closing Improv client
-      await this._releaseReaderWriter();
+      await prepareStreamsForOperation(this.esploader, this._espStub, {
+        onLog: (msg) => this.logger.log(msg),
+        onError: (msg) => this.logger.error(msg),
+      });
 
       return false; // No switch needed
     }
@@ -2184,46 +1959,29 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log(`Chip detected: ${this.esploader.chipFamily}`);
     }
 
-    // CRITICAL: Create stub before reset
+    // Create stub before reset
     if (!this._espStub) {
       this.logger.log("Creating stub for firmware mode switch...");
       this._espStub = await this.esploader.runStub();
       this.logger.log(`Stub created: IS_STUB=${this._espStub.IS_STUB}`);
     }
 
-    // CRITICAL: Set baudrate to 115200 BEFORE switching
-    await this._resetBaudrateForConsole();
-
-    // CRITICAL: Save parent loader
+    // Save parent loader
     const loaderToSave = this._espStub._parent || this._espStub;
     (this as any)._savedLoaderBeforeSwitch = loaderToSave;
 
-    // Check if USB-JTAG/OTG device
-    const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
+    // Switch to firmware mode (handles all reset and port management)
+    const portClosed = await switchToFirmwareMode(
+      this.esploader,
+      this._espStub,
+      {
+        onLog: (msg) => this.logger.log(msg),
+        onError: (msg) => this.logger.error(msg),
+      },
+    );
 
-    if (isUsbJtagOrOtg) {
-      // USB-JTAG/OTG: Need WDT reset and port reconnection
-
-      // CRITICAL: Release locks BEFORE calling resetToFirmware()
-      this.logger.log("Releasing reader/writer...");
-      await this._releaseReaderWriter();
-
-      try {
-        // CRITICAL: Forget the old port
-        try {
-          await this._port.forget();
-          this.logger.log("Old port forgotten");
-        } catch (forgetErr: any) {
-          this.logger.log(`Port forget failed: ${forgetErr.message}`);
-        }
-
-        // Use resetToFirmware() for CDC this is doing a WDT reset
-        await this.esploader.resetToFirmware();
-        this.logger.log("Device reset to firmware mode - port closed");
-      } catch (err: any) {
-        this.logger.debug(`Reset to firmware error (expected): ${err.message}`);
-      }
-
+    if (portClosed) {
+      // USB-JTAG/OTG: Port was closed, need user to select new port
       // Reset ESP state
       await sleep(100);
 
@@ -2253,42 +2011,10 @@ export class EwtInstallDialog extends LitElement {
       this._error = "";
       this._busy = false;
       return true; // Port reconnection needed
-    } else {
-      // External serial chip: Can reset to firmware without port change
-      this.logger.log("External serial chip - resetting to firmware mode");
-
-      try {
-        // CRITICAL: Call hardReset BEFORE releasing locks (so it can communicate)
-        await this.esploader.hardReset(false); // false = firmware mode
-        this.logger.log("Device reset to firmware mode");
-      } catch (err: any) {
-        this.logger.log(
-          `Reset worked. Expected slip Timeout read error: ${err.message}`,
-        );
-      }
-
-      // Wait for reset to complete
-      await sleep(500);
-
-      // NOW release locks AFTER reset
-      this.logger.log("Releasing reader/writer after reset...");
-      await this._releaseReaderWriter();
-
-      // Reset ESP state
-      this._espStub = undefined;
-      this.esploader.IS_STUB = false;
-      this.esploader.chipFamily = null;
-
-      try {
-        // Do a hardReset to start firmware
-        await this.esploader.hardReset(false); // false = firmware mode
-        this.logger.log("Device in firmware mode, start firmware with reset");
-      } catch (err: any) {
-        this.logger.log(`Reset error: ${err.message}`);
-      }
-
-      return false; // No port reconnection needed
     }
+
+    // External serial: Port stayed open, no reconnection needed
+    return false;
   }
 
   private _startInstall(erase: boolean) {
@@ -2657,38 +2383,17 @@ export class EwtInstallDialog extends LitElement {
         `Port info: VID=0x${portInfo.usbVendorId?.toString(16).padStart(4, "0")}, PID=0x${portInfo.usbProductId?.toString(16).padStart(4, "0")}`,
       );
 
-      // CRITICAL: Reset device BEFORE testing Improv to ensure firmware is running (unless skipReset is true)
-      if (!skipReset) {
-        this.logger.log("Resetting device for Improv detection...");
-
-        try {
-          // Release locks before reset
-          await this._releaseReaderWriter();
-
-          await this.esploader.hardReset(false);
-          this.logger.log("Device reset sent, device is rebooting...");
-
-          // CRITICAL: hardReset consumes the streams
-          // Need to recreate them before Improv can use the port
-          await this._releaseReaderWriter();
-          this.logger.log("Streams recreated after reset");
-
-          // Wait for device to boot up
-          this.logger.log(
-            "Waiting for firmware running to be ready for Improv test...",
-          );
-          await sleep(500);
-        } catch (resetErr: any) {
-          this.logger.log(`Failed to reset device: ${resetErr.message}`);
-          // Continue anyway
-        }
-      }
-
-      // CRITICAL: Recreate streams one more time to flush any buffered firmware output
-      // Firmware debug messages can interfere with Improv protocol
-      this.logger.log("Flushing serial buffer before Improv init...");
-      await this._releaseReaderWriter();
-      await sleep(100);
+      // Prepare device for Improv test
+      // This handles reset, stream recreation, and buffer flushing
+      await prepareForImprovTest(
+        this.esploader,
+        this._espStub,
+        skipReset,
+        {
+          onLog: (msg) => this.logger.log(msg),
+          onError: (msg) => this.logger.error(msg),
+        },
+      );
 
       improvSerial = new ImprovSerial(this._port, this.logger);
       improvSerial.addEventListener("state-changed", () => {
@@ -2837,50 +2542,16 @@ export class EwtInstallDialog extends LitElement {
         await sleep(200);
       }
 
-      // Different handling for different device types:
-      // - WebSerial: Just release locks
-      // - WebUSB CDC: Do hardReset + release locks
-      // - WebUSB external serial: Just release locks
-      const isWebUsbExternal = await this._isWebUsbWithExternalSerial();
-      const isWebUsbCdc =
-        this.esploader.isWebUSB &&
-        this.esploader.isWebUSB() &&
-        !isWebUsbExternal;
-
-      if (isWebUsbCdc) {
-        // WebUSB CDC needs hardReset
-        this.logger.log("WebUSB CDC: Resetting device for Wi-Fi setup...");
-
-        try {
-          await this.esploader.hardReset(false);
-          this.logger.log("Device reset completed");
-        } catch (err: any) {
-          this.logger.log(`Reset error: ${err.message}`);
-        }
-
-        await this._releaseReaderWriter();
-        await sleep(200);
-      } else {
-        // WebSerial or WebUSB external serial: Just release locks
-        if (isWebUsbExternal) {
-          this.logger.log(
-            "WebUSB external serial: Preparing port for Wi-Fi setup...",
-          );
-        } else {
-          this.logger.log("WebSerial: Preparing port for Wi-Fi setup...");
-        }
-
-        await this._releaseReaderWriter();
-        await sleep(200);
-      }
-
-      this.logger.log("Port ready for Wi-Fi setup");
-
-      // CRITICAL: Recreate streams one more time to flush any buffered firmware output
-      // Firmware debug messages can interfere with Improv protocol
-      this.logger.log("Flushing serial buffer before Improv init...");
-      await this._releaseReaderWriter();
-      await sleep(100);
+      // Prepare device for Improv WiFi provisioning
+      // This handles all device types and stream management
+      await prepareForImprovProvisioning(
+        this.esploader,
+        this._espStub,
+        {
+          onLog: (msg) => this.logger.log(msg),
+          onError: (msg) => this.logger.error(msg),
+        },
+      );
 
       // Re-create Improv client for Wi-Fi provisioning
       this.logger.log("Re-initializing Improv Serial for Wi-Fi setup");
