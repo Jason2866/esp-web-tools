@@ -35,9 +35,11 @@ import {
   hardResetToFirmware,
   prepareForImprovProvisioning,
   prepareForImprovTest,
-  switchToFirmwareMode,
   prepareStreamsForOperation,
   ensureStubForFlash,
+  handleFlashCompleteUsbJtag,
+  handleFlashCompleteExternalSerial,
+  prepareDeviceForImprov,
 } from "./mode-switching";
 
 const ERROR_ICON = "⚠️";
@@ -167,7 +169,7 @@ export class EwtInstallDialog extends LitElement {
     if (needsReconnect) {
       this.logger.log("Console mode exited with port change");
     }
-    
+
     // Reset ESP state after exiting console
     this._espStub = undefined;
     this.esploader.IS_STUB = false;
@@ -201,32 +203,18 @@ export class EwtInstallDialog extends LitElement {
     this._isUsbJtagOrOtgDevice = isUsbJtagOrOtg; // Update state for UI
 
     if (isUsbJtagOrOtg) {
-      // For USB-JTAG/OTG devices: Reset to firmware mode (port will change!)
-      // Then user must select new port (User Gesture) and we test Improv
-      this.logger.log("USB-JTAG/OTG device - resetting to firmware mode");
-
-      // CRITICAL: Release locks BEFORE resetToFirmware()
-      await this._releaseReaderWriter();
-
-      // CRITICAL: Forget the old port so browser doesn't show it in selection
-      try {
-        await this._port.forget();
-        this.logger.log("Old port forgotten");
-      } catch (forgetErr: any) {
-        this.logger.log(`Port forget failed: ${forgetErr.message}`);
-      }
-
-      try {
-        // Use resetToFirmware() method close the port and device will reboot to firmware
-        await this.esploader.resetToFirmware();
-        this.logger.log("Device reset to firmware mode - port closed");
-      } catch (err: any) {
-        this.logger.debug(`Reset to firmware error (expected): ${err.message}`);
-      }
+      // USB-JTAG/OTG: Handle port closure and reconnection
+      await handleFlashCompleteUsbJtag(
+        this.esploader,
+        this._espStub,
+        this._port,
+        {
+          onLog: (msg) => this.logger.log(msg),
+          onError: (msg) => this.logger.error(msg),
+        },
+      );
 
       // Reset ESP state
-      await sleep(100);
-
       this._espStub = undefined;
       this.esploader.IS_STUB = false;
       this.esploader.chipFamily = null;
@@ -235,8 +223,6 @@ export class EwtInstallDialog extends LitElement {
       this._improvSupported = false; // Unknown until after reconnect
       this.esploader._reader = undefined;
 
-      this.logger.log("Flash complete - waiting for user to select new port");
-
       // CRITICAL: Set state to REQUEST_PORT_SELECTION to show "Select Port" button
       this._state = "REQUEST_PORT_SELECTION";
       this._error = "";
@@ -244,9 +230,11 @@ export class EwtInstallDialog extends LitElement {
       return;
     }
 
-    // Normal flow for non-USB-JTAG/OTG devices
-    // Release locks and reset ESP state for Improv test
-    await this._releaseReaderWriter();
+    // External serial: Handle reconnection and reset
+    await handleFlashCompleteExternalSerial(this.esploader, this._espStub, {
+      onLog: (msg) => this.logger.log(msg),
+      onError: (msg) => this.logger.error(msg),
+    });
 
     // Reset ESP state for Improv test
     this._espStub = undefined;
@@ -254,34 +242,6 @@ export class EwtInstallDialog extends LitElement {
     this.esploader.chipFamily = null;
     this._improvChecked = false;
     this.esploader._reader = undefined;
-    this.logger.log("ESP state reset for Improv test");
-
-    // Reconnect with 115200 baud and reset ESP to boot into new firmware
-    try {
-      // CRITICAL: After flashing at higher baudrate, reconnect at 115200
-      // reconnectToBootloader() closes port and reopens at 115200 baud
-      // It now automatically detects WebUSB vs WebSerial and uses appropriate methods
-      this.logger.log("Reconnecting at 115200 baud for firmware reset...");
-      try {
-        await this.esploader.reconnectToBootloader();
-        this.logger.log("Port reconnected at 115200 baud");
-      } catch (reconnectErr: any) {
-        this.logger.log(`Reconnect failed: ${reconnectErr.message}`);
-      }
-
-      // Reset device to firmware mode for new firmware
-      this.logger.log("Performing hardware reset to start new firmware...");
-      try {
-        await hardResetToFirmware(this.esploader, {
-          onLog: (msg) => this.logger.log(msg),
-          onError: (msg) => this.logger.error(msg),
-        });
-      } catch (err: any) {
-        this.logger.log(`Reset to firmware failed: ${err.message}`);
-      }
-    } catch (resetErr: any) {
-      this.logger.log(`Hard reset failed: ${resetErr.message}`);
-    }
 
     // Test Improv with new firmware
     await this._initialize(true);
@@ -378,7 +338,7 @@ export class EwtInstallDialog extends LitElement {
           : ""}
         ${content!}
       </ewt-dialog>
-      
+
       <!-- ESP32-S2 Modal for port selection during mode switching -->
       <ewt-s2-modal
         title="Port Selection Required"
@@ -1798,100 +1758,40 @@ export class EwtInstallDialog extends LitElement {
     const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
     this._isUsbJtagOrOtgDevice = isUsbJtagOrOtg; // Update state for UI
 
-    // Check if device is in bootloader mode
-    // If yes, switch to firmware mode first (needed for Improv)
-    const inBootloaderMode = this.esploader.chipFamily !== null;
+    // Prepare device for Improv (handles bootloader → firmware mode switch)
+    const { portClosed, espStub } = await prepareDeviceForImprov(
+      this.esploader,
+      this._espStub,
+      {
+        onLog: (msg) => this.logger.log(msg),
+        onError: (msg) => this.logger.error(msg),
+      },
+    );
 
-    if (inBootloaderMode) {
-      this.logger.log(
-        "Device is in BOOTLOADER mode - switching to FIRMWARE mode for Improv test",
-      );
+    if (portClosed) {
+      // USB-JTAG/OTG: Port was closed, need user to select new port
+      await sleep(100);
 
-      if (isUsbJtagOrOtg) {
-        // USB-JTAG/OTG: Need WDT reset → port closes → user must select new port
-        this.logger.log(
-          "USB-JTAG/OTG device - need to switch to firmware mode",
-        );
+      // Reset ESP state
+      this._espStub = undefined;
+      this.esploader.IS_STUB = false;
+      this.esploader.chipFamily = null;
+      this._improvChecked = false; // Will check after user reconnects
+      this._client = undefined;
+      this._improvSupported = false;
+      this.esploader._reader = undefined;
 
-        try {
-          // CRITICAL: Ensure chipFamily is set before calling resetToFirmware()
-          if (!this.esploader.chipFamily) {
-            this.logger.log("Detecting chip type...");
-            await this.esploader.initialize();
-            this.logger.log(`Chip detected: ${this.esploader.chipFamily}`);
-          }
+      this.logger.log("Waiting for user to select new port");
 
-          // CRITICAL: Create stub before reset
-          if (!this._espStub) {
-            this.logger.log("Creating stub for firmware mode switch...");
-            this._espStub = await this.esploader.runStub();
-            this.logger.log(`Stub created: IS_STUB=${this._espStub.IS_STUB}`);
-          }
-
-          // CRITICAL: Save parent loader
-          const loaderToSave = this._espStub._parent || this._espStub;
-          (this as any)._savedLoaderBeforeConsole = loaderToSave;
-
-          // Switch to firmware mode (handles all reset and port management)
-          const portClosed = await switchToFirmwareMode(
-            this.esploader,
-            this._espStub,
-            {
-              onLog: (msg) => this.logger.log(msg),
-              onError: (msg) => this.logger.error(msg),
-            },
-          );
-
-          if (portClosed) {
-            // Reset ESP state (port is already closed by switchToFirmwareMode)
-            await sleep(100);
-
-            this._espStub = undefined;
-            this.esploader.IS_STUB = false;
-            this.esploader.chipFamily = null;
-            this._improvChecked = false; // Will check after user reconnects
-            this._client = undefined;
-            this._improvSupported = false;
-            this.esploader._reader = undefined;
-
-            this.logger.log("Waiting for user to select new port");
-
-            // Show port selection UI
-            this._state = "REQUEST_PORT_SELECTION";
-            this._error = "";
-            this._busy = false;
-            return;
-          }
-        } catch (err: any) {
-          this.logger.debug(
-            `Reset to firmware error (expected): ${err.message}`,
-          );
-        }
-      } else {
-        // External serial chip: Can reset to firmware without port change
-        this.logger.log("External serial chip - resetting to firmware mode");
-
-        try {
-          await hardResetToFirmware(this.esploader, {
-            onLog: (msg) => this.logger.log(msg),
-            onError: (msg) => this.logger.error(msg),
-          });
-          await sleep(500); // Wait for firmware to start
-        } catch (err: any) {
-          this.logger.log(`Reset to firmware failed: ${err.message}`);
-        }
-      }
-    } else {
-      this.logger.log(
-        "Device is already in FIRMWARE mode - ready for Improv test",
-      );
+      // Show port selection UI
+      this._state = "REQUEST_PORT_SELECTION";
+      this._error = "";
+      this._busy = false;
+      return;
     }
 
-    // Prepare streams for Improv test
-    await prepareStreamsForOperation(this.esploader, this._espStub, {
-      onLog: (msg) => this.logger.log(msg),
-      onError: (msg) => this.logger.error(msg),
-    });
+    // Update stub reference
+    this._espStub = espStub;
 
     // Don't switch to bootloader on initial connect!
     // Just test Improv directly - device should now be in firmware mode
@@ -1952,26 +1852,8 @@ export class EwtInstallDialog extends LitElement {
       `Device is in bootloader mode - switching to firmware for ${actionAfterReconnect || "operation"}`,
     );
 
-    // CRITICAL: Ensure chipFamily is set
-    if (!this.esploader.chipFamily) {
-      this.logger.log("Detecting chip type...");
-      await this.esploader.initialize();
-      this.logger.log(`Chip detected: ${this.esploader.chipFamily}`);
-    }
-
-    // Create stub before reset
-    if (!this._espStub) {
-      this.logger.log("Creating stub for firmware mode switch...");
-      this._espStub = await this.esploader.runStub();
-      this.logger.log(`Stub created: IS_STUB=${this._espStub.IS_STUB}`);
-    }
-
-    // Save parent loader
-    const loaderToSave = this._espStub._parent || this._espStub;
-    (this as any)._savedLoaderBeforeSwitch = loaderToSave;
-
-    // Switch to firmware mode (handles all reset and port management)
-    const portClosed = await switchToFirmwareMode(
+    // Prepare device for firmware mode (handles chip detection, stub creation, and mode switch)
+    const { portClosed, espStub } = await prepareDeviceForImprov(
       this.esploader,
       this._espStub,
       {
@@ -1982,9 +1864,9 @@ export class EwtInstallDialog extends LitElement {
 
     if (portClosed) {
       // USB-JTAG/OTG: Port was closed, need user to select new port
-      // Reset ESP state
       await sleep(100);
 
+      // Reset ESP state
       this._espStub = undefined;
       this.esploader.IS_STUB = false;
       this.esploader.chipFamily = null;
@@ -2012,6 +1894,9 @@ export class EwtInstallDialog extends LitElement {
       this._busy = false;
       return true; // Port reconnection needed
     }
+
+    // Update stub reference
+    this._espStub = espStub;
 
     // External serial: Port stayed open, no reconnection needed
     return false;
@@ -2385,15 +2270,10 @@ export class EwtInstallDialog extends LitElement {
 
       // Prepare device for Improv test
       // This handles reset, stream recreation, and buffer flushing
-      await prepareForImprovTest(
-        this.esploader,
-        this._espStub,
-        skipReset,
-        {
-          onLog: (msg) => this.logger.log(msg),
-          onError: (msg) => this.logger.error(msg),
-        },
-      );
+      await prepareForImprovTest(this.esploader, this._espStub, skipReset, {
+        onLog: (msg) => this.logger.log(msg),
+        onError: (msg) => this.logger.error(msg),
+      });
 
       improvSerial = new ImprovSerial(this._port, this.logger);
       improvSerial.addEventListener("state-changed", () => {
@@ -2544,14 +2424,10 @@ export class EwtInstallDialog extends LitElement {
 
       // Prepare device for Improv WiFi provisioning
       // This handles all device types and stream management
-      await prepareForImprovProvisioning(
-        this.esploader,
-        this._espStub,
-        {
-          onLog: (msg) => this.logger.log(msg),
-          onError: (msg) => this.logger.error(msg),
-        },
-      );
+      await prepareForImprovProvisioning(this.esploader, this._espStub, {
+        onLog: (msg) => this.logger.log(msg),
+        onError: (msg) => this.logger.error(msg),
+      });
 
       // Re-create Improv client for Wi-Fi provisioning
       this.logger.log("Re-initializing Improv Serial for Wi-Fi setup");

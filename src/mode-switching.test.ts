@@ -118,7 +118,7 @@ describe("Mode Switching - Enter Console Mode", () => {
   it("should handle USB-JTAG devices", async () => {
     const hardResetMock = vi.fn().mockResolvedValue(undefined);
     const detectUsbConnectionTypeMock = vi.fn().mockResolvedValue(true);
-    
+
     const esploader = {
       port: { writable: true, readable: true },
       detectUsbConnectionType: detectUsbConnectionTypeMock,
@@ -135,7 +135,7 @@ describe("Mode Switching - Enter Console Mode", () => {
   it("should handle external serial chip devices", async () => {
     const hardResetMock = vi.fn().mockResolvedValue(undefined);
     const detectUsbConnectionTypeMock = vi.fn().mockResolvedValue(false);
-    
+
     const esploader = {
       port: { writable: true, readable: true },
       detectUsbConnectionType: detectUsbConnectionTypeMock,
@@ -152,7 +152,7 @@ describe("Mode Switching - Enter Console Mode", () => {
   it("should call callbacks", async () => {
     const onLogMock = vi.fn();
     const onErrorMock = vi.fn();
-    
+
     const esploader = {
       port: { writable: true, readable: true },
       detectUsbConnectionType: vi.fn().mockResolvedValue(false),
@@ -183,7 +183,7 @@ describe("Mode Switching - Exit Console Mode", () => {
 
   it("should handle USB-OTG devices (S2)", async () => {
     const hardResetMock = vi.fn().mockResolvedValue(undefined);
-    
+
     const esploader = {
       chipFamily: 0x00000002, // ESP32-S2
       chipName: "ESP32-S2",
@@ -198,7 +198,7 @@ describe("Mode Switching - Exit Console Mode", () => {
 
   it("should handle USB-OTG devices (P4)", async () => {
     const hardResetMock = vi.fn().mockResolvedValue(undefined);
-    
+
     const esploader = {
       chipFamily: 0x00000012, // ESP32-P4
       chipName: "ESP32-P4",
@@ -213,7 +213,7 @@ describe("Mode Switching - Exit Console Mode", () => {
 
   it("should handle non-OTG devices", async () => {
     const reconnectToBootloaderMock = vi.fn().mockResolvedValue(undefined);
-    
+
     const esploader = {
       chipFamily: 0x00000005, // ESP32-C3
       reconnectToBootloader: reconnectToBootloaderMock,
@@ -241,7 +241,7 @@ describe("Mode Switching - Reset in Console Mode", () => {
   it("should not reset if console reset is not supported", async () => {
     const hardResetMock = vi.fn();
     const onLogMock = vi.fn();
-    
+
     const esploader = {
       chipFamily: 0x00000002, // ESP32-S2
       isUsbJtagOrOtg: true,
@@ -252,13 +252,13 @@ describe("Mode Switching - Reset in Console Mode", () => {
 
     expect(hardResetMock).not.toHaveBeenCalled();
     expect(onLogMock).toHaveBeenCalledWith(
-      expect.stringContaining("not supported")
+      expect.stringContaining("not supported"),
     );
   });
 
   it("should reset if console reset is supported", async () => {
     const hardResetMock = vi.fn().mockResolvedValue(undefined);
-    
+
     const esploader = {
       chipFamily: 0x00000005, // ESP32-C3
       isUsbJtagOrOtg: false,
@@ -272,7 +272,7 @@ describe("Mode Switching - Reset in Console Mode", () => {
 
   it("should throw error on reset failure", async () => {
     const hardResetMock = vi.fn().mockRejectedValue(new Error("Reset failed"));
-    
+
     const esploader = {
       chipFamily: 0x00000005,
       isUsbJtagOrOtg: false,
@@ -289,7 +289,7 @@ describe("Mode Switching - Error Handling", () => {
     const detectUsbConnectionTypeMock = vi
       .fn()
       .mockRejectedValue(new Error("Detection failed"));
-    
+
     const esploader = {
       port: { writable: true, readable: true },
       detectUsbConnectionType: detectUsbConnectionTypeMock,
@@ -299,14 +299,14 @@ describe("Mode Switching - Error Handling", () => {
     await enterConsoleMode(esploader, { onError: onErrorMock });
 
     expect(onErrorMock).toHaveBeenCalledWith(
-      expect.stringContaining("Detection failed")
+      expect.stringContaining("Detection failed"),
     );
   });
 
   it("should handle reset failure", async () => {
     const onErrorMock = vi.fn();
     const hardResetMock = vi.fn().mockRejectedValue(new Error("Reset failed"));
-    
+
     const esploader = {
       port: { writable: true, readable: true },
       detectUsbConnectionType: vi.fn().mockResolvedValue(false),
@@ -316,7 +316,7 @@ describe("Mode Switching - Error Handling", () => {
     await enterConsoleMode(esploader, { onError: onErrorMock });
 
     expect(onErrorMock).toHaveBeenCalledWith(
-      expect.stringContaining("Reset failed")
+      expect.stringContaining("Reset failed"),
     );
   });
 });

@@ -31,14 +31,14 @@ export async function setBaudrate(
   }
 
   const currentBaud = espStub.currentBaudRate || 115200;
-  
+
   if (currentBaud === baudRate) {
     onLog?.(`Baudrate already at ${baudRate}, skipping`);
     return;
   }
 
   onLog?.(`Setting baudrate from ${currentBaud} to ${baudRate}...`);
-  
+
   try {
     await espStub.setBaudrate(baudRate);
     onLog?.(`Baudrate set to ${baudRate}`);
@@ -54,10 +54,10 @@ export async function setBaudrate(
 /**
  * Ensure baudrate is set for FLASH operations (BOOTLOADER mode)
  * Flash operations use HIGH SPEED baudrate (e.g. 460800 or user-specified)
- * 
+ *
  * IMPORTANT: Only use this for BOOTLOADER/FLASH mode!
  * For FIRMWARE/CONSOLE mode, always use 115200 (see resetBaudrateForConsole)
- * 
+ *
  * @param espStub - ESP stub instance
  * @param baudRate - Target baudrate for flash operations (typically 460800 or higher)
  * @param callbacks - Logging callbacks
@@ -82,10 +82,10 @@ export async function ensureFlashBaudrate(
 /**
  * Reset baudrate to 115200 for CONSOLE mode (FIRMWARE mode)
  * Firmware console ALWAYS runs at 115200 baud
- * 
+ *
  * IMPORTANT: Only use this when switching to FIRMWARE/CONSOLE mode!
  * For BOOTLOADER/FLASH mode, use ensureFlashBaudrate with high speed
- * 
+ *
  * @param espStub - ESP stub instance
  * @param callbacks - Logging callbacks
  */
@@ -101,13 +101,15 @@ export async function resetBaudrateForConsole(
   }
 
   const currentBaud = espStub.currentBaudRate || 115200;
-  
+
   if (currentBaud === 115200) {
     onLog?.("Baudrate already at 115200 for console");
     return;
   }
 
-  onLog?.(`Resetting baudrate from ${currentBaud} to 115200 for CONSOLE/FIRMWARE mode`);
+  onLog?.(
+    `Resetting baudrate from ${currentBaud} to 115200 for CONSOLE/FIRMWARE mode`,
+  );
   await setBaudrate(espStub, 115200, callbacks);
 }
 
@@ -225,7 +227,6 @@ export async function hardResetToBootloader(
   // Wait for reset to complete
   await sleep(500);
 }
-
 
 /**
  * Check if device is ESP32-S2
@@ -404,7 +405,9 @@ export async function exitConsoleMode(
     }
 
     await sleep(500);
-    onLog?.(`${esploader.chipName}: Port changed. Please select the bootloader port.`);
+    onLog?.(
+      `${esploader.chipName}: Port changed. Please select the bootloader port.`,
+    );
     return true; // Manual reconnection needed
   }
 
@@ -574,10 +577,7 @@ export async function reconnectToBootloader(
  * Show modal for ESP32-S2 port selection
  * Returns a promise that resolves when user clicks reconnect
  */
-export function showS2Modal(
-  title: string,
-  message: string,
-): Promise<void> {
+export function showS2Modal(title: string, message: string): Promise<void> {
   return new Promise((resolve) => {
     // Create modal element
     const modal = document.createElement("div");
@@ -823,7 +823,9 @@ export async function resetS2ConsoleMode(
     return;
   }
 
-  onLog?.("ESP32-S2 console reset: entering bootloader, then WDT reset to firmware...");
+  onLog?.(
+    "ESP32-S2 console reset: entering bootloader, then WDT reset to firmware...",
+  );
 
   // Exit console mode (firmware → bootloader)
   const needsReconnect = await exitConsoleMode(esploader, callbacks);
@@ -1002,9 +1004,159 @@ export async function prepareStreamsForOperation(
 }
 
 /**
+ * Handle post-flash cleanup for USB-JTAG/OTG devices
+ * Resets to firmware mode and prepares for port reconnection
+ * @param esploader - ESP loader instance
+ * @param espStub - ESP stub instance
+ * @param port - Serial port
+ * @param callbacks - Logging callbacks
+ * @returns true if port was closed and needs reconnection, false otherwise
+ */
+export async function handleFlashCompleteUsbJtag(
+  esploader: any,
+  espStub: any | undefined,
+  port: SerialPort,
+  callbacks: ModeSwitchingCallbacks = {},
+): Promise<boolean> {
+  const { onLog } = callbacks;
+
+  onLog?.("USB-JTAG/OTG device - resetting to firmware mode");
+
+  // CRITICAL: Release locks BEFORE resetToFirmware()
+  await releaseReaderWriter(esploader, espStub, callbacks);
+
+  // CRITICAL: Forget the old port so browser doesn't show it in selection
+  try {
+    await port.forget();
+    onLog?.("Old port forgotten");
+  } catch (forgetErr: any) {
+    onLog?.(`Port forget failed: ${forgetErr.message}`);
+  }
+
+  try {
+    // Use resetToFirmware() method - closes port and device will reboot to firmware
+    await esploader.resetToFirmware();
+    onLog?.("Device reset to firmware mode - port closed");
+  } catch (err: any) {
+    onLog?.(`Reset to firmware error (expected): ${err.message}`);
+  }
+
+  // Wait for reset to complete
+  await sleep(100);
+
+  onLog?.("Flash complete - port closed, needs reconnection");
+  return true; // Port closed, needs reconnection
+}
+
+/**
+ * Handle post-flash cleanup for external serial devices
+ * Reconnects at 115200 baud and resets to firmware mode
+ * @param esploader - ESP loader instance
+ * @param espStub - ESP stub instance
+ * @param callbacks - Logging callbacks
+ */
+export async function handleFlashCompleteExternalSerial(
+  esploader: any,
+  espStub: any | undefined,
+  callbacks: ModeSwitchingCallbacks = {},
+): Promise<void> {
+  const { onLog } = callbacks;
+
+  onLog?.("External serial device - preparing for firmware mode");
+
+  // Release locks and reset ESP state for Improv test
+  await releaseReaderWriter(esploader, espStub, callbacks);
+  onLog?.("ESP state reset for Improv test");
+
+  // Reconnect with 115200 baud and reset ESP to boot into new firmware
+  try {
+    // CRITICAL: After flashing at higher baudrate, reconnect at 115200
+    // reconnectToBootloader() closes port and reopens at 115200 baud
+    onLog?.("Reconnecting at 115200 baud for firmware reset...");
+    try {
+      await esploader.reconnectToBootloader();
+      onLog?.("Port reconnected at 115200 baud");
+    } catch (reconnectErr: any) {
+      onLog?.(`Reconnect failed: ${reconnectErr.message}`);
+    }
+
+    // Reset device to firmware mode for new firmware
+    onLog?.("Performing hardware reset to start new firmware...");
+    try {
+      await hardResetToFirmware(esploader, callbacks);
+    } catch (err: any) {
+      onLog?.(`Reset to firmware failed: ${err.message}`);
+    }
+  } catch (resetErr: any) {
+    onLog?.(`Hard reset failed: ${resetErr.message}`);
+  }
+
+  onLog?.("Flash complete - device ready for Improv test");
+}
+
+/**
+ * Prepare device for Improv initialization
+ * Switches from bootloader to firmware mode if needed
+ * @param esploader - ESP loader instance
+ * @param espStub - ESP stub instance (optional)
+ * @param callbacks - Logging callbacks with onPortChange for USB-JTAG/OTG devices
+ * @returns Object with portClosed flag and updated espStub
+ */
+export async function prepareDeviceForImprov(
+  esploader: any,
+  espStub: any | undefined,
+  callbacks: ModeSwitchingCallbacks = {},
+): Promise<{ portClosed: boolean; espStub: any | undefined }> {
+  const { onLog } = callbacks;
+
+  // Check if device is in bootloader mode
+  const inBootloaderMode = esploader.chipFamily !== null;
+
+  if (!inBootloaderMode) {
+    onLog?.("Device is already in FIRMWARE mode - ready for Improv test");
+
+    // Prepare streams for Improv test
+    await prepareStreamsForOperation(esploader, espStub, callbacks);
+
+    return { portClosed: false, espStub };
+  }
+
+  onLog?.(
+    "Device is in BOOTLOADER mode - switching to FIRMWARE mode for Improv test",
+  );
+
+  // Ensure chipFamily is set
+  if (!esploader.chipFamily) {
+    onLog?.("Detecting chip type...");
+    await esploader.initialize();
+    onLog?.(`Chip detected: ${esploader.chipFamily}`);
+  }
+
+  // Create stub before reset if needed
+  if (!espStub || !espStub.IS_STUB) {
+    onLog?.("Creating stub for firmware mode switch...");
+    espStub = await esploader.runStub();
+    onLog?.(`Stub created: IS_STUB=${espStub.IS_STUB}`);
+  }
+
+  // Switch to firmware mode (handles all reset and port management)
+  const portClosed = await switchToFirmwareMode(esploader, espStub, callbacks);
+
+  if (portClosed) {
+    onLog?.("Port closed - needs reconnection");
+    return { portClosed: true, espStub: undefined };
+  }
+
+  // Port stayed open - prepare streams
+  await prepareStreamsForOperation(esploader, espStub, callbacks);
+
+  return { portClosed: false, espStub };
+}
+
+/**
  * Ensure stub is initialized and ready for FLASH operations
  * Sets HIGH SPEED baudrate for fast flashing (bootloader mode)
- * 
+ *
  * @param esploader - ESP loader instance
  * @param existingStub - Existing stub instance (optional)
  * @param baudRate - Target baudrate for flash operations (e.g. 460800)
@@ -1044,10 +1196,14 @@ export async function ensureStubForFlash(
         onLog?.(`Found chip: ${esploader.chipFamily}`);
         break; // Success!
       } catch (err: any) {
-        onError?.(`Connection failed to stub (attempt ${attempt}/2): ${err.message}`);
+        onError?.(
+          `Connection failed to stub (attempt ${attempt}/2): ${err.message}`,
+        );
         if (attempt === 2) {
           // Both attempts failed
-          throw new Error(`Failed to connect to ESP after 2 attempts: ${err.message}`);
+          throw new Error(
+            `Failed to connect to ESP after 2 attempts: ${err.message}`,
+          );
         }
       }
     }

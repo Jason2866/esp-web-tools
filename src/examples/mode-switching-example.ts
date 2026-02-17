@@ -28,10 +28,10 @@ export async function exampleEnterConsoleMode(esploader: any) {
     onError: (msg) => console.error(`[ERROR] ${msg}`),
     onPortChange: async (message, reason) => {
       console.log(`Port change requested: ${message} (${reason})`);
-      
+
       // Show modal to user
       alert(message);
-      
+
       // Request new port
       if (isUsingWebUSB()) {
         const requestSerialPort = (globalThis as any).requestSerialPort;
@@ -64,7 +64,7 @@ export async function exampleExitConsoleMode(esploader: any) {
     onPortChange: async (message, reason) => {
       console.log(`Port change requested: ${message} (${reason})`);
       alert(message);
-      
+
       if (isUsingWebUSB()) {
         const requestSerialPort = (globalThis as any).requestSerialPort;
         return await requestSerialPort();
@@ -133,7 +133,7 @@ export async function exampleS2ConsoleReset(esploader: any) {
     onError: (msg) => console.error(`[ERROR] ${msg}`),
     onPortChange: async (message, reason) => {
       console.log(`Port change requested: ${message} (${reason})`);
-      
+
       // Show appropriate message based on reason
       if (reason === "s2-reset-bootloader") {
         alert("Step 1/2: Select bootloader port for WDT reset");
@@ -142,7 +142,7 @@ export async function exampleS2ConsoleReset(esploader: any) {
       } else {
         alert(message);
       }
-      
+
       if (isUsingWebUSB()) {
         const requestSerialPort = (globalThis as any).requestSerialPort;
         return await requestSerialPort();
@@ -173,7 +173,7 @@ export async function exampleCompleteConsoleSession(esploader: any) {
     onPortChange: async (message, reason) => {
       console.log(`Port change: ${message} (${reason})`);
       alert(message);
-      
+
       if (isUsingWebUSB()) {
         const requestSerialPort = (globalThis as any).requestSerialPort;
         return await requestSerialPort();
@@ -192,7 +192,7 @@ export async function exampleCompleteConsoleSession(esploader: any) {
     // Step 2: Do console work (read logs, etc.)
     console.log("Step 2: Console is now active - you can read logs here");
     // ... your console work here ...
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate work
+    await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate work
 
     // Step 3: Reset if needed (optional)
     if (isConsoleResetSupported(esploader)) {
@@ -218,7 +218,10 @@ export async function exampleCompleteConsoleSession(esploader: any) {
  * Example 6: Flash → Console Flow
  * Common pattern: flash firmware, then immediately open console
  */
-export async function exampleFlashAndConsole(esploader: any, firmwareData: Uint8Array) {
+export async function exampleFlashAndConsole(
+  esploader: any,
+  firmwareData: Uint8Array,
+) {
   console.log("=== Example: Flash and Console ===");
 
   const callbacks: ModeSwitchingCallbacks = {
@@ -248,7 +251,6 @@ export async function exampleFlashAndConsole(esploader: any, firmwareData: Uint8
 
     // Now you can read console output
     // ... read console here ...
-
   } catch (err: any) {
     console.error("✗ Flash and console failed:", err.message);
   }
@@ -266,9 +268,13 @@ export function exampleDetectCapabilities(esploader: any) {
   const usingWebUSB = isUsingWebUSB();
 
   console.log(`Device: ${esploader.chipName || "Unknown"}`);
-  console.log(`Chip Family: 0x${(esploader.chipFamily || 0).toString(16).padStart(8, "0")}`);
+  console.log(
+    `Chip Family: 0x${(esploader.chipFamily || 0).toString(16).padStart(8, "0")}`,
+  );
   console.log(`Is ESP32-S2: ${isS2 ? "YES" : "NO"}`);
-  console.log(`Console Reset Supported: ${consoleResetSupported ? "YES" : "NO"}`);
+  console.log(
+    `Console Reset Supported: ${consoleResetSupported ? "YES" : "NO"}`,
+  );
   console.log(`Using WebUSB (Android): ${usingWebUSB ? "YES" : "NO"}`);
 
   if (isS2) {
