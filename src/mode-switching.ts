@@ -299,7 +299,11 @@ export async function isWebUsbWithExternalSerial(
 
 /**
  * Enter console mode (bootloader → firmware)
- * Returns true if port was closed and needs to be reopened
+ * Delegates to esploader.enterConsoleMode() which handles all chip-specific logic:
+ * - USB-JTAG/OTG with WDT support (S2/S3/P4): WDT reset, port changes → returns true
+ * - USB-JTAG without WDT (C3/C5/C6/H2): classic DTR/RTS reset, port stays → returns false
+ * - External serial: release locks + classic reset, port stays → returns false
+ * @returns true if port was closed and needs to be reopened
  */
 export async function enterConsoleMode(
   esploader: any,
@@ -307,72 +311,36 @@ export async function enterConsoleMode(
 ): Promise<boolean> {
   const { onLog, onError } = callbacks;
 
-  // Check if enterConsoleMode method exists on esploader
+  // Delegate to the library's enterConsoleMode() which handles everything correctly
   if (typeof esploader.enterConsoleMode === "function") {
     onLog?.("Using esploader.enterConsoleMode()");
-    return await esploader.enterConsoleMode();
-  }
-
-  // Fallback implementation if method doesn't exist
-  onLog?.("Entering console mode...");
-
-  // Reset baudrate to 115200 for console (firmware always runs at 115200)
-  await resetBaudrateForConsole(esploader, callbacks);
-
-  // Check if port is open
-  if (!esploader.port?.writable || !esploader.port?.readable) {
-    onLog?.("Port is not open - port selection needed");
-    return true;
-  }
-
-  // Detect USB connection type
-  let isUsbJtag = false;
-  try {
-    if (typeof esploader.detectUsbConnectionType === "function") {
-      isUsbJtag = await esploader.detectUsbConnectionType();
+    try {
+      const portClosed = await esploader.enterConsoleMode();
       onLog?.(
-        `USB connection type: ${isUsbJtag ? "USB-JTAG/OTG" : "External Serial Chip"}`,
+        portClosed
+          ? "Port closed after reset - needs reopening"
+          : "Port stayed open - console mode ready",
       );
+      return portClosed;
+    } catch (err: any) {
+      onError?.(`enterConsoleMode failed: ${err.message}`);
+      throw err;
     }
-  } catch (err: any) {
-    onError?.(`USB detection failed: ${err.message}`);
   }
 
-  if (isUsbJtag) {
-    // USB-JTAG/OTG: Port will close after reset
-    onLog?.("USB-JTAG/OTG device: Port will close after reset");
-
-    // Perform reset to firmware
-    try {
-      if (typeof esploader.hardReset === "function") {
-        await esploader.hardReset(false); // false = firmware mode (GPIO0=HIGH)
-      }
-    } catch (err: any) {
-      onError?.(`Reset failed: ${err.message}`);
-    }
-
-    await sleep(500);
-    return true; // Port closed, needs reopening
-  } else {
-    // External serial chip: Port stays open
-    onLog?.("External serial chip: Port stays open");
-
-    try {
-      if (typeof esploader.hardReset === "function") {
-        await esploader.hardReset(false); // false = firmware mode
-      }
-    } catch (err: any) {
-      onError?.(`Reset failed: ${err.message}`);
-    }
-
-    await sleep(200);
-    return false; // Port stays open
-  }
+  // Fallback: should not happen with current library version
+  onError?.(
+    "esploader.enterConsoleMode() not available - cannot enter console mode",
+  );
+  throw new Error("enterConsoleMode() method not available on esploader");
 }
 
 /**
  * Exit console mode (firmware → bootloader)
- * Returns true if manual reconnection is needed
+ * Delegates to esploader.exitConsoleMode() which handles all chip-specific logic:
+ * - USB-OTG (S2/P4): hardResetClassic to bootloader, port changes → returns true
+ * - All others (C3/C5/C6/H2/ext serial): reconnectToBootloader (close→reopen→sync) → returns false
+ * @returns true if manual reconnection is needed (port changed), false otherwise
  */
 export async function exitConsoleMode(
   esploader: any,
@@ -380,43 +348,28 @@ export async function exitConsoleMode(
 ): Promise<boolean> {
   const { onLog, onError } = callbacks;
 
-  // Check if exitConsoleMode method exists on esploader
+  // Delegate to the library's exitConsoleMode() which handles everything correctly
   if (typeof esploader.exitConsoleMode === "function") {
     onLog?.("Using esploader.exitConsoleMode()");
-    return await esploader.exitConsoleMode();
-  }
-
-  // Fallback implementation
-  onLog?.("Exiting console mode...");
-
-  // Check if this is a USB-OTG device
-  const isOtgChip = isUsbOtgChip(esploader);
-
-  if (isOtgChip) {
-    onLog?.(`${esploader.chipName} USB: Resetting to bootloader mode`);
-
-    // Perform hardware reset to bootloader (GPIO0=LOW)
     try {
-      if (typeof esploader.hardReset === "function") {
-        await esploader.hardReset(true); // true = bootloader mode (GPIO0=LOW)
-      }
+      const needsReconnect = await esploader.exitConsoleMode();
+      onLog?.(
+        needsReconnect
+          ? "Port changed - manual reconnection needed"
+          : "Reconnected to bootloader - ready for flash operations",
+      );
+      return needsReconnect;
     } catch (err: any) {
-      onError?.(`Reset failed: ${err.message}`);
+      onError?.(`exitConsoleMode failed: ${err.message}`);
+      throw err;
     }
-
-    await sleep(500);
-    onLog?.(
-      `${esploader.chipName}: Port changed. Please select the bootloader port.`,
-    );
-    return true; // Manual reconnection needed
   }
 
-  // For other devices, use standard reconnect
-  if (typeof esploader.reconnectToBootloader === "function") {
-    await esploader.reconnectToBootloader();
-  }
-
-  return false;
+  // Fallback: should not happen with current library version
+  onError?.(
+    "esploader.exitConsoleMode() not available - cannot exit console mode",
+  );
+  throw new Error("exitConsoleMode() method not available on esploader");
 }
 
 /**
@@ -883,7 +836,10 @@ export async function resetS2ConsoleMode(
 
 /**
  * Switch device from bootloader mode to firmware mode
- * Handles USB-JTAG/OTG devices (port closes) and external serial (port stays open)
+ * Delegates to esploader.resetToFirmwareMode() which handles all chip-specific logic:
+ * - S2/S3/P4 (WDT support): WDT reset, port changes → returns true
+ * - C3/C5/C6/H2 (no WDT): classic DTR/RTS reset, port stays → returns false
+ * - External serial: classic reset, port stays → returns false
  * @param esploader - ESP loader instance
  * @param espStub - ESP stub instance (optional)
  * @param callbacks - Logging callbacks
@@ -907,42 +863,31 @@ export async function switchToFirmwareMode(
 
   onLog?.("Device is in bootloader mode - switching to firmware mode");
 
-  // CRITICAL: Ensure chipFamily is set
+  // CRITICAL: Ensure chipFamily is set (needed by resetToFirmwareMode for chip-specific logic)
   if (!esploader.chipFamily) {
     onLog?.("Detecting chip type...");
     await esploader.initialize();
     onLog?.(`Chip detected: ${esploader.chipFamily}`);
   }
 
-  // Create stub before reset if not exists
-  if (!espStub || !espStub.IS_STUB) {
-    onLog?.("Creating stub for firmware mode switch...");
-    espStub = await esploader.runStub();
-    onLog?.(`Stub created: IS_STUB=${espStub.IS_STUB}`);
-  }
-
-  // Check if USB-JTAG/OTG device
-  let isUsbJtagOrOtg = false;
+  // Use the library's resetToFirmwareMode() which handles everything correctly:
+  // - Detects USB connection type
+  // - For S2/S3/P4: drops to ROM, does WDT reset → returns true (port changes)
+  // - For C3/C5/C6/H2: hardResetToFirmware() → returns false (port stays)
+  // - For external serial: hardResetToFirmware() → returns false (port stays)
+  // IMPORTANT: Do NOT call forget() before reset - resetToFirmwareMode() needs
+  // an active port connection to write WDT registers for S2/S3/P4
   try {
-    if (typeof esploader.detectUsbConnectionType === "function") {
-      isUsbJtagOrOtg = await esploader.detectUsbConnectionType();
-      onLog?.(
-        `USB connection type: ${isUsbJtagOrOtg ? "USB-JTAG/OTG" : "External Serial Chip"}`,
-      );
-    }
-  } catch (err: any) {
-    onError?.(`USB detection failed: ${err.message}`);
-  }
+    onLog?.("Calling esploader.resetToFirmwareMode()...");
+    const portWillChange = await esploader.resetToFirmwareMode();
+    onLog?.(
+      portWillChange
+        ? "Port will change after reset - need user to select new port"
+        : "Port stays open after reset",
+    );
 
-  if (isUsbJtagOrOtg) {
-    // USB-JTAG/OTG: Need WDT reset and port reconnection
-    onLog?.("USB-JTAG/OTG device: Port will close after reset");
-
-    // CRITICAL: Release locks BEFORE calling resetToFirmware()
-    await releaseReaderWriter(esploader, espStub, callbacks);
-
-    try {
-      // CRITICAL: Forget the old port so browser doesn't show it in selection
+    if (portWillChange) {
+      // Port will change (S2/S3/P4 WDT reset) - forget old port
       const port = esploader.port;
       if (port && typeof port.forget === "function") {
         try {
@@ -952,34 +897,29 @@ export async function switchToFirmwareMode(
           onLog?.(`Port forget failed: ${forgetErr.message}`);
         }
       }
-
-      // Use resetToFirmware() for CDC - does WDT reset
-      if (typeof esploader.resetToFirmware === "function") {
-        await esploader.resetToFirmware();
-        onLog?.("Device reset to firmware mode - port closed");
-      }
-    } catch (err: any) {
-      onLog?.(`Reset to firmware error (expected): ${err.message}`);
+      return true; // Port closed, needs reopening
+    } else {
+      // Port stays open (C3/C5/C6/H2 classic reset, or external serial)
+      // Release reader/writer locks so console/Improv can use the port
+      await releaseReaderWriter(esploader, espStub, callbacks);
+      return false; // No port reconnection needed
     }
-
-    // Reset ESP state
-    await sleep(100);
-    return true; // Port closed, needs reopening
-  } else {
-    // External serial chip: Can reset to firmware without port change
-    onLog?.("External serial chip - resetting to firmware mode");
-
-    // Call hardReset BEFORE releasing locks (so it can communicate)
-    await hardResetToFirmware(esploader, callbacks);
-
-    // Wait for reset to complete
-    await sleep(500);
-
-    // NOW release locks AFTER reset
-    onLog?.("Releasing reader/writer after reset...");
-    await releaseReaderWriter(esploader, espStub, callbacks);
-
-    return false; // No port reconnection needed
+  } catch (err: any) {
+    onError?.(`resetToFirmwareMode failed: ${err.message}`);
+    // If reset failed, try to determine if port is still usable
+    try {
+      const isUsbJtag = await esploader.detectUsbConnectionType();
+      if (isUsbJtag) {
+        onLog?.(
+          "USB-JTAG/OTG reset failed - port may be dead, requesting reselection",
+        );
+        return true;
+      }
+    } catch (_) {
+      // ignore detection failure
+    }
+    onLog?.("Reset failed but port should still be usable");
+    return false;
   }
 }
 
@@ -1005,12 +945,14 @@ export async function prepareStreamsForOperation(
 
 /**
  * Handle post-flash cleanup for USB-JTAG/OTG devices
- * Resets to firmware mode and prepares for port reconnection
+ * Uses esploader.resetToFirmwareMode() to reset to firmware and check if port changes
+ * - S2/S3/P4 (WDT): port changes → forget old port → returns true
+ * - C3/C5/C6/H2 (classic): port stays → release locks → returns false
  * @param esploader - ESP loader instance
  * @param espStub - ESP stub instance
  * @param port - Serial port
  * @param callbacks - Logging callbacks
- * @returns true if port was closed and needs reconnection, false otherwise
+ * @returns true if port was closed and needs reconnection, false if port stays open
  */
 export async function handleFlashCompleteUsbJtag(
   esploader: any,
@@ -1018,34 +960,46 @@ export async function handleFlashCompleteUsbJtag(
   port: SerialPort,
   callbacks: ModeSwitchingCallbacks = {},
 ): Promise<boolean> {
-  const { onLog } = callbacks;
+  const { onLog, onError } = callbacks;
 
-  onLog?.("USB-JTAG/OTG device - resetting to firmware mode");
+  onLog?.("USB-JTAG/OTG device - resetting to firmware mode after flash");
 
-  // CRITICAL: Release locks BEFORE resetToFirmware()
-  await releaseReaderWriter(esploader, espStub, callbacks);
-
-  // CRITICAL: Forget the old port so browser doesn't show it in selection
+  // IMPORTANT: Do NOT call forget() or releaseReaderWriter() before resetToFirmwareMode()
+  // The reset method needs an active connection to write WDT registers (for S2/S3/P4)
   try {
-    await port.forget();
-    onLog?.("Old port forgotten");
-  } catch (forgetErr: any) {
-    onLog?.(`Port forget failed: ${forgetErr.message}`);
-  }
+    onLog?.("Calling esploader.resetToFirmwareMode()...");
+    const portWillChange = await esploader.resetToFirmwareMode();
+    onLog?.(
+      portWillChange
+        ? "Port will change - need user to select new port"
+        : "Port stays open after reset",
+    );
 
-  try {
-    // Use resetToFirmware() method - closes port and device will reboot to firmware
-    await esploader.resetToFirmware();
-    onLog?.("Device reset to firmware mode - port closed");
+    if (portWillChange) {
+      // S2/S3/P4: Port changed after WDT reset - forget old port
+      try {
+        await port.forget();
+        onLog?.("Old port forgotten");
+      } catch (forgetErr: any) {
+        onLog?.(`Port forget failed: ${forgetErr.message}`);
+      }
+
+      await sleep(100);
+      onLog?.("Flash complete - port closed, needs reconnection");
+      return true; // Port closed, needs reconnection
+    } else {
+      // C3/C5/C6/H2: Port stays open after classic reset
+      // Release locks so Improv/console can use the port
+      await releaseReaderWriter(esploader, espStub, callbacks);
+      onLog?.("Flash complete - port stays open, ready for Improv test");
+      return false; // No port reconnection needed
+    }
   } catch (err: any) {
-    onLog?.(`Reset to firmware error (expected): ${err.message}`);
+    onError?.(`resetToFirmwareMode failed: ${err.message}`);
+    // Assume port is dead for USB-JTAG devices on failure
+    onLog?.("Reset failed - assuming port needs reconnection");
+    return true;
   }
-
-  // Wait for reset to complete
-  await sleep(100);
-
-  onLog?.("Flash complete - port closed, needs reconnection");
-  return true; // Port closed, needs reconnection
 }
 
 /**
@@ -1097,6 +1051,7 @@ export async function handleFlashCompleteExternalSerial(
 /**
  * Prepare device for Improv initialization
  * Switches from bootloader to firmware mode if needed
+ * Uses esploader.resetToFirmwareMode() which handles all chip-specific logic internally
  * @param esploader - ESP loader instance
  * @param espStub - ESP stub instance (optional)
  * @param callbacks - Logging callbacks with onPortChange for USB-JTAG/OTG devices
@@ -1125,21 +1080,8 @@ export async function prepareDeviceForImprov(
     "Device is in BOOTLOADER mode - switching to FIRMWARE mode for Improv test",
   );
 
-  // Ensure chipFamily is set
-  if (!esploader.chipFamily) {
-    onLog?.("Detecting chip type...");
-    await esploader.initialize();
-    onLog?.(`Chip detected: ${esploader.chipFamily}`);
-  }
-
-  // Create stub before reset if needed
-  if (!espStub || !espStub.IS_STUB) {
-    onLog?.("Creating stub for firmware mode switch...");
-    espStub = await esploader.runStub();
-    onLog?.(`Stub created: IS_STUB=${espStub.IS_STUB}`);
-  }
-
   // Switch to firmware mode (handles all reset and port management)
+  // Note: resetToFirmwareMode() handles stub→ROM transition internally if needed
   const portClosed = await switchToFirmwareMode(esploader, espStub, callbacks);
 
   if (portClosed) {

@@ -203,8 +203,8 @@ export class EwtInstallDialog extends LitElement {
     this._isUsbJtagOrOtgDevice = isUsbJtagOrOtg; // Update state for UI
 
     if (isUsbJtagOrOtg) {
-      // USB-JTAG/OTG: Handle port closure and reconnection
-      await handleFlashCompleteUsbJtag(
+      // USB-JTAG/OTG: Use resetToFirmwareMode() which returns whether port changes
+      const portClosed = await handleFlashCompleteUsbJtag(
         this.esploader,
         this._espStub,
         this._port,
@@ -218,14 +218,27 @@ export class EwtInstallDialog extends LitElement {
       this._espStub = undefined;
       this.esploader.IS_STUB = false;
       this.esploader.chipFamily = null;
-      this._improvChecked = false; // Will check after user reconnects
-      this._client = null; // Set to null (not undefined) to avoid "Wrapping up" UI state
-      this._improvSupported = false; // Unknown until after reconnect
+      this._improvChecked = false;
+      this._client = null;
+      this._improvSupported = false;
       this.esploader._reader = undefined;
 
-      // CRITICAL: Set state to REQUEST_PORT_SELECTION to show "Select Port" button
-      this._state = "REQUEST_PORT_SELECTION";
-      this._error = "";
+      if (portClosed) {
+        // S2/S3/P4: Port changed after WDT reset - need user to select new port
+        this.logger.log(
+          "Port changed after WDT reset - requesting port selection",
+        );
+        this._state = "REQUEST_PORT_SELECTION";
+        this._error = "";
+        this.requestUpdate();
+        return;
+      }
+
+      // C3/C5/C6/H2: Port stayed open after classic reset - proceed directly to Improv
+      this.logger.log(
+        "Port stayed open after classic reset - testing Improv directly",
+      );
+      await this._initialize(true);
       this.requestUpdate();
       return;
     }
