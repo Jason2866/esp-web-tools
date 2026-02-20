@@ -333,47 +333,57 @@ export class EwtInstallDialog extends LitElement {
     this._isUsbJtagOrOtgDevice = isUsbJtagOrOtg; // Update state for UI
 
     if (isUsbJtagOrOtg) {
-      // For USB-JTAG/OTG devices: Reset to firmware mode (port will change!)
-      // Then user must select new port (User Gesture) and we test Improv
+      // USB-JTAG/OTG device: Use resetToFirmware() which returns whether port will change.
+      // ESP32-C3/C5/C6/H2: classic DTR/RTS reset → port stays open (returns false)
+      // ESP32-S2/S3/P4: WDT reset → port changes (returns true)
       this.logger.log("USB-JTAG/OTG device - resetting to firmware mode");
 
-      // CRITICAL: Release locks BEFORE resetToFirmware()
+      // Release locks so resetToFirmware() can communicate
       await this._releaseReaderWriter();
 
-      // CRITICAL: Forget the old port so browser doesn't show it in selection
+      let portWillChange = false;
       try {
-        await this._port.forget();
-        this.logger.log("Old port forgotten");
-      } catch (forgetErr: any) {
-        this.logger.log(`Port forget failed: ${forgetErr.message}`);
-      }
-
-      try {
-        // Use resetToFirmware() method close the port and device will reboot to firmware
-        await this.esploader.resetToFirmware();
-        this.logger.log("Device reset to firmware mode - port closed");
+        portWillChange = await this.esploader.resetToFirmware();
+        this.logger.log(
+          `Device reset to firmware mode (portWillChange=${portWillChange})`,
+        );
       } catch (err: any) {
         this.logger.debug(`Reset to firmware error (expected): ${err.message}`);
       }
 
-      // Reset ESP state
-      await sleep(100);
+      if (portWillChange) {
+        // Port changes after WDT reset (S2/S3/P4) — forget old port and wait for reselection
+        try {
+          await this._port.forget();
+          this.logger.log("Old port forgotten");
+        } catch (forgetErr: any) {
+          this.logger.log(`Port forget failed: ${forgetErr.message}`);
+        }
 
-      this._espStub = undefined;
-      this.esploader.IS_STUB = false;
-      this.esploader.chipFamily = null;
-      this._improvChecked = false; // Will check after user reconnects
-      this._client = null; // Set to null (not undefined) to avoid "Wrapping up" UI state
-      this._improvSupported = false; // Unknown until after reconnect
-      this.esploader._reader = undefined;
+        // Reset ESP state
+        await sleep(100);
 
-      this.logger.log("Flash complete - waiting for user to select new port");
+        this._espStub = undefined;
+        this.esploader.IS_STUB = false;
+        this.esploader.chipFamily = null;
+        this._improvChecked = false;
+        this._client = null;
+        this._improvSupported = false;
+        this.esploader._reader = undefined;
 
-      // CRITICAL: Set state to REQUEST_PORT_SELECTION to show "Select Port" button
-      this._state = "REQUEST_PORT_SELECTION";
-      this._error = "";
-      this.requestUpdate();
-      return;
+        this.logger.log("Flash complete - waiting for user to select new port");
+
+        this._state = "REQUEST_PORT_SELECTION";
+        this._error = "";
+        this.requestUpdate();
+        return;
+      }
+
+      // Port stays open (C3/C5/C6/H2) — continue with normal flow below
+      this.logger.log(
+        "Port stayed open after classic reset - continuing with Improv test",
+      );
+      await sleep(500); // Wait for firmware to boot
     }
 
     // Normal flow for non-USB-JTAG/OTG devices
@@ -381,9 +391,11 @@ export class EwtInstallDialog extends LitElement {
     await this._releaseReaderWriter();
 
     // Reset ESP state for Improv test
+    // NOTE: Do NOT null chipFamily here — it's needed by hardReset() →
+    // rtcWdtResetChipSpecific() during the reset sequence below.
+    // _resetDeviceAndReleaseLocks() will null it after the reset.
     this._espStub = undefined;
     this.esploader.IS_STUB = false;
-    this.esploader.chipFamily = null;
     this._improvChecked = false;
     this.esploader._reader = undefined;
     this.logger.log("ESP state reset for Improv test");
@@ -2029,7 +2041,9 @@ export class EwtInstallDialog extends LitElement {
       );
 
       if (isUsbJtagOrOtg) {
-        // USB-JTAG/OTG: Need WDT reset → port closes → user must select new port
+        // USB-JTAG/OTG: Use resetToFirmware() which returns whether port will change.
+        // ESP32-C3/C5/C6/H2: classic DTR/RTS reset → port stays open (returns false)
+        // ESP32-S2/S3/P4: WDT reset → port changes (returns true)
         this.logger.log(
           "USB-JTAG/OTG device - need to switch to firmware mode",
         );
@@ -2053,44 +2067,66 @@ export class EwtInstallDialog extends LitElement {
           const loaderToSave = this._espStub._parent || this._espStub;
           (this as any)._savedLoaderBeforeConsole = loaderToSave;
 
-          // CRITICAL: Release locks BEFORE calling resetToFirmware()
+          // Release locks so resetToFirmware() can communicate
           await this._releaseReaderWriter();
 
-          // CRITICAL: Forget the old port so browser doesn't show it in selection
+          // Call resetToFirmware() which handles chip-specific reset strategy
+          let portWillChange = false;
           try {
-            await this._port.forget();
-            this.logger.log("Old port forgotten");
-          } catch (forgetErr: any) {
-            this.logger.log(`Port forget failed: ${forgetErr.message}`);
+            portWillChange = await this.esploader.resetToFirmware();
+            this.logger.log(
+              `Device reset to firmware mode (portWillChange=${portWillChange})`,
+            );
+          } catch (resetErr: any) {
+            this.logger.debug(
+              `Reset to firmware error (expected): ${resetErr.message}`,
+            );
           }
 
-          // Use resetToFirmware() which handles WDT reset and port close
-          await this.esploader.resetToFirmware();
-          this.logger.log("Device reset to firmware mode - port closed");
+          if (portWillChange) {
+            // Port changes after WDT reset (S2/S3/P4) — forget old port and wait for reselection
+            try {
+              await this._port.forget();
+              this.logger.log("Old port forgotten");
+            } catch (forgetErr: any) {
+              this.logger.log(`Port forget failed: ${forgetErr.message}`);
+            }
+
+            // Reset ESP state (port is closed)
+            await sleep(100);
+
+            this._espStub = undefined;
+            this.esploader.IS_STUB = false;
+            this.esploader.chipFamily = null;
+            this._improvChecked = false;
+            this._client = undefined;
+            this._improvSupported = false;
+            this.esploader._reader = undefined;
+
+            this.logger.log("Waiting for user to select new port");
+
+            this._state = "REQUEST_PORT_SELECTION";
+            this._error = "";
+            this._busy = false;
+            return;
+          }
+
+          // Port stays open (C3/C5/C6/H2) — continue with Improv test
+          this.logger.log(
+            "Port stayed open after classic reset - continuing with Improv test",
+          );
+          await sleep(500); // Wait for firmware to boot
+
+          // Reset ESP state but keep port
+          this._espStub = undefined;
+          this.esploader.IS_STUB = false;
+          this.esploader.chipFamily = null;
+          this.esploader._reader = undefined;
         } catch (err: any) {
           this.logger.debug(
             `Reset to firmware error (expected): ${err.message}`,
           );
         }
-
-        // Reset ESP state (port is already closed by resetToFirmware)
-        await sleep(100);
-
-        this._espStub = undefined;
-        this.esploader.IS_STUB = false;
-        this.esploader.chipFamily = null;
-        this._improvChecked = false; // Will check after user reconnects
-        this._client = undefined;
-        this._improvSupported = false;
-        this.esploader._reader = undefined;
-
-        this.logger.log("Waiting for user to select new port");
-
-        // Show port selection UI
-        this._state = "REQUEST_PORT_SELECTION";
-        this._error = "";
-        this._busy = false;
-        return;
       } else {
         // External serial chip: Can reset to firmware without port change
         this.logger.log("External serial chip - resetting to firmware mode");
@@ -2155,14 +2191,19 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log("Device already in firmware mode");
 
       // If opening console for the FIRST time, do a reset to ensure device is ready
+      // Skip if chipFamily is null — hardReset needs chip info for WDT reset
       if (actionAfterReconnect === "console" && !this._consoleInitialized) {
         this.logger.log("First console open - resetting device...");
         this._consoleInitialized = true;
-        try {
-          await this.esploader.hardReset(false);
-          this.logger.log("Device reset completed");
-        } catch (err: any) {
-          this.logger.log(`Reset error (expected): ${err.message}`);
+        if (this.esploader.chipFamily) {
+          try {
+            await this.esploader.hardReset(false);
+            this.logger.log("Device reset completed");
+          } catch (err: any) {
+            this.logger.log(`Reset error (expected): ${err.message}`);
+          }
+        } else {
+          this.logger.log("chipFamily unknown — skipping hardReset (device already in firmware mode)");
         }
       }
 
@@ -2202,14 +2243,25 @@ export class EwtInstallDialog extends LitElement {
     const isUsbJtagOrOtg = await this._isUsbJtagOrOtg();
 
     if (isUsbJtagOrOtg) {
-      // USB-JTAG/OTG: Need WDT reset and port reconnection
+      // USB-JTAG/OTG: Use resetToFirmware() which returns whether port will change.
+      // ESP32-C3/C5/C6/H2: classic DTR/RTS reset → port stays open (returns false)
+      // ESP32-S2/S3/P4: WDT reset → port changes (returns true)
 
-      // CRITICAL: Release locks BEFORE calling resetToFirmware()
       this.logger.log("Releasing reader/writer...");
       await this._releaseReaderWriter();
 
+      let portWillChange = false;
       try {
-        // CRITICAL: Forget the old port
+        portWillChange = await this.esploader.resetToFirmware();
+        this.logger.log(
+          `Device reset to firmware mode (portWillChange=${portWillChange})`,
+        );
+      } catch (err: any) {
+        this.logger.debug(`Reset to firmware error (expected): ${err.message}`);
+      }
+
+      if (portWillChange) {
+        // Port changes after WDT reset (S2/S3/P4) — forget old port and wait for reselection
         try {
           await this._port.forget();
           this.logger.log("Old port forgotten");
@@ -2217,42 +2269,49 @@ export class EwtInstallDialog extends LitElement {
           this.logger.log(`Port forget failed: ${forgetErr.message}`);
         }
 
-        // Use resetToFirmware() for CDC this is doing a WDT reset
-        await this.esploader.resetToFirmware();
-        this.logger.log("Device reset to firmware mode - port closed");
-      } catch (err: any) {
-        this.logger.debug(`Reset to firmware error (expected): ${err.message}`);
+        // Reset ESP state
+        await sleep(100);
+
+        this._espStub = undefined;
+        this.esploader.IS_STUB = false;
+        this.esploader.chipFamily = null;
+        this._improvChecked = false;
+        this._client = null;
+        this._improvSupported = false;
+        this.esploader._reader = undefined;
+
+        // Set flag for action after reconnect
+        if (actionAfterReconnect === "console") {
+          this._openConsoleAfterReconnect = true;
+        } else if (actionAfterReconnect === "visit") {
+          this._visitDeviceAfterReconnect = true;
+        } else if (actionAfterReconnect === "homeassistant") {
+          this._addToHAAfterReconnect = true;
+        } else if (actionAfterReconnect === "wifi") {
+          this._changeWiFiAfterReconnect = true;
+        }
+
+        this.logger.log("Waiting for user to select new port");
+
+        this._state = "REQUEST_PORT_SELECTION";
+        this._error = "";
+        this._busy = false;
+        return true; // Port reconnection needed
       }
 
-      // Reset ESP state
-      await sleep(100);
+      // Port stays open (C3/C5/C6/H2) — device is now in firmware mode
+      this.logger.log(
+        "Port stayed open after classic reset - device in firmware mode",
+      );
+      await sleep(500); // Wait for firmware to boot
 
+      // Reset ESP state but keep port
       this._espStub = undefined;
       this.esploader.IS_STUB = false;
       this.esploader.chipFamily = null;
-      this._improvChecked = false;
-      this._client = null;
-      this._improvSupported = false;
       this.esploader._reader = undefined;
 
-      // Set flag for action after reconnect
-      if (actionAfterReconnect === "console") {
-        this._openConsoleAfterReconnect = true;
-      } else if (actionAfterReconnect === "visit") {
-        this._visitDeviceAfterReconnect = true;
-      } else if (actionAfterReconnect === "homeassistant") {
-        this._addToHAAfterReconnect = true;
-      } else if (actionAfterReconnect === "wifi") {
-        this._changeWiFiAfterReconnect = true;
-      }
-
-      this.logger.log("Waiting for user to select new port");
-
-      // Show port selection UI
-      this._state = "REQUEST_PORT_SELECTION";
-      this._error = "";
-      this._busy = false;
-      return true; // Port reconnection needed
+      return false; // No port reconnection needed
     } else {
       // External serial chip: Can reset to firmware without port change
       this.logger.log("External serial chip - resetting to firmware mode");
@@ -2658,6 +2717,8 @@ export class EwtInstallDialog extends LitElement {
       );
 
       // CRITICAL: Reset device BEFORE testing Improv to ensure firmware is running (unless skipReset is true)
+      // Skip reset if chipFamily is null (USB-JTAG/OTG after port re-selection — device already booted into firmware)
+      //if (!skipReset && this.esploader.chipFamily) {
       if (!skipReset) {
         this.logger.log("Resetting device for Improv detection...");
 
