@@ -30,6 +30,9 @@ import { dialogStyles } from "./styles";
 import { parsePartitionTable, type Partition } from "./partition.js";
 import { detectFilesystemType } from "./util/partition.js";
 import {
+  connectWithPort,
+} from "tasmota-webserial-esptool";
+import {
   exitConsoleMode,
   releaseReaderWriter,
   hardResetToFirmware,
@@ -219,9 +222,22 @@ export class EwtInstallDialog extends LitElement {
       this.esploader.IS_STUB = false;
       this.esploader.chipFamily = null;
       this._improvChecked = false;
-      this._client = null;
       this._improvSupported = false;
       this.esploader._reader = undefined;
+
+      // CRITICAL: Properly close old ImprovSerial client BEFORE nulling it.
+      // Its _processInput readLoop holds a reader on port.readable.
+      // If the browser reuses the same SerialPort object after WDT reconnect,
+      // the stale reader would keep port.readable locked, blocking Improv.
+      if (this._client) {
+        try {
+          await this._closeClientWithoutEvents(this._client);
+          this.logger.log("Old Improv client closed properly after flash");
+        } catch (e: any) {
+          this.logger.log(`Failed to close old Improv client: ${e.message}`);
+        }
+        this._client = null;
+      }
 
       if (portClosed) {
         // S2/S3/P4: Port changed after WDT reset - need user to select new port
@@ -2161,13 +2177,36 @@ export class EwtInstallDialog extends LitElement {
     // Check if port is already open (shouldn't be, but just in case)
     if (newPort.readable !== null || newPort.writable !== null) {
       this.logger.log("WARNING: Port appears to be open, closing it first...");
+
+      // Release any locked streams before closing
+      try {
+        if (newPort.readable) {
+          const reader = newPort.readable.getReader();
+          await reader.cancel();
+          reader.releaseLock();
+          this.logger.log("Readable stream released");
+        }
+      } catch (readerErr: any) {
+        this.logger.log(`Readable release failed: ${readerErr.message}`);
+      }
+
+      try {
+        if (newPort.writable) {
+          const writer = newPort.writable.getWriter();
+          writer.releaseLock();
+          this.logger.log("Writable stream released");
+        }
+      } catch (writerErr: any) {
+        this.logger.log(`Writable release failed: ${writerErr.message}`);
+      }
+
       try {
         await newPort.close();
         await sleep(200); // Wait for port to fully close
         this.logger.log("Port closed successfully");
       } catch (closeErr: any) {
         this.logger.log(`Port close failed: ${closeErr.message}`);
-        // Continue anyway - maybe it wasn't really open
+        // Continue anyway - open() below will tell us if it's really still open
       }
     }
 
@@ -2178,71 +2217,95 @@ export class EwtInstallDialog extends LitElement {
         `Dialog in DOM after opening port: ${this.parentNode ? "yes" : "no"}`,
       );
     } catch (err: any) {
-      this.logger.error("Port open error:", err);
-      this._busy = false;
-      this._state = "ERROR";
-      this._error = `Failed to open port: ${err.message}`;
-      return;
-    }
-
-    // Don't create a new ESPLoader - reuse the existing one and just update the port! -> espStub.port = newPort
-    this.logger.log(
-      "Updating existing ESPLoader with new port for firmware mode...",
-    );
-
-    // CRITICAL: Update ALL port references!!
-    // Updates: espStub.port, espStub._parent.port, espLoaderBeforeConsole.port
-
-    // 1. Update base loader port (CRITICAL - this is what _port getter uses!)
-    this.logger.log("Updating base loader port");
-    this.esploader.port = newPort;
-    this.esploader.connected = true;
-
-    // 2. Update stub port if it exists
-    if (this._espStub) {
-      this.logger.log("Updating STUB port");
-      this._espStub.port = newPort;
-      this._espStub.connected = true;
-
-      // 3. Update parent if it exists
-      if (this._espStub._parent) {
-        this.logger.log("Updating parent loader port");
-        this._espStub._parent.port = newPort;
+      if (
+        err instanceof DOMException &&
+        err.name === "InvalidStateError" &&
+        err.message.includes("already open")
+      ) {
+        // Port is already open at some baudrate - that's fine, we can use it
+        this.logger.log(
+          "Port was already open - continuing with existing connection",
+        );
+      } else {
+        this.logger.error("Port open error:", err);
+        this._busy = false;
+        this._state = "ERROR";
+        this._error = `Failed to open port: ${err.message}`;
+        return;
       }
     }
 
-    // 4. Update saved loader if it exists
-    if ((this as any)._savedLoaderBeforeConsole) {
-      this.logger.log("Updating saved loader port");
-      (this as any)._savedLoaderBeforeConsole.port = newPort;
+    // CRITICAL: Close old ImprovSerial client if it exists.
+    // Its _processInput readLoop may still hold a reader on the port.
+    if (this._client) {
+      try {
+        await this._closeClientWithoutEvents(this._client);
+        this.logger.log("Old Improv client closed before port switch");
+      } catch (e: any) {
+        this.logger.log(`Failed to close old Improv client: ${e.message}`);
+      }
+      this._client = null;
     }
+
+    // CRITICAL: Create a NEW ESPLoader for the new port instead of reusing the old one.
+    // This is how esp32tool solves it: each port gets its own fresh ESPLoader.
+    // The old ESPLoader has a readLoop that may still be running and would lock
+    // the new port's readable stream if we just swapped esploader.port.
     this.logger.log(
-      "ESPLoader port updated for firmware mode (no bootloader sync)",
+      "Creating new ESPLoader for firmware port (like esp32tool does)...",
     );
 
+    // Suppress disconnect event from old ESPLoader dying
+    if (this.esploader._suppressDisconnect !== undefined) {
+      this.esploader._suppressDisconnect = true;
+    }
+    // Stop old ESPLoader's readLoop
+    this.esploader.connected = false;
+    if (this.esploader._reader) {
+      try {
+        await this.esploader._reader.cancel();
+      } catch (_) {
+        /* old port dead */
+      }
+    }
+
+    // Create fresh ESPLoader with the new port - no readLoop, no stale state
+    const newEsploader = await connectWithPort(newPort, this.logger);
+    this.logger.log("New ESPLoader created for firmware port");
+
+    // Replace esploader reference - old one will be GC'd
+    this.esploader = newEsploader;
+    this._espStub = undefined;
+
     // Wait for device to fully boot into firmware after WDT reset
-    // AND for port to be ready for communication
     this.logger.log(
       "Waiting 700ms for device to fully boot and port to be ready...",
     );
     await sleep(700);
 
-    // CRITICAL: Verify port is actually open and ready
-    this.logger.log(
-      `Port state check: readable=${this._port.readable !== null}, writable=${this._port.writable !== null}`,
-    );
-
-    // CRITICAL: Check if there are any reader/writer locks that could interfere with Improv
-    this.logger.log(
-      `Checking for locks: reader=${this.esploader._reader ? "LOCKED" : "free"}, writer=${this.esploader._writer ? "LOCKED" : "free"}`,
-    );
-    if (this.esploader._reader || this.esploader._writer) {
+    // Ensure port.readable is NOT locked before Improv tries to getReader()
+    // This can happen if the browser reused the same SerialPort object and
+    // an old ImprovSerial or ESPLoader reader wasn't fully released yet.
+    if (newPort.readable?.locked) {
       this.logger.log(
-        "WARNING: Port has active locks! Releasing them before Improv test...",
+        "WARNING: port.readable is still locked after cleanup! Closing and reopening port...",
       );
-      await this._releaseReaderWriter();
-      this.logger.log("Locks released");
+      try {
+        await newPort.close();
+        await sleep(200);
+        await newPort.open({ baudRate: 115200 });
+        this.logger.log("Port reopened - readable lock cleared");
+      } catch (reopenErr: any) {
+        this.logger.log(`Port reopen failed: ${reopenErr.message}`);
+      }
+    } else {
+      this.logger.log("Port readable is not locked - good");
     }
+
+    this.logger.log(
+      `Port state: readable=${this._port.readable !== null}, writable=${this._port.writable !== null}, ` +
+        `readable.locked=${this._port.readable?.locked}, writable.locked=${this._port.writable?.locked}`,
+    );
 
     this.logger.log("Device should be ready now");
 
@@ -2254,9 +2317,9 @@ export class EwtInstallDialog extends LitElement {
     this.requestUpdate(); // Force UI update to show progress
 
     // Continue with Improv test
-    // For USB-JTAG/OTG: Device is in firmware mode but firmware not started - need reset
-    // For external serial: Reset ensures device is in clean state
-    await this._testImprov(1000, false);
+    // Device is already in firmware mode after WDT reset - skip hardware reset
+    // (chipFamily is null, so hardReset would fail trying WDT path anyway)
+    await this._testImprov(1000, true);
   }
 
   private async _testImprov(timeout = 1000, skipReset = false) {
@@ -2287,6 +2350,21 @@ export class EwtInstallDialog extends LitElement {
         onLog: (msg) => this.logger.log(msg),
         onError: (msg) => this.logger.error(msg),
       });
+
+      // SAFETY: Verify port.readable is not locked before ImprovSerial grabs a reader
+      if (this._port.readable?.locked) {
+        this.logger.log(
+          "WARNING: port.readable locked before Improv init! Attempting close/reopen...",
+        );
+        try {
+          await this._port.close();
+          await sleep(200);
+          await this._port.open({ baudRate: 115200 });
+          this.logger.log("Port reopened for Improv");
+        } catch (reopenErr: any) {
+          this.logger.log(`Port reopen for Improv failed: ${reopenErr.message}`);
+        }
+      }
 
       improvSerial = new ImprovSerial(this._port, this.logger);
       improvSerial.addEventListener("state-changed", () => {
