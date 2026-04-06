@@ -26,6 +26,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22
+          registry-url: 'https://registry.npmjs.org'
       - name: Check npm version
         run: npm --version
       - name: NPM CI
@@ -46,7 +47,10 @@ jobs:
         with:
           commit_message: "Github Action: Updated dist files"
       - name: Publish to NPM registry (OIDC Trusted Publishing)
-        run: npm publish --provenance --access public
+        uses: JS-DevTools/npm-publish@v4
+        with:
+          registry: https://registry.npmjs.org/
+          strategy: all
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
