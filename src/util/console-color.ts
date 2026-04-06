@@ -7,6 +7,8 @@ interface ConsoleState {
   backgroundColor: string | null;
   carriageReturn: boolean;
   secret: boolean;
+  blink: boolean;
+  rapidBlink: boolean;
 }
 
 export class ColoredConsole {
@@ -19,6 +21,8 @@ export class ColoredConsole {
     backgroundColor: null,
     carriageReturn: false,
     secret: false,
+    blink: false,
+    rapidBlink: false,
   };
 
   constructor(public targetElement: HTMLElement) {}
@@ -56,6 +60,8 @@ export class ColoredConsole {
       if (this.state.underline) span.classList.add("log-underline");
       if (this.state.strikethrough) span.classList.add("log-strikethrough");
       if (this.state.secret) span.classList.add("log-secret");
+      if (this.state.blink) span.classList.add("log-blink");
+      if (this.state.rapidBlink) span.classList.add("log-rapid-blink");
       if (this.state.foregroundColor !== null)
         span.classList.add(`log-fg-${this.state.foregroundColor}`);
       if (this.state.backgroundColor !== null)
@@ -92,6 +98,8 @@ export class ColoredConsole {
             this.state.foregroundColor = null;
             this.state.backgroundColor = null;
             this.state.secret = false;
+            this.state.blink = false;
+            this.state.rapidBlink = false;
             break;
           case 1:
             this.state.bold = true;
@@ -103,10 +111,13 @@ export class ColoredConsole {
             this.state.underline = true;
             break;
           case 5:
-            this.state.secret = true;
+            this.state.blink = true;
             break;
           case 6:
-            this.state.secret = false;
+            this.state.rapidBlink = true;
+            break;
+          case 8:
+            this.state.secret = true;
             break;
           case 9:
             this.state.strikethrough = true;
@@ -119,6 +130,13 @@ export class ColoredConsole {
             break;
           case 24:
             this.state.underline = false;
+            break;
+          case 25:
+            this.state.blink = false;
+            this.state.rapidBlink = false;
+            break;
+          case 28:
+            this.state.secret = false;
             break;
           case 29:
             this.state.strikethrough = false;
@@ -221,6 +239,17 @@ export const coloredConsoleStyles = `
   }
   .log-underline.log-strikethrough {
     text-decoration: underline line-through;
+  }
+  .log-blink {
+    animation: blink 1s step-end infinite;
+  }
+  .log-rapid-blink {
+    animation: blink 0.4s step-end infinite;
+  }
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
   }
   .log-secret {
     -webkit-user-select: none;
