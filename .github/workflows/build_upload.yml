@@ -19,8 +19,6 @@ jobs:
       - uses: actions/checkout@v6
       - name: Remove old files and folders
         run: |
-          rm -rf yarn.lock
-          rm -rf package-lock.json
           rm -rf dist
           rm -rf js/modules
           mkdir js/modules
