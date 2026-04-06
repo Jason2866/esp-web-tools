@@ -29,12 +29,10 @@ jobs:
         with:
           node-version: 22
           registry-url: 'https://registry.npmjs.org'
-      - name: Update npm to latest
-        run: npm install -g npm@latest
       - name: Check npm version
         run: npm --version
       - name: Install NPM
-        run: npm install
+        run: npm ci
       - name: Prettier
         run: npm exec -- prettier --write src
       - name: Compile TypeScript
