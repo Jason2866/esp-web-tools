@@ -29,7 +29,7 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
       - name: Check npm version
         run: npm --version
-      - name: Install NPM
+      - name: NPM CI
         run: npm ci
       - name: Prettier
         run: npm exec -- prettier --write src
