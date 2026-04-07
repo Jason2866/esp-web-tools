@@ -1,6 +1,7 @@
 import { ColoredConsole, coloredConsoleStyles } from "../util/console-color";
 import { sleep } from "../util/sleep";
 import { LineBreakTransformer } from "../util/line-break-transformer";
+import { TimestampTransformer } from "../util/timestamp-transformer";
 import { Logger } from "../const";
 
 export class EwtConsole extends HTMLElement {
@@ -113,10 +114,11 @@ export class EwtConsole extends HTMLElement {
           },
         )
         .pipeThrough(new TransformStream(new LineBreakTransformer()))
+        .pipeThrough(new TransformStream(new TimestampTransformer()))
         .pipeTo(
           new WritableStream({
             write: (chunk) => {
-              this._console!.addLine(chunk.replace("\r", ""));
+              this._console!.addLine(chunk);
             },
           }),
         );

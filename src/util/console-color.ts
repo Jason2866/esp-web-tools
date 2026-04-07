@@ -6,6 +6,7 @@ interface ConsoleState {
   foregroundColor: string | null;
   backgroundColor: string | null;
   carriageReturn: boolean;
+  lines: string[];
   secret: boolean;
   blink: boolean;
   rapidBlink: boolean;
@@ -20,6 +21,7 @@ export class ColoredConsole {
     foregroundColor: null,
     backgroundColor: null,
     carriageReturn: false,
+    lines: [],
     secret: false,
     blink: false,
     rapidBlink: false,
@@ -28,28 +30,18 @@ export class ColoredConsole {
   constructor(public targetElement: HTMLElement) {}
 
   logs(): string {
+    if (this.state.lines.length > 0) {
+      this.processLines();
+    }
     return this.targetElement.innerText;
   }
 
-  addLine(line: string) {
+  processLine(line: string): Element {
     const re = /(?:\x1B|\\x1B)(?:\[(.*?)[@-~]|\].*?(?:\x07|\x1B\\))/g;
     let i = 0;
 
-    if (this.state.carriageReturn) {
-      if (line !== "\n") {
-        // don't remove if \r\n
-        this.targetElement.removeChild(this.targetElement.lastChild!);
-      }
-      this.state.carriageReturn = false;
-    }
-
-    if (line.includes("\r")) {
-      this.state.carriageReturn = true;
-    }
-
     const lineSpan = document.createElement("span");
     lineSpan.classList.add("line");
-    this.targetElement.appendChild(lineSpan);
 
     const addSpan = (content: string) => {
       if (content === "") return;
@@ -196,16 +188,56 @@ export class ColoredConsole {
         }
       }
     }
+    addSpan(line.substring(i));
+    return lineSpan;
+  }
+
+  processLines() {
     const atBottom =
       this.targetElement.scrollTop >
       this.targetElement.scrollHeight - this.targetElement.offsetHeight - 50;
+    const prevCarriageReturn = this.state.carriageReturn;
+    const fragment = document.createDocumentFragment();
 
-    addSpan(line.substring(i));
+    if (this.state.lines.length === 0) {
+      return;
+    }
+
+    for (const line of this.state.lines) {
+      if (this.state.carriageReturn && line !== "\n") {
+        if (fragment.childElementCount) {
+          fragment.removeChild(fragment.lastChild!);
+        }
+      }
+      const hadCarriageReturn = line.endsWith("\r");
+      fragment.appendChild(this.processLine(line.replace(/\r/g, "")));
+      this.state.carriageReturn = hadCarriageReturn;
+    }
+
+    if (
+      prevCarriageReturn &&
+      this.state.lines[0] !== "\n" &&
+      this.targetElement.lastChild
+    ) {
+      this.targetElement.replaceChild(fragment, this.targetElement.lastChild!);
+    } else {
+      this.targetElement.appendChild(fragment);
+    }
+
+    this.state.lines = [];
 
     // Keep scroll at bottom
     if (atBottom) {
       this.targetElement.scrollTop = this.targetElement.scrollHeight;
     }
+  }
+
+  addLine(line: string) {
+    // Processing of lines is deferred for performance reasons
+    if (this.state.lines.length === 0) {
+      setTimeout(() => this.processLines(), 0);
+    }
+    this.state.lines.push(line);
   }
 }
 
