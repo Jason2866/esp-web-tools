@@ -90,15 +90,15 @@ export class EwtConsole extends HTMLElement {
     };
   }
 
-  private async _connect(abortSignal: AbortSignal) {
+  private async _connect(signal: AbortSignal) {
     this.logger.debug("Starting console read loop");
-
-    // Check if port.readable is available
+    // Capture a stable reference; addLine() becomes a no-op after destroy()
+    const consoleView = this._console;
     if (!this.port.readable) {
-      this._console!.addLine("");
-      this._console!.addLine("");
-      this._console!.addLine(
-        `Terminal disconnected: Port readable stream not available`,
+      consoleView?.addLine("");
+      consoleView?.addLine("");
+      consoleView?.addLine(
+        "Terminal disconnected: Port readable stream not available",
       );
       this.logger.error(
         "Port readable stream not available - port may need to be reopened at correct baudrate",
@@ -107,31 +107,31 @@ export class EwtConsole extends HTMLElement {
     }
 
     try {
-      await this.port
-        .readable!.pipeThrough(
+      await this.port.readable
+        .pipeThrough(
           new TextDecoderStream() as ReadableWritablePair<string, Uint8Array>,
-          {
-            signal: abortSignal,
-          },
+          { signal },
         )
         .pipeThrough(new TransformStream(new LineBreakTransformer()))
         .pipeThrough(new TransformStream(new TimestampTransformer()))
         .pipeTo(
           new WritableStream({
-            write: (chunk) => {
-              this._console!.addLine(chunk);
+            write: (line: string) => {
+              consoleView?.addLine(line);
             },
           }),
         );
-      if (!abortSignal.aborted) {
-        this._console!.addLine("");
-        this._console!.addLine("");
-        this._console!.addLine("Terminal disconnected");
+      if (!signal.aborted) {
+        consoleView?.addLine("");
+        consoleView?.addLine("");
+        consoleView?.addLine("Terminal disconnected");
       }
-    } catch (e) {
-      this._console!.addLine("");
-      this._console!.addLine("");
-      this._console!.addLine(`Terminal disconnected: ${e}`);
+    } catch (err) {
+      if (!signal.aborted) {
+        consoleView?.addLine("");
+        consoleView?.addLine("");
+        consoleView?.addLine(`Terminal disconnected: ${err}`);
+      }
     } finally {
       await sleep(100);
       this.logger.debug("Finished console read loop");
