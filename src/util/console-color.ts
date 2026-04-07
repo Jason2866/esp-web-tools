@@ -33,12 +33,16 @@ export class ColoredConsole {
   private _timeoutId = 0;
   private _atBottom = true;
   private _intersectionObserver?: IntersectionObserver;
+  private _sentinel: HTMLElement | null = null;
+  // Full history for log export — never trimmed, unlike the DOM cap
+  private _exportLines: string[] = [];
 
   constructor(public targetElement: HTMLElement) {
     // Track whether the user is scrolled to the bottom via IntersectionObserver
     // on a sentinel element, avoiding forced reflows on every processLines call.
     const sentinel = document.createElement("div");
     sentinel.style.height = "1px";
+    this._sentinel = sentinel;
     targetElement.appendChild(sentinel);
 
     this._intersectionObserver = new IntersectionObserver(
@@ -51,18 +55,20 @@ export class ColoredConsole {
   }
 
   logs(): string {
+    // Flush any pending lines into the export buffer first
     if (this.state.lines.length > 0) {
       this.processLines();
     }
-    // Exclude the sentinel div from the text output
-    return Array.from(this.targetElement.children)
-      .slice(0, -1)
-      .map((el) => (el as HTMLElement).innerText)
-      .join("");
+    return this._exportLines.join("");
   }
 
   destroy() {
     this._intersectionObserver?.disconnect();
+    // Remove the sentinel from the DOM to avoid leaking it on teardown
+    if (this._sentinel) {
+      this._sentinel.remove();
+      this._sentinel = null;
+    }
     if (this._rafId) {
       cancelAnimationFrame(this._rafId);
       this._rafId = 0;
@@ -282,6 +288,7 @@ export class ColoredConsole {
   }
 
   addLine(line: string) {
+    this._exportLines.push(line);
     this.state.lines.push(line);
     // Schedule a flush if none is pending yet
     if (!this._rafId && !this._timeoutId) {

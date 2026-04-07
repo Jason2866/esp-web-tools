@@ -163,7 +163,14 @@ export class EwtConsole extends HTMLElement {
   }
 
   public disconnectedCallback() {
-    this.disconnect();
+    // Tear down the stream and observers but keep this._console intact so
+    // connectedCallback's guard (if (this._console) return) prevents
+    // re-running the full shadow/DOM setup on reattach.
+    if (this._cancelConnection) {
+      this._cancelConnection();
+      this._cancelConnection = undefined;
+    }
+    this._console?.destroy();
   }
 
   public async reset() {
