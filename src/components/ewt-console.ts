@@ -139,18 +139,24 @@ export class EwtConsole extends HTMLElement {
   }
 
   private async _sendCommand() {
-    const input = this.shadowRoot!.querySelector("input")!;
-    const command = input.value;
-    const encoder = new TextEncoder();
-    const writer = this.port.writable!.getWriter();
-    await writer.write(encoder.encode(command + "\r\n"));
-    this._console!.addLine(`> ${command}\r\n`);
-    input.value = "";
-    input.focus();
+    const input = this.shadowRoot?.querySelector("input");
+    if (!input || !this.port.writable) return;
+
+    const value = input.value;
+    const writer = this.port.writable.getWriter();
     try {
-      writer.releaseLock();
-    } catch (err) {
-      console.error("Ignoring release lock error", err);
+      await writer.write(new TextEncoder().encode(`${value}\r\n`));
+      this._console?.addLine(`> ${value}\r\n`);
+      if (input.isConnected) {
+        input.value = "";
+        input.focus();
+      }
+    } finally {
+      try {
+        writer.releaseLock();
+      } catch (err) {
+        console.error("Ignoring release lock error", err);
+      }
     }
   }
 
