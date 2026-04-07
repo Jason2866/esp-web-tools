@@ -3,7 +3,11 @@ export class TimestampTransformer implements Transformer<string, string> {
     chunk: string,
     controller: TransformStreamDefaultController<string>,
   ) {
-    if (chunk === "") {
+    // Pass through pure newline (blank-line sentinel) and empty chunks unchanged
+    // so that carriage-return overwrite logic in console-color.ts can still
+    // detect them via line !== "\n".
+    if (chunk === "" || chunk === "\n") {
+      controller.enqueue(chunk);
       return;
     }
     const date = new Date();
