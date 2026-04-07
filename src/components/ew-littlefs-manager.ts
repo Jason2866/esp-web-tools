@@ -669,7 +669,7 @@ export class EwtLittleFSManager extends LitElement {
       max-width: 100%;
       margin: 0 auto;
       padding: 15px;
-      border: 2px solid var(--mdc-theme-primary, #03a9f4);
+      border: 2px solid var(--md-sys-color-primary, #03a9f4);
       border-radius: 10px;
       background-color: rgba(3, 169, 244, 0.05);
       box-sizing: border-box;
@@ -677,7 +677,7 @@ export class EwtLittleFSManager extends LitElement {
 
     h3 {
       margin: 0 0 15px 0;
-      color: var(--mdc-theme-primary, #03a9f4);
+      color: var(--md-sys-color-primary, #03a9f4);
       font-size: 18px;
       font-weight: 600;
     }
@@ -716,8 +716,8 @@ export class EwtLittleFSManager extends LitElement {
       height: 100%;
       background: linear-gradient(
         90deg,
-        var(--mdc-theme-primary, #03a9f4) 0%,
-        var(--mdc-theme-primary, #03a9f4) 100%
+        var(--md-sys-color-primary, #03a9f4) 0%,
+        var(--md-sys-color-primary, #03a9f4) 100%
       );
       transition: width 0.3s ease;
     }
@@ -755,7 +755,7 @@ export class EwtLittleFSManager extends LitElement {
     .disk-version {
       font-size: 11px;
       padding: 2px 6px;
-      background-color: var(--mdc-theme-primary, #03a9f4);
+      background-color: var(--md-sys-color-primary, #03a9f4);
       color: white;
       border-radius: 4px;
     }
@@ -858,7 +858,7 @@ export class EwtLittleFSManager extends LitElement {
     }
 
     .file-name.clickable:hover {
-      color: var(--mdc-theme-primary, #03a9f4);
+      color: var(--md-sys-color-primary, #03a9f4);
       text-decoration: underline;
     }
 

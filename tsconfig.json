@@ -3,7 +3,7 @@
     "lib": ["es2019", "dom"],
     "target": "es2019",
     "module": "es2020",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "outDir": "dist",
     "declaration": true,
