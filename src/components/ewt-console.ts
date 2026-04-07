@@ -158,6 +158,7 @@ export class EwtConsole extends HTMLElement {
       await this._cancelConnection();
       this._cancelConnection = undefined;
     }
+    this._console?.destroy();
   }
 
   public async reset() {

@@ -12,6 +12,8 @@ interface ConsoleState {
   rapidBlink: boolean;
 }
 
+const MAX_LINES = 2000;
+
 export class ColoredConsole {
   public state: ConsoleState = {
     bold: false,
@@ -27,13 +29,39 @@ export class ColoredConsole {
     rapidBlink: false,
   };
 
-  constructor(public targetElement: HTMLElement) {}
+  private _rafPending = false;
+  private _atBottom = true;
+  private _intersectionObserver?: IntersectionObserver;
+
+  constructor(public targetElement: HTMLElement) {
+    // Track whether the user is scrolled to the bottom via IntersectionObserver
+    // on a sentinel element, avoiding forced reflows on every processLines call.
+    const sentinel = document.createElement("div");
+    sentinel.style.height = "1px";
+    targetElement.appendChild(sentinel);
+
+    this._intersectionObserver = new IntersectionObserver(
+      (entries) => {
+        this._atBottom = entries[0].isIntersecting;
+      },
+      { root: targetElement, threshold: 0 },
+    );
+    this._intersectionObserver.observe(sentinel);
+  }
 
   logs(): string {
     if (this.state.lines.length > 0) {
       this.processLines();
     }
-    return this.targetElement.innerText;
+    // Exclude the sentinel div from the text output
+    return Array.from(this.targetElement.children)
+      .slice(0, -1)
+      .map((el) => (el as HTMLElement).innerText)
+      .join("");
+  }
+
+  destroy() {
+    this._intersectionObserver?.disconnect();
   }
 
   processLine(line: string): Element {
@@ -193,15 +221,14 @@ export class ColoredConsole {
   }
 
   processLines() {
-    const atBottom =
-      this.targetElement.scrollTop >
-      this.targetElement.scrollHeight - this.targetElement.offsetHeight - 50;
-    const prevCarriageReturn = this.state.carriageReturn;
-    const fragment = document.createDocumentFragment();
+    this._rafPending = false;
 
     if (this.state.lines.length === 0) {
       return;
     }
+
+    const prevCarriageReturn = this.state.carriageReturn;
+    const fragment = document.createDocumentFragment();
 
     for (const line of this.state.lines) {
       if (this.state.carriageReturn && line !== "\n") {
@@ -214,30 +241,43 @@ export class ColoredConsole {
       this.state.carriageReturn = hadCarriageReturn;
     }
 
+    // Sentinel is always the last child — insert before it
+    const sentinel = this.targetElement.lastChild!;
+
     if (
       prevCarriageReturn &&
       this.state.lines[0] !== "\n" &&
-      this.targetElement.lastChild
+      sentinel.previousSibling
     ) {
-      this.targetElement.replaceChild(fragment, this.targetElement.lastChild!);
+      this.targetElement.replaceChild(fragment, sentinel.previousSibling);
     } else {
-      this.targetElement.appendChild(fragment);
+      this.targetElement.insertBefore(fragment, sentinel);
     }
 
     this.state.lines = [];
 
-    // Keep scroll at bottom
-    if (atBottom) {
+    // Trim oldest line-spans when DOM grows too large
+    const children = this.targetElement.children;
+    // -1 to exclude the sentinel div
+    const excess = children.length - 1 - MAX_LINES;
+    if (excess > 0) {
+      for (let i = 0; i < excess; i++) {
+        this.targetElement.removeChild(children[0]);
+      }
+    }
+
+    if (this._atBottom) {
       this.targetElement.scrollTop = this.targetElement.scrollHeight;
     }
   }
 
   addLine(line: string) {
-    // Processing of lines is deferred for performance reasons
-    if (this.state.lines.length === 0) {
-      setTimeout(() => this.processLines(), 0);
-    }
     this.state.lines.push(line);
+    // Use rAF for batching — at most 60 flushes/s regardless of data rate
+    if (!this._rafPending) {
+      this._rafPending = true;
+      requestAnimationFrame(() => this.processLines());
+    }
   }
 }
 
