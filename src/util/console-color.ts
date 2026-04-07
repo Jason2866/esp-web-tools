@@ -30,9 +30,9 @@ export class ColoredConsole {
   constructor(public targetElement: HTMLElement) {}
 
   logs(): string {
-   if (this.state.lines.length > 0) {
-     this.processLines();
-   }
+    if (this.state.lines.length > 0) {
+      this.processLines();
+    }
     return this.targetElement.innerText;
   }
 
