@@ -12,6 +12,9 @@ export class EwtConsole extends HTMLElement {
 
   private _console?: ColoredConsole;
   private _cancelConnection?: () => Promise<void>;
+  private _commandHistory: string[] = [];
+  private _historyIndex = -1;
+  private _currentInput = "";
 
   public logs(): string {
     return this._console?.logs() || "";
@@ -78,6 +81,15 @@ export class EwtConsole extends HTMLElement {
           ev.preventDefault();
           ev.stopPropagation();
           this._sendCommand();
+        } else if (ev.key === "ArrowUp") {
+          ev.preventDefault();
+          this._navigateHistory(input, 1);
+        } else if (ev.key === "ArrowDown") {
+          ev.preventDefault();
+          this._navigateHistory(input, -1);
+        } else {
+          // User is editing — reset history navigation
+          this._historyIndex = -1;
         }
       });
     }
@@ -138,6 +150,30 @@ export class EwtConsole extends HTMLElement {
     }
   }
 
+  private _navigateHistory(input: HTMLInputElement, direction: 1 | -1) {
+    if (this._commandHistory.length === 0) return;
+
+    // Save current input before navigating away
+    if (this._historyIndex === -1) {
+      this._currentInput = input.value;
+    }
+
+    const newIndex = this._historyIndex + direction;
+
+    if (newIndex < 0) {
+      // Back to current (unsent) input
+      this._historyIndex = -1;
+      input.value = this._currentInput;
+    } else if (newIndex < this._commandHistory.length) {
+      this._historyIndex = newIndex;
+      input.value = this._commandHistory[this._historyIndex];
+    }
+
+    // Move cursor to end
+    const len = input.value.length;
+    input.setSelectionRange(len, len);
+  }
+
   private async _sendCommand() {
     const input = this.shadowRoot?.querySelector("input");
     if (!input || !this.port.writable) return;
@@ -148,6 +184,15 @@ export class EwtConsole extends HTMLElement {
       await writer.write(new TextEncoder().encode(`${value}\r\n`));
       this._console?.addLine(`> ${value}\r\n`);
       if (input.isConnected) {
+        // Add to history (skip empty, skip consecutive duplicates, cap at 100)
+        if (value && value !== this._commandHistory[0]) {
+          this._commandHistory.unshift(value);
+          if (this._commandHistory.length > 100) {
+            this._commandHistory.pop();
+          }
+        }
+        this._historyIndex = -1;
+        this._currentInput = "";
         input.value = "";
         input.focus();
       }
