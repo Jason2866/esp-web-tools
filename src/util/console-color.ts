@@ -12,6 +12,8 @@ interface ConsoleState {
   rapidBlink: boolean;
 }
 
+const MAX_LINES = 2000;
+
 export class ColoredConsole {
   public state: ConsoleState = {
     bold: false,
@@ -27,13 +29,72 @@ export class ColoredConsole {
     rapidBlink: false,
   };
 
-  constructor(public targetElement: HTMLElement) {}
+  private _destroyed = false;
+  private _rafId = 0;
+  private _timeoutId = 0;
+  private _atBottom = true;
+  private _intersectionObserver?: IntersectionObserver;
+  private _sentinel: HTMLElement | null = null;
+  // Full history for log export — never trimmed, unlike the DOM cap
+  private _exportLines: string[] = [];
+  private _visibilityHandler: (() => void) | null = null;
+
+  constructor(public targetElement: HTMLElement) {
+    // Track whether the user is scrolled to the bottom via IntersectionObserver
+    // on a sentinel element, avoiding forced reflows on every processLines call.
+    const sentinel = document.createElement("div");
+    sentinel.style.height = "1px";
+    this._sentinel = sentinel;
+    targetElement.appendChild(sentinel);
+
+    this._intersectionObserver = new IntersectionObserver(
+      (entries) => {
+        this._atBottom = entries[0].isIntersecting;
+      },
+      { root: targetElement, threshold: 0 },
+    );
+    this._intersectionObserver.observe(sentinel);
+
+    // When the page becomes hidden, rAF is paused. Switch any pending rAF to
+    // a timeout so state.lines doesn't accumulate unbounded while backgrounded.
+    this._visibilityHandler = () => {
+      if (document.hidden && this._rafId) {
+        cancelAnimationFrame(this._rafId);
+        this._rafId = 0;
+        if (!this._timeoutId) {
+          this._timeoutId = window.setTimeout(() => this.processLines(), 50);
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", this._visibilityHandler);
+  }
 
   logs(): string {
-    if (this.state.lines.length > 0) {
-      this.processLines();
+    return this._exportLines.join("");
+  }
+
+  destroy() {
+    this._destroyed = true;
+    this.state.carriageReturn = false;
+    this.state.lines = [];
+    this._intersectionObserver?.disconnect();
+    if (this._visibilityHandler) {
+      document.removeEventListener("visibilitychange", this._visibilityHandler);
+      this._visibilityHandler = null;
     }
-    return this.targetElement.innerText;
+    // Remove the sentinel from the DOM to avoid leaking it on teardown
+    if (this._sentinel) {
+      this._sentinel.remove();
+      this._sentinel = null;
+    }
+    if (this._rafId) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = 0;
+    }
+    if (this._timeoutId) {
+      clearTimeout(this._timeoutId);
+      this._timeoutId = 0;
+    }
   }
 
   processLine(line: string): Element {
@@ -193,15 +254,15 @@ export class ColoredConsole {
   }
 
   processLines() {
-    const atBottom =
-      this.targetElement.scrollTop >
-      this.targetElement.scrollHeight - this.targetElement.offsetHeight - 50;
-    const prevCarriageReturn = this.state.carriageReturn;
-    const fragment = document.createDocumentFragment();
+    this._rafId = 0;
+    this._timeoutId = 0;
 
-    if (this.state.lines.length === 0) {
+    if (this._destroyed || this.state.lines.length === 0) {
       return;
     }
+
+    const prevCarriageReturn = this.state.carriageReturn;
+    const fragment = document.createDocumentFragment();
 
     for (const line of this.state.lines) {
       if (this.state.carriageReturn && line !== "\n") {
@@ -214,30 +275,69 @@ export class ColoredConsole {
       this.state.carriageReturn = hadCarriageReturn;
     }
 
+    // Use the tracked sentinel reference instead of lastChild! so this is
+    // safe even if the container is empty or the sentinel was removed.
+    const sentinel = this._sentinel;
+    if (!sentinel) {
+      this.state.lines = [];
+      return;
+    }
+
     if (
       prevCarriageReturn &&
       this.state.lines[0] !== "\n" &&
-      this.targetElement.lastChild
+      sentinel.previousSibling
     ) {
-      this.targetElement.replaceChild(fragment, this.targetElement.lastChild!);
+      this.targetElement.replaceChild(fragment, sentinel.previousSibling);
     } else {
-      this.targetElement.appendChild(fragment);
+      this.targetElement.insertBefore(fragment, sentinel);
     }
 
     this.state.lines = [];
 
-    // Keep scroll at bottom
-    if (atBottom) {
+    // Trim oldest line-spans when DOM grows too large
+    const children = this.targetElement.children;
+    // -1 to exclude the sentinel div
+    const excess = children.length - 1 - MAX_LINES;
+    if (excess > 0) {
+      if (!this._atBottom) {
+        // Anchor the viewport: subtract the height of removed nodes so the
+        // visible content doesn't jump when we're not scrolled to the bottom.
+        let removedHeight = 0;
+        for (let i = 0; i < excess; i++) {
+          removedHeight += (children[i] as HTMLElement).getBoundingClientRect()
+            .height;
+        }
+        for (let i = 0; i < excess; i++) {
+          this.targetElement.removeChild(children[0]);
+        }
+        this.targetElement.scrollTop -= removedHeight;
+      } else {
+        for (let i = 0; i < excess; i++) {
+          this.targetElement.removeChild(children[0]);
+        }
+      }
+    }
+
+    if (this._atBottom) {
       this.targetElement.scrollTop = this.targetElement.scrollHeight;
     }
   }
 
   addLine(line: string) {
-    // Processing of lines is deferred for performance reasons
-    if (this.state.lines.length === 0) {
-      setTimeout(() => this.processLines(), 0);
-    }
+    if (this._destroyed) return;
+    this._exportLines.push(line);
     this.state.lines.push(line);
+    // Schedule a flush if none is pending yet
+    if (!this._rafId && !this._timeoutId) {
+      if (document.hidden) {
+        // rAF is paused when the page is hidden — use a timeout fallback
+        // so state.lines doesn't accumulate unbounded while backgrounded
+        this._timeoutId = window.setTimeout(() => this.processLines(), 50);
+      } else {
+        this._rafId = requestAnimationFrame(() => this.processLines());
+      }
+    }
   }
 }
 
