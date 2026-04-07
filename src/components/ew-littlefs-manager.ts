@@ -538,32 +538,31 @@ export class EwtLittleFSManager extends LitElement {
         </div>
 
         <div class="littlefs-controls">
-          <ew-text-button
-            @click=${this._refreshFiles}
-            ?disabled=${this._busy}
-          >Refresh</ew-text-button>
-          <ew-text-button
-            @click=${this._backupImage}
-            ?disabled=${this._busy}
-          >Backup Image</ew-text-button>
-          <ew-text-button
-            @click=${this._writeToFlash}
-            ?disabled=${this._busy}
-          >Write to Flash</ew-text-button>
+          <ew-text-button @click=${this._refreshFiles} ?disabled=${this._busy}
+            >Refresh</ew-text-button
+          >
+          <ew-text-button @click=${this._backupImage} ?disabled=${this._busy}
+            >Backup Image</ew-text-button
+          >
+          <ew-text-button @click=${this._writeToFlash} ?disabled=${this._busy}
+            >Write to Flash</ew-text-button
+          >
           <ew-text-button
             @click=${() => {
               this._cleanup();
               if (this.onClose) this.onClose();
             }}
             ?disabled=${this._busy}
-          >Close</ew-text-button>
+            >Close</ew-text-button
+          >
         </div>
 
         <div class="littlefs-breadcrumb">
           <ew-text-button
             @click=${this._navigateUp}
             ?disabled=${this._currentPath === "/" || this._busy}
-          >↑ Up</ew-text-button>
+            >↑ Up</ew-text-button
+          >
           <span>${this._currentPath || "/"}</span>
         </div>
 
@@ -576,11 +575,11 @@ export class EwtLittleFSManager extends LitElement {
           <ew-text-button
             @click=${this._uploadFile}
             ?disabled=${!this._selectedFile || this._busy}
-          >Upload File</ew-text-button>
-          <ew-text-button
-            @click=${this._createFolder}
-            ?disabled=${this._busy}
-          >New Folder</ew-text-button>
+            >Upload File</ew-text-button
+          >
+          <ew-text-button @click=${this._createFolder} ?disabled=${this._busy}
+            >New Folder</ew-text-button
+          >
         </div>
 
         <div class="littlefs-files">
@@ -637,7 +636,8 @@ export class EwtLittleFSManager extends LitElement {
                                     @click=${() =>
                                       this._downloadFile(entry.path)}
                                     ?disabled=${this._busy}
-                                  >Download</ew-text-button>
+                                    >Download</ew-text-button
+                                  >
                                 `
                               : ""}
                             <ew-text-button
@@ -645,7 +645,8 @@ export class EwtLittleFSManager extends LitElement {
                               @click=${() =>
                                 this._deleteFile(entry.path, entry.type)}
                               ?disabled=${this._busy}
-                            >Delete</ew-text-button>
+                              >Delete</ew-text-button
+                            >
                           </div>
                         </td>
                       </tr>
