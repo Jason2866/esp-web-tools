@@ -29,6 +29,7 @@ export class ColoredConsole {
     rapidBlink: false,
   };
 
+  private _destroyed = false;
   private _rafId = 0;
   private _timeoutId = 0;
   private _atBottom = true;
@@ -69,6 +70,9 @@ export class ColoredConsole {
   }
 
   logs(): string {
+    if (this._destroyed) {
+      return this._exportLines.join("");
+    }
     // Flush any pending lines into the export buffer first
     if (this.state.lines.length > 0) {
       this.processLines();
@@ -77,6 +81,7 @@ export class ColoredConsole {
   }
 
   destroy() {
+    this._destroyed = true;
     this._intersectionObserver?.disconnect();
     if (this._visibilityHandler) {
       document.removeEventListener("visibilitychange", this._visibilityHandler);
