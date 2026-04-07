@@ -209,7 +209,7 @@ export class ColoredConsole {
           fragment.removeChild(fragment.lastChild!);
         }
       }
-      const hadCarriageReturn = line.includes("\r");
+      const hadCarriageReturn = line.endsWith("\r");
       fragment.appendChild(this.processLine(line.replace(/\r/g, "")));
       this.state.carriageReturn = hadCarriageReturn;
     }
