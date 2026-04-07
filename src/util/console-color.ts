@@ -70,18 +70,13 @@ export class ColoredConsole {
   }
 
   logs(): string {
-    if (this._destroyed) {
-      return this._exportLines.join("");
-    }
-    // Flush any pending lines into the export buffer first
-    if (this.state.lines.length > 0) {
-      this.processLines();
-    }
     return this._exportLines.join("");
   }
 
   destroy() {
     this._destroyed = true;
+    this.state.carriageReturn = false;
+    this.state.lines = [];
     this._intersectionObserver?.disconnect();
     if (this._visibilityHandler) {
       document.removeEventListener("visibilitychange", this._visibilityHandler);
@@ -262,7 +257,7 @@ export class ColoredConsole {
     this._rafId = 0;
     this._timeoutId = 0;
 
-    if (this.state.lines.length === 0) {
+    if (this._destroyed || this.state.lines.length === 0) {
       return;
     }
 
@@ -280,8 +275,13 @@ export class ColoredConsole {
       this.state.carriageReturn = hadCarriageReturn;
     }
 
-    // Sentinel is always the last child — insert before it
-    const sentinel = this.targetElement.lastChild!;
+    // Use the tracked sentinel reference instead of lastChild! so this is
+    // safe even if the container is empty or the sentinel was removed.
+    const sentinel = this._sentinel;
+    if (!sentinel) {
+      this.state.lines = [];
+      return;
+    }
 
     if (
       prevCarriageReturn &&
@@ -325,6 +325,7 @@ export class ColoredConsole {
   }
 
   addLine(line: string) {
+    if (this._destroyed) return;
     this._exportLines.push(line);
     this.state.lines.push(line);
     // Schedule a flush if none is pending yet
