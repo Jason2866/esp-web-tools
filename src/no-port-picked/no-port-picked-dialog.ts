@@ -1,7 +1,7 @@
 import { LitElement, html, css, svg } from "lit";
 import { customElement } from "lit/decorators.js";
-import "../components/ewt-dialog";
-import "../components/ewt-button";
+import "../components/ew-dialog";
+import "../components/ew-text-button";
 import { dialogStyles } from "../styles";
 
 const cloudDownload = svg`
@@ -31,113 +31,108 @@ class EwtNoPortPickedDialog extends LitElement {
 
   public render() {
     return html`
-      <ewt-dialog
-        open
-        heading="No port selected"
-        scrimClickAction
-        @closed=${this._handleClose}
-      >
-        <div>
-          If you didn't select a port because you didn't see your device listed,
-          try the following steps:
+      <ew-dialog open @cancel=${this._preventDefault} @closed=${this._handleClose}>
+        <div slot="headline">No port selected</div>
+        <div slot="content">
+          <div>
+            If you didn't select a port because you didn't see your device listed,
+            try the following steps:
+          </div>
+          <ol>
+            <li>
+              Make sure that the device is connected to this computer (the one
+              that runs the browser that shows this website)
+            </li>
+            <li>
+              Most devices have a tiny light when it is powered on. If yours has
+              one, make sure it is on.
+            </li>
+            <li>
+              Make sure that the USB cable you use can be used for data and is not
+              a power-only cable.
+            </li>
+            <li>
+              Make sure you have the right drivers installed. Below are the
+              drivers for common chips used in ESP devices:
+              <ul>
+                <li>
+                  CP2102 drivers:
+                  <a
+                    href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers"
+                    target="_blank"
+                    rel="noopener"
+                    >Windows & Mac</a
+                  >
+                </li>
+                <li>
+                  CH342, CH343, CH9102 drivers:
+                  <a
+                    href="https://www.wch.cn/downloads/CH343SER_ZIP.html"
+                    target="_blank"
+                    rel="noopener"
+                    >Windows</a
+                  >,
+                  <a
+                    href="https://www.wch.cn/downloads/CH34XSER_MAC_ZIP.html"
+                    target="_blank"
+                    rel="noopener"
+                    >Mac</a
+                  >
+                  <br />
+                  (download via blue button with ${cloudDownload} icon)
+                </li>
+                <li>
+                  CH340, CH341 drivers:
+                  <a
+                    href="https://www.wch.cn/downloads/CH341SER_ZIP.html"
+                    target="_blank"
+                    rel="noopener"
+                    >Windows</a
+                  >,
+                  <a
+                    href="https://www.wch.cn/downloads/CH341SER_MAC_ZIP.html"
+                    target="_blank"
+                    rel="noopener"
+                    >Mac</a
+                  >
+                  <br />
+                  (download via blue button with ${cloudDownload} icon)
+                </li>
+              </ul>
+            </li>
+            <li>
+              If you are using a Linux flavor, add your username to the dialout
+              group so you have the appropriate permissions on the device.
+              <ul>
+                <code>sudo usermod -a -G dialout YourUserName</code>
+              </ul>
+              You may need to logout & back in or reboot to activate the new group
+              access.
+            </li>
+          </ol>
         </div>
-        <ol>
-          <li>
-            Make sure that the device is connected to this computer (the one
-            that runs the browser that shows this website)
-          </li>
-          <li>
-            Most devices have a tiny light when it is powered on. If yours has
-            one, make sure it is on.
-          </li>
-          <li>
-            Make sure that the USB cable you use can be used for data and is not
-            a power-only cable.
-          </li>
-          <li>
-            Make sure you have the right drivers installed. Below are the
-            drivers for common chips used in ESP devices:
-            <ul>
-              <li>
-                CP2102 drivers:
-                <a
-                  href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers"
-                  target="_blank"
-                  rel="noopener"
-                  >Windows & Mac</a
-                >
-              </li>
-              <li>
-                CH342, CH343, CH9102 drivers:
-                <a
-                  href="https://www.wch.cn/downloads/CH343SER_ZIP.html"
-                  target="_blank"
-                  rel="noopener"
-                  >Windows</a
-                >,
-                <a
-                  href="https://www.wch.cn/downloads/CH34XSER_MAC_ZIP.html"
-                  target="_blank"
-                  rel="noopener"
-                  >Mac</a
-                >
-                <br />
-                (download via blue button with ${cloudDownload} icon)
-              </li>
-              <li>
-                CH340, CH341 drivers:
-                <a
-                  href="https://www.wch.cn/downloads/CH341SER_ZIP.html"
-                  target="_blank"
-                  rel="noopener"
-                  >Windows</a
-                >,
-                <a
-                  href="https://www.wch.cn/downloads/CH341SER_MAC_ZIP.html"
-                  target="_blank"
-                  rel="noopener"
-                  >Mac</a
-                >
-                <br />
-                (download via blue button with ${cloudDownload} icon)
-              </li>
-            </ul>
-          </li>
-          <li>
-            If you are using a Linux flavor, add your username to the dialout
-            group so you have the appropriate permissions on the device.
-            <ul>
-              <code>sudo usermod -a -G dialout YourUserName</code>
-            </ul>
-            You may need to logout & back in or reboot to activate the new group
-            access.
-          </li>
-        </ol>
-        ${this.doTryAgain
-          ? html`
-              <ewt-button
-                slot="primaryAction"
-                dialogAction="close"
-                label="Try Again"
-                @click=${this.doTryAgain}
-              ></ewt-button>
-
-              <ewt-button
-                no-attention
-                slot="secondaryAction"
-                dialogAction="close"
-                label="Cancel"
-              ></ewt-button>
-            `
-          : html`
-              <ewt-button
-                slot="primaryAction"
-                dialogAction="close"
-                label="Close"
-              ></ewt-button>
-            `}
-      </ewt-dialog>
+        <div slot="actions">
+          ${this.doTryAgain
+            ? html`
+                <ew-text-button
+                  @click=${this._handleClose}
+                >Cancel</ew-text-button>
+                <ew-text-button
+                  @click=${this.doTryAgain}
+                >Try Again</ew-text-button>
+              `
+            : html`
+                <ew-text-button
+                  @click=${this._handleClose}
+                >Close</ew-text-button>
+              `}
+        </div>
+      </ew-dialog>
     `;
+  }
+
+  private _preventDefault(ev: Event) {
+    ev.preventDefault();
   }
 
   private async _handleClose() {
