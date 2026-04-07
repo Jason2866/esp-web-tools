@@ -210,7 +210,11 @@ export class ColoredConsole {
       this.state.carriageReturn = line.includes("\r");
     }
 
-    if (prevCarriageReturn && this.state.lines[0] !== "\n") {
+    if (
+      prevCarriageReturn &&
+      this.state.lines[0] !== "\n" &&
+      this.targetElement.lastChild
+    ) {
       this.targetElement.replaceChild(fragment, this.targetElement.lastChild!);
     } else {
       this.targetElement.appendChild(fragment);

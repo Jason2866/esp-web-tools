@@ -3,6 +3,9 @@ export class TimestampTransformer implements Transformer<string, string> {
     chunk: string,
     controller: TransformStreamDefaultController<string>,
   ) {
+    if (chunk === "") {
+      return;
+    }
     const date = new Date();
     const h = date.getHours().toString().padStart(2, "0");
     const m = date.getMinutes().toString().padStart(2, "0");
