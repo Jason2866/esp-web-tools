@@ -495,7 +495,6 @@ export class EwtInstallDialog extends LitElement {
 
     let heading: string | undefined;
     let content: TemplateResult;
-    let hideActions = false;
     let allowClosing = false;
 
     // During installation phase we temporarily remove the client
@@ -510,43 +509,42 @@ export class EwtInstallDialog extends LitElement {
       this._state !== "DASHBOARD" // Don't show "Connecting" when in DASHBOARD state
     ) {
       if (this._error) {
-        [heading, content, hideActions] = this._renderError(this._error);
+        [heading, content] = this._renderError(this._error);
       } else {
         content = this._renderProgress("Connecting");
-        hideActions = true;
       }
     } else if (this._state === "INSTALL") {
-      [heading, content, hideActions, allowClosing] = this._renderInstall();
+      [heading, content, , allowClosing] = this._renderInstall();
     } else if (this._state === "REQUEST_PORT_SELECTION") {
-      [heading, content, hideActions] = this._renderRequestPortSelection();
+      [heading, content] = this._renderRequestPortSelection();
     } else if (this._state === "ASK_ERASE") {
       [heading, content] = this._renderAskErase();
     } else if (this._state === "ERROR") {
-      [heading, content, hideActions] = this._renderError(this._error!);
+      [heading, content] = this._renderError(this._error!);
     } else if (this._state === "DASHBOARD") {
       try {
-        [heading, content, hideActions, allowClosing] =
+        [heading, content, , allowClosing] =
           this._improvSupported && this._info
             ? this._renderDashboard()
             : this._renderDashboardNoImprov();
       } catch (err: any) {
         this.logger.error(`Error rendering dashboard: ${err.message}`, err);
-        [heading, content, hideActions] = this._renderError(
+        [heading, content] = this._renderError(
           `Dashboard render error: ${err.message}`,
         );
       }
     } else if (this._state === "PROVISION") {
-      [heading, content, hideActions] = this._renderProvision();
+      [heading, content] = this._renderProvision();
     } else if (this._state === "LOGS") {
-      [heading, content, hideActions] = this._renderLogs();
+      [heading, content] = this._renderLogs();
     } else if (this._state === "PARTITIONS") {
-      [heading, content, hideActions] = this._renderPartitions();
+      [heading, content] = this._renderPartitions();
     } else if (this._state === "LITTLEFS") {
-      [heading, content, hideActions, allowClosing] = this._renderLittleFS();
+      [heading, content, , allowClosing] = this._renderLittleFS();
     } else {
       // Fallback for unknown state
       this.logger.error(`Unknown state: ${this._state}`);
-      [heading, content, hideActions] = this._renderError(
+      [heading, content] = this._renderError(
         `Unknown state: ${this._state}`,
       );
     }
