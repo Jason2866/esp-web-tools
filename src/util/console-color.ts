@@ -30,6 +30,9 @@ export class ColoredConsole {
   constructor(public targetElement: HTMLElement) {}
 
   logs(): string {
+   if (this.state.lines.length > 0) {
+     this.processLines();
+   }
     return this.targetElement.innerText;
   }
 
@@ -206,8 +209,9 @@ export class ColoredConsole {
           fragment.removeChild(fragment.lastChild!);
         }
       }
-      fragment.appendChild(this.processLine(line));
-      this.state.carriageReturn = line.includes("\r");
+      const hadCarriageReturn = line.includes("\r");
+      fragment.appendChild(this.processLine(line.replace(/\r/g, "")));
+      this.state.carriageReturn = hadCarriageReturn;
     }
 
     if (
