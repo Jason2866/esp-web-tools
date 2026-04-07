@@ -88,10 +88,8 @@ export class EwtConsole extends HTMLElement {
           ev.preventDefault();
           this._navigateHistory(input, -1);
         } else {
-          // User is editing — reset history navigation, track current input
-          if (this._historyIndex !== -1) {
-            this._historyIndex = -1;
-          }
+          // User is editing — reset history navigation
+          this._historyIndex = -1;
         }
       });
     }
