@@ -2,7 +2,7 @@ import { LitElement, html, PropertyValues, css, TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
 import "./components/ew-text-button";
 import "./components/ew-checkbox";
-import "./components/ewt-console";
+import "./components/ew-console";
 import "./components/ew-dialog";
 import "./components/ew-icon-button";
 import "./components/ew-filled-text-field";
@@ -12,9 +12,9 @@ import "./components/ew-select-option";
 import "./components/ew-divider";
 import "./components/ew-list";
 import "./components/ew-list-item";
-import "./components/ewt-littlefs-manager";
-import "./pages/ewt-page-progress";
-import "./pages/ewt-page-message";
+import "./components/ew-littlefs-manager";
+import "./pages/ew-page-progress";
+import "./pages/ew-page-message";
 import { closeIcon } from "./components/svg";
 import { Logger, Manifest, FlashStateType, FlashState } from "./const.js";
 import { ImprovSerial, Ssid } from "improv-wifi-serial-sdk/dist/serial";
@@ -1565,16 +1565,16 @@ export class EwtInstallDialog extends LitElement {
     let hideActions = false;
 
     content = html`
-      <ewt-console
+      <ew-console
         .port=${this._port}
         .logger=${this.logger}
         .onReset=${async () => await this.esploader.hardReset(false)}
-      ></ewt-console>
+      ></ew-console>
       <ew-text-button
         slot="actions"
         label="Back"
         @click=${async () => {
-          await this.shadowRoot!.querySelector("ewt-console")!.disconnect();
+          await this.shadowRoot!.querySelector("ew-console")!.disconnect();
 
           // After console: ESP stays in firmware mode
           // Device will only switch to bootloader mode when "Install" or "Manage Filesystem" is clicked
@@ -1593,18 +1593,18 @@ export class EwtInstallDialog extends LitElement {
         label="Download Logs"
         @click=${() => {
           textDownload(
-            this.shadowRoot!.querySelector("ewt-console")!.logs(),
+            this.shadowRoot!.querySelector("ew-console")!.logs(),
             `esp-web-tools-logs.txt`,
           );
 
-          this.shadowRoot!.querySelector("ewt-console")!.reset();
+          this.shadowRoot!.querySelector("ew-console")!.reset();
         }}
       ></ew-text-button>
       <ew-text-button
         slot="actions"
         label="Reset Device"
         @click=${async () => {
-          await this.shadowRoot!.querySelector("ewt-console")!.reset();
+          await this.shadowRoot!.querySelector("ew-console")!.reset();
         }}
       ></ew-text-button>
     `;
@@ -3033,7 +3033,7 @@ export class EwtInstallDialog extends LitElement {
       :host([state="LOGS"]) ew-dialog {
         --md-dialog-container-max-inline-size: 90vw;
       }
-      ewt-console {
+      ew-console {
         width: calc(80vw - 48px);
         height: 80vh;
       }

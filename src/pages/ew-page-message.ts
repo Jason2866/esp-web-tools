@@ -1,6 +1,6 @@
 import { LitElement, html, css, TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
-import "../components/ewt-circular-progress";
+import "../components/ew-circular-progress";
 
 class EwtPageMessage extends LitElement {
   @property() icon!: string;

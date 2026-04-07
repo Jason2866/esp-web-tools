@@ -173,10 +173,10 @@ export class EwtConsole extends HTMLElement {
   }
 }
 
-customElements.define("ewt-console", EwtConsole);
+customElements.define("ew-console", EwtConsole);
 
 declare global {
   interface HTMLElementTagNameMap {
-    "ewt-console": EwtConsole;
+    "ew-console": EwtConsole;
   }
 }
