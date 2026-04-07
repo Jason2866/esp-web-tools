@@ -22,8 +22,7 @@ export class EwtConsole extends HTMLElement {
       return;
     }
     // attachShadow throws if a shadow root already exists; reuse it on reattach
-    const shadowRoot =
-      this.shadowRoot ?? this.attachShadow({ mode: "open" });
+    const shadowRoot = this.shadowRoot ?? this.attachShadow({ mode: "open" });
 
     shadowRoot.innerHTML = `
       <style>

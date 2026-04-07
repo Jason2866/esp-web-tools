@@ -300,7 +300,8 @@ export class ColoredConsole {
         // visible content doesn't jump when we're not scrolled to the bottom.
         let removedHeight = 0;
         for (let i = 0; i < excess; i++) {
-          removedHeight += (children[i] as HTMLElement).getBoundingClientRect().height;
+          removedHeight += (children[i] as HTMLElement).getBoundingClientRect()
+            .height;
         }
         for (let i = 0; i < excess; i++) {
           this.targetElement.removeChild(children[0]);
