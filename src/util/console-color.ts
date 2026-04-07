@@ -199,7 +199,7 @@ export class ColoredConsole {
     const prevCarriageReturn = this.state.carriageReturn;
     const fragment = document.createDocumentFragment();
 
-    if (this.state.lines.length == 0) {
+    if (this.state.lines.length === 0) {
       return;
     }
 
@@ -234,7 +234,7 @@ export class ColoredConsole {
 
   addLine(line: string) {
     // Processing of lines is deferred for performance reasons
-    if (this.state.lines.length == 0) {
+    if (this.state.lines.length === 0) {
       setTimeout(() => this.processLines(), 0);
     }
     this.state.lines.push(line);
