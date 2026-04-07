@@ -29,7 +29,8 @@ export class ColoredConsole {
     rapidBlink: false,
   };
 
-  private _rafPending = false;
+  private _rafId = 0;
+  private _timeoutId = 0;
   private _atBottom = true;
   private _intersectionObserver?: IntersectionObserver;
 
@@ -62,6 +63,14 @@ export class ColoredConsole {
 
   destroy() {
     this._intersectionObserver?.disconnect();
+    if (this._rafId) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = 0;
+    }
+    if (this._timeoutId) {
+      clearTimeout(this._timeoutId);
+      this._timeoutId = 0;
+    }
   }
 
   processLine(line: string): Element {
@@ -221,7 +230,8 @@ export class ColoredConsole {
   }
 
   processLines() {
-    this._rafPending = false;
+    this._rafId = 0;
+    this._timeoutId = 0;
 
     if (this.state.lines.length === 0) {
       return;
@@ -273,10 +283,15 @@ export class ColoredConsole {
 
   addLine(line: string) {
     this.state.lines.push(line);
-    // Use rAF for batching — at most 60 flushes/s regardless of data rate
-    if (!this._rafPending) {
-      this._rafPending = true;
-      requestAnimationFrame(() => this.processLines());
+    // Schedule a flush if none is pending yet
+    if (!this._rafId && !this._timeoutId) {
+      if (document.hidden) {
+        // rAF is paused when the page is hidden — use a timeout fallback
+        // so state.lines doesn't accumulate unbounded while backgrounded
+        this._timeoutId = window.setTimeout(() => this.processLines(), 50);
+      } else {
+        this._rafId = requestAnimationFrame(() => this.processLines());
+      }
     }
   }
 }

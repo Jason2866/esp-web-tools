@@ -159,6 +159,11 @@ export class EwtConsole extends HTMLElement {
       this._cancelConnection = undefined;
     }
     this._console?.destroy();
+    this._console = undefined;
+  }
+
+  public disconnectedCallback() {
+    this.disconnect();
   }
 
   public async reset() {
