@@ -21,7 +21,9 @@ export class EwtConsole extends HTMLElement {
     if (this._console) {
       return;
     }
-    const shadowRoot = this.attachShadow({ mode: "open" });
+    // attachShadow throws if a shadow root already exists; reuse it on reattach
+    const shadowRoot =
+      this.shadowRoot ?? this.attachShadow({ mode: "open" });
 
     shadowRoot.innerHTML = `
       <style>
@@ -163,14 +165,12 @@ export class EwtConsole extends HTMLElement {
   }
 
   public disconnectedCallback() {
-    // Tear down the stream and observers but keep this._console intact so
-    // connectedCallback's guard (if (this._console) return) prevents
-    // re-running the full shadow/DOM setup on reattach.
     if (this._cancelConnection) {
       this._cancelConnection();
       this._cancelConnection = undefined;
     }
     this._console?.destroy();
+    this._console = undefined;
   }
 
   public async reset() {

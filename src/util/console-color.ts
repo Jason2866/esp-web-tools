@@ -36,6 +36,7 @@ export class ColoredConsole {
   private _sentinel: HTMLElement | null = null;
   // Full history for log export — never trimmed, unlike the DOM cap
   private _exportLines: string[] = [];
+  private _visibilityHandler: (() => void) | null = null;
 
   constructor(public targetElement: HTMLElement) {
     // Track whether the user is scrolled to the bottom via IntersectionObserver
@@ -52,6 +53,19 @@ export class ColoredConsole {
       { root: targetElement, threshold: 0 },
     );
     this._intersectionObserver.observe(sentinel);
+
+    // When the page becomes hidden, rAF is paused. Switch any pending rAF to
+    // a timeout so state.lines doesn't accumulate unbounded while backgrounded.
+    this._visibilityHandler = () => {
+      if (document.hidden && this._rafId) {
+        cancelAnimationFrame(this._rafId);
+        this._rafId = 0;
+        if (!this._timeoutId) {
+          this._timeoutId = window.setTimeout(() => this.processLines(), 50);
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", this._visibilityHandler);
   }
 
   logs(): string {
@@ -64,6 +78,10 @@ export class ColoredConsole {
 
   destroy() {
     this._intersectionObserver?.disconnect();
+    if (this._visibilityHandler) {
+      document.removeEventListener("visibilitychange", this._visibilityHandler);
+      this._visibilityHandler = null;
+    }
     // Remove the sentinel from the DOM to avoid leaking it on teardown
     if (this._sentinel) {
       this._sentinel.remove();
@@ -277,8 +295,21 @@ export class ColoredConsole {
     // -1 to exclude the sentinel div
     const excess = children.length - 1 - MAX_LINES;
     if (excess > 0) {
-      for (let i = 0; i < excess; i++) {
-        this.targetElement.removeChild(children[0]);
+      if (!this._atBottom) {
+        // Anchor the viewport: subtract the height of removed nodes so the
+        // visible content doesn't jump when we're not scrolled to the bottom.
+        let removedHeight = 0;
+        for (let i = 0; i < excess; i++) {
+          removedHeight += (children[i] as HTMLElement).getBoundingClientRect().height;
+        }
+        for (let i = 0; i < excess; i++) {
+          this.targetElement.removeChild(children[0]);
+        }
+        this.targetElement.scrollTop -= removedHeight;
+      } else {
+        for (let i = 0; i < excess; i++) {
+          this.targetElement.removeChild(children[0]);
+        }
       }
     }
 
