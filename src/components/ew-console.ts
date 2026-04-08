@@ -59,8 +59,8 @@ export class EwtConsole extends HTMLElement {
       ${
         this.allowInput
           ? `<form>
-                >
-                <input autofocus>
+                <span aria-hidden="true">></span>
+                <input aria-label="Serial command" autofocus>
               </form>
             `
           : ""

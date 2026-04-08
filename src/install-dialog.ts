@@ -676,7 +676,7 @@ export class EwtInstallDialog extends LitElement {
 
                   // Device is in firmware mode - open URL
                   if (this._client && this._client.nextUrl) {
-                    window.open(this._client.nextUrl, "_blank");
+                    window.open(this._client.nextUrl, "_blank", "noopener,noreferrer");
                   }
                   this._busy = false;
                 }}
@@ -708,6 +708,7 @@ export class EwtInstallDialog extends LitElement {
                     window.open(
                       `https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`,
                       "_blank",
+                      "noopener,noreferrer",
                     );
                   }
                   this._busy = false;
@@ -1201,7 +1202,7 @@ export class EwtInstallDialog extends LitElement {
                             if (popup) {
                               popup.location.href = url;
                             } else {
-                              window.open(url, "_blank");
+                              window.open(url, "_blank", "noopener,noreferrer");
                             }
                             this._state = "DASHBOARD";
                           }}
@@ -1240,7 +1241,7 @@ export class EwtInstallDialog extends LitElement {
                             if (popup) {
                               popup.location.href = url;
                             } else {
-                              window.open(url, "_blank");
+                              window.open(url, "_blank", "noopener,noreferrer");
                             }
                             this._state = "DASHBOARD";
                           }}
@@ -2835,7 +2836,7 @@ export class EwtInstallDialog extends LitElement {
       this.logger.log("Opening Visit Device URL as requested by user");
       this._visitDeviceAfterReconnect = false; // Reset flag
       if (this._client && this._client.nextUrl) {
-        window.open(this._client.nextUrl, "_blank");
+        window.open(this._client.nextUrl, "_blank", "noopener,noreferrer");
       }
       this._state = "DASHBOARD";
     } else if (this._addToHAAfterReconnect) {
@@ -2845,6 +2846,7 @@ export class EwtInstallDialog extends LitElement {
         window.open(
           `https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`,
           "_blank",
+          "noopener,noreferrer",
         );
       }
       this._state = "DASHBOARD";
