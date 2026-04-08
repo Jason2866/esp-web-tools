@@ -3064,7 +3064,7 @@ export class EwtInstallDialog extends LitElement {
       }
       ew-dialog {
         min-width: min(340px, 100% - 48px);
-        max-width: min(600px, 100% - 48px);
+        max-width: min(500px, 100% - 48px);
       }
       div[slot="headline"] {
         flex: 1;
