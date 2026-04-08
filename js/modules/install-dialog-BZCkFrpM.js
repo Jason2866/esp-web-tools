@@ -735,7 +735,7 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
     }
 
     .danger {
-      --mdc-theme-primary: var(--improv-danger-color, #db4437);
+      --md-sys-color-primary: var(--danger-color, #db4437);
     }
   `,i([r({type:Object})],ii.prototype,"partition",void 0),i([r({type:Object})],ii.prototype,"espStub",void 0),i([r({type:Function})],ii.prototype,"logger",void 0),i([r({type:Function})],ii.prototype,"onClose",void 0),i([a()],ii.prototype,"_currentPath",void 0),i([a()],ii.prototype,"_files",void 0),i([a()],ii.prototype,"_fs",void 0),i([a()],ii.prototype,"_blockSize",void 0),i([a()],ii.prototype,"_usage",void 0),i([a()],ii.prototype,"_diskVersion",void 0),i([a()],ii.prototype,"_busy",void 0),i([a()],ii.prototype,"_selectedFile",void 0),i([a()],ii.prototype,"_flashProgress",void 0),i([a()],ii.prototype,"_isFlashing",void 0),i([a()],ii.prototype,"_flashOperation",void 0),ii=i([x("ewt-littlefs-manager")],ii);class ri extends s{constructor(){super(...arguments),this.value=0,this.max=1,this.indeterminate=!1,this.fourColor=!1}render(){const{ariaLabel:e}=this;return p`
       <div
@@ -876,9 +876,9 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
                 <ew-text-button
                   ?disabled=${this._busy}
                   text-left
-                  .label=${this._isSameFirmware?`Update ${this._manifest.name}`:`Install ${this._manifest.name}`}
                   @click=${()=>{this._isSameFirmware?this._startInstall(!1):this._manifest.new_install_prompt_erase?this._state="ASK_ERASE":this._startInstall(!0)}}
-                ></ew-text-button>
+                  >${this._isSameFirmware?`Update ${this._manifest.name}`:`Install ${this._manifest.name}`}</ew-text-button
+                >
               </div>
             `}
         ${this._client&&void 0!==this._client.nextUrl?p`
@@ -903,9 +903,9 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
               <div>
                 <ew-text-button
                   ?disabled=${this._busy}
-                  .label=${this._client.state===pi.READY?"Connect to Wi-Fi":"Change Wi-Fi"}
                   @click=${async()=>{this._busy=!0;if(await this._switchToFirmwareMode("wifi"))return;if(this.logger.log("Device is running firmware for Wi-Fi setup"),this._client){try{await this._closeClientWithoutEvents(this._client),this.logger.log("Improv client closed")}catch(e){this.logger.log("Failed to close Improv client:",e)}this._client=void 0,await se(500)}const e=await this._isWebUsbWithExternalSerial();if(this.esploader.isWebUSB&&this.esploader.isWebUSB()&&!e){this.logger.log("WebUSB CDC: Resetting device for Wi-Fi setup...");try{await this._releaseReaderWriter(),await this.esploader.hardReset(!1),this.logger.log("Device reset completed"),await this._releaseReaderWriter(),this.logger.log("Streams recreated after reset"),await se(500)}catch(e){this.logger.log(`Reset error: ${e.message}`)}}else e?this.logger.log("WebUSB external serial: Preparing port for Wi-Fi setup..."):this.logger.log("WebSerial: Preparing port for Wi-Fi setup..."),await this._releaseReaderWriter(),await se(500);this.logger.log("Port ready for new Improv client"),this.logger.log("Flushing serial buffer before Improv init..."),await this._releaseReaderWriter(),await se(100);const t=new mi(this._port,this.logger);t.addEventListener("state-changed",()=>{this.requestUpdate()}),t.addEventListener("error-changed",()=>this.requestUpdate());try{this._info=await t.initialize(1e4),this._client=t,t.addEventListener("disconnect",this._handleDisconnect),this.logger.log("Improv client ready for Wi-Fi provisioning")}catch(e){try{await this._closeClientWithoutEvents(t)}catch(e){this.logger.log("Failed to close Improv client after init error:",e)}try{await this._releaseReaderWriter(),this.logger.log("Streams recreated after Improv failure")}catch(e){this.logger.log(`Failed to recreate streams: ${e.message}`)}return this.logger.log(`Improv initialization failed: ${e.message}`),this._error=`Improv initialization failed: ${e.message}`,this._state="ERROR",void(this._busy=!1)}this._state="PROVISION",this._provisionForce=!0,this._busy=!1}}
-                ></ew-text-button>
+                  >${this._client.state===pi.READY?"Connect to Wi-Fi":"Change Wi-Fi"}</ew-text-button
+                >
               </div>
             `:""}
         ${this._isUsbJtagOrOtgDevice?p`
@@ -961,9 +961,9 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
           <ew-text-button
             ?disabled=${this._busy}
             text-left
-            .label=${`Install ${this._manifest.name}`}
             @click=${()=>{this._manifest.new_install_prompt_erase?this._state="ASK_ERASE":this._startInstall(!0)}}
-          ></ew-text-button>
+            >Install ${this._manifest.name}</ew-text-button
+          >
         </div>
 
         ${this._isUsbJtagOrOtgDevice?"":p`
@@ -1039,9 +1039,9 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
         >
         <ew-text-button
           slot="actions"
-          .label=${this._installState&&this._installErase?"Skip":"Back"}
           @click=${async()=>{if(this._client)try{await this._closeClientWithoutEvents(this._client),this.logger.log("Improv client closed")}catch(e){this.logger.log("Failed to close Improv client:",e)}await this._releaseReaderWriter(),this.logger.log("Returning to dashboard (device stays in firmware mode)"),this._state="DASHBOARD"}}
-        ></ew-text-button>
+          >${this._installState&&this._installErase?"Skip":"Back"}</ew-text-button
+        >
       `}else{t=void 0;const r=!this._wasProvisioned&&(void 0!==this._client.nextUrl||"home_assistant_domain"in this._manifest);i=r,e=p`
         <ewt-page-message
           .icon=${"🎉"}

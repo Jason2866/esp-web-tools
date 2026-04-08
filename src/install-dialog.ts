@@ -638,9 +638,10 @@ export class EwtInstallDialog extends LitElement {
                       this._startInstall(true);
                     }
                   }}
-                >${!this._isSameFirmware
+                  >${!this._isSameFirmware
                     ? `Install ${this._manifest.name}`
-                    : `Update ${this._manifest.name}`}</ew-text-button>
+                    : `Update ${this._manifest.name}`}</ew-text-button
+                >
               </div>
             `
           : ""}
@@ -849,9 +850,10 @@ export class EwtInstallDialog extends LitElement {
                     this._provisionForce = true;
                     this._busy = false;
                   }}
-                >${this._client.state === ImprovSerialCurrentState.READY
+                  >${this._client.state === ImprovSerialCurrentState.READY
                     ? "Connect to Wi-Fi"
-                    : "Change Wi-Fi"}</ew-text-button>
+                    : "Change Wi-Fi"}</ew-text-button
+                >
               </div>
             `
           : ""}
@@ -1000,7 +1002,8 @@ export class EwtInstallDialog extends LitElement {
                 this._startInstall(true);
               }
             }}
-          >Install ${this._manifest.name}</ew-text-button>
+            >Install ${this._manifest.name}</ew-text-button
+          >
         </div>
 
         ${!this._isUsbJtagOrOtgDevice
@@ -1381,7 +1384,10 @@ export class EwtInstallDialog extends LitElement {
 
             this._state = "DASHBOARD";
           }}
-        >${this._installState && this._installErase ? "Skip" : "Back"}</ew-text-button>
+          >${this._installState && this._installErase
+            ? "Skip"
+            : "Back"}</ew-text-button
+        >
       `;
     }
     return [heading, content, hideActions];
