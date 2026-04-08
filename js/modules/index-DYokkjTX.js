@@ -51,7 +51,7 @@ import{y as e,z as t,k as o,_ as l,t as i,b as a,h as s}from"./styles-D69gtq6_.j
                   <a
                     href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers"
                     target="_blank"
-                    rel="noopener"
+                    rel="noopener noreferrer"
                     >Windows & Mac</a
                   >
                 </li>
@@ -60,13 +60,13 @@ import{y as e,z as t,k as o,_ as l,t as i,b as a,h as s}from"./styles-D69gtq6_.j
                   <a
                     href="https://www.wch.cn/downloads/CH343SER_ZIP.html"
                     target="_blank"
-                    rel="noopener"
+                    rel="noopener noreferrer"
                     >Windows</a
                   >,
                   <a
                     href="https://www.wch.cn/downloads/CH34XSER_MAC_ZIP.html"
                     target="_blank"
-                    rel="noopener"
+                    rel="noopener noreferrer"
                     >Mac</a
                   >
                   <br />
@@ -77,13 +77,13 @@ import{y as e,z as t,k as o,_ as l,t as i,b as a,h as s}from"./styles-D69gtq6_.j
                   <a
                     href="https://www.wch.cn/downloads/CH341SER_ZIP.html"
                     target="_blank"
-                    rel="noopener"
+                    rel="noopener noreferrer"
                     >Windows</a
                   >,
                   <a
                     href="https://www.wch.cn/downloads/CH341SER_MAC_ZIP.html"
                     target="_blank"
-                    rel="noopener"
+                    rel="noopener noreferrer"
                     >Mac</a
                   >
                   <br />

@@ -64,7 +64,7 @@ class EwtNoPortPickedDialog extends LitElement {
                   <a
                     href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers"
                     target="_blank"
-                    rel="noopener"
+                    rel="noopener noreferrer"
                     >Windows & Mac</a
                   >
                 </li>
@@ -73,13 +73,13 @@ class EwtNoPortPickedDialog extends LitElement {
                   <a
                     href="https://www.wch.cn/downloads/CH343SER_ZIP.html"
                     target="_blank"
-                    rel="noopener"
+                    rel="noopener noreferrer"
                     >Windows</a
                   >,
                   <a
                     href="https://www.wch.cn/downloads/CH34XSER_MAC_ZIP.html"
                     target="_blank"
-                    rel="noopener"
+                    rel="noopener noreferrer"
                     >Mac</a
                   >
                   <br />
@@ -90,13 +90,13 @@ class EwtNoPortPickedDialog extends LitElement {
                   <a
                     href="https://www.wch.cn/downloads/CH341SER_ZIP.html"
                     target="_blank"
-                    rel="noopener"
+                    rel="noopener noreferrer"
                     >Windows</a
                   >,
                   <a
                     href="https://www.wch.cn/downloads/CH341SER_MAC_ZIP.html"
                     target="_blank"
-                    rel="noopener"
+                    rel="noopener noreferrer"
                     >Mac</a
                   >
                   <br />

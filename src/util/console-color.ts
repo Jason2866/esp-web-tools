@@ -37,6 +37,8 @@ export class ColoredConsole {
   private _sentinel: HTMLElement | null = null;
   // Full history for log export — never trimmed, unlike the DOM cap
   private _exportLines: string[] = [];
+  // Redacted plain-text version of _exportLines for logs() export
+  private _redactedLines: string[] = [];
   private _visibilityHandler: (() => void) | null = null;
 
   constructor(public targetElement: HTMLElement) {
@@ -70,11 +72,47 @@ export class ColoredConsole {
   }
 
   logs(): string {
-    // Strip ANSI/CSI escape sequences (SGR colour codes, cursor moves, etc.)
-    // before exporting so the downloaded log file contains plain text.
-    const ansiRe =
-      /(?:\x1B|\x9B)(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\))/g;
-    return this._exportLines.map((l) => l.replace(ansiRe, "")).join("");
+    return this._redactedLines.join("");
+  }
+
+  private _redactLine(line: string): string {
+    // Mirrors the SGR state machine in processLine but produces plain text,
+    // replacing concealed (SGR 8) spans with "[redacted]" and stripping all
+    // other ANSI sequences so the export never leaks hidden content.
+    const re = /(?:\x1B|\\x1B)(?:\[(.*?)[@-~]|\].*?(?:\x07|\x1B\\))/g;
+    let i = 0;
+    let secret = false;
+    let out = "";
+
+    while (true) {
+      const match = re.exec(line);
+      if (match === null) break;
+
+      const j = match.index;
+      const text = line.substring(i, j);
+      if (text) out += secret ? "[redacted]" : text;
+      i = j + match[0].length;
+
+      if (match[1] === undefined) continue;
+
+      for (const colorCode of match[1].split(";")) {
+        switch (parseInt(colorCode)) {
+          case 0:
+            secret = false;
+            break;
+          case 8:
+            secret = true;
+            break;
+          case 28:
+            secret = false;
+            break;
+        }
+      }
+    }
+
+    const tail = line.substring(i);
+    if (tail) out += secret ? "[redacted]" : tail;
+    return out;
   }
 
   destroy() {
@@ -327,6 +365,7 @@ export class ColoredConsole {
   addLine(line: string) {
     if (this._destroyed) return;
     this._exportLines.push(line);
+    this._redactedLines.push(this._redactLine(line));
     this.state.lines.push(line);
     if (!this._rafId && !this._timeoutId) {
       if (document.hidden) {
