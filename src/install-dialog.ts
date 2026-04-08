@@ -15,7 +15,21 @@ import "./components/ew-list-item";
 import "./components/ew-littlefs-manager";
 import "./pages/ew-page-progress";
 import "./pages/ew-page-message";
-import { closeIcon } from "./components/svg";
+import {
+  closeIcon,
+  warningIcon,
+  checkCircleIcon,
+  listItemInstallIcon,
+  listItemWifi,
+  listItemConsole,
+  listItemVisitDevice,
+  listItemHomeAssistant,
+  listItemEraseUserData,
+  listItemFundDevelopment,
+  firmwareIcon,
+  downloadIcon,
+  refreshIcon,
+} from "./components/svg";
 import { Logger, Manifest, FlashStateType, FlashState } from "./const.js";
 import { ImprovSerial, Ssid } from "improv-wifi-serial-sdk/dist/serial";
 import {
@@ -32,8 +46,8 @@ import { parsePartitionTable, type Partition } from "./partition.js";
 import { detectFilesystemType } from "./util/partition.js";
 import { getChipFamilyName } from "./util/chip-family-name";
 
-const ERROR_ICON = "⚠️";
-const OK_ICON = "🎉";
+const ERROR_ICON = warningIcon;
+const OK_ICON = checkCircleIcon;
 
 export class EwtInstallDialog extends LitElement {
   public esploader!: any; // ESPLoader instance from tasmota-webserial-esptool
@@ -615,6 +629,7 @@ export class EwtInstallDialog extends LitElement {
     content = html`
       <ew-list>
         <ew-list-item>
+          ${firmwareIcon}
           <div slot="headline">Connected to ${this._info!.name}</div>
           <div slot="supporting-text">
             ${this._info!.firmware}&nbsp;${this._info!.version}
@@ -638,8 +653,8 @@ export class EwtInstallDialog extends LitElement {
                     }
                   }}
                   >${!this._isSameFirmware
-                    ? `Install ${this._manifest.name}`
-                    : `Update ${this._manifest.name}`}</ew-text-button
+                    ? html`${listItemInstallIcon} Install ${this._manifest.name}`
+                    : html`${refreshIcon} Update ${this._manifest.name}`}</ew-text-button
                 >
               </div>
             `
@@ -666,7 +681,7 @@ export class EwtInstallDialog extends LitElement {
                     }
                     this._busy = false;
                   }}
-                  >Visit Device</ew-text-button
+                  >${listItemVisitDevice} Visit Device</ew-text-button
                 >
               </div>
             `}
@@ -697,7 +712,7 @@ export class EwtInstallDialog extends LitElement {
                     }
                     this._busy = false;
                   }}
-                  >Add to Home Assistant</ew-text-button
+                  >${listItemHomeAssistant} Add to Home Assistant</ew-text-button
                 >
               </div>
             `}
@@ -849,9 +864,9 @@ export class EwtInstallDialog extends LitElement {
                     this._provisionForce = true;
                     this._busy = false;
                   }}
-                  >${this._client.state === ImprovSerialCurrentState.READY
-                    ? "Connect to Wi-Fi"
-                    : "Change Wi-Fi"}</ew-text-button
+                  >${listItemWifi}${this._client.state === ImprovSerialCurrentState.READY
+                    ? " Connect to Wi-Fi"
+                    : " Change Wi-Fi"}</ew-text-button
                 >
               </div>
             `
@@ -888,7 +903,7 @@ export class EwtInstallDialog extends LitElement {
                     this._state = "LOGS";
                     this._busy = false;
                   }}
-                  >Open Console</ew-text-button
+                  >${listItemConsole} Open Console</ew-text-button
                 >
               </div>
             `
@@ -909,7 +924,7 @@ export class EwtInstallDialog extends LitElement {
 
                     this._state = "LOGS";
                   }}
-                  >Logs &amp; Console</ew-text-button
+                  >${listItemConsole} Logs &amp; Console</ew-text-button
                 >
               </div>
             `
@@ -959,7 +974,7 @@ export class EwtInstallDialog extends LitElement {
                   href=${this._manifest.funding_url}
                   target="_blank"
                 >
-                  <ew-text-button>Fund Development</ew-text-button>
+                  <ew-text-button>${listItemFundDevelopment} Fund Development</ew-text-button>
                 </a>
               </div>
             `
@@ -971,7 +986,7 @@ export class EwtInstallDialog extends LitElement {
                   ?disabled=${this._busy}
                   class="danger"
                   @click=${() => this._startInstall(true)}
-                  >Erase User Data</ew-text-button
+                  >${listItemEraseUserData} Erase User Data</ew-text-button
                 >
               </div>
             `
@@ -1000,7 +1015,7 @@ export class EwtInstallDialog extends LitElement {
                 this._startInstall(true);
               }
             }}
-            >Install ${this._manifest.name}</ew-text-button
+            >${listItemInstallIcon} Install ${this._manifest.name}</ew-text-button
           >
         </div>
 
@@ -1026,7 +1041,7 @@ export class EwtInstallDialog extends LitElement {
                     this._state = "LOGS";
                     this._busy = false;
                   }}
-                  >Logs &amp; Console</ew-text-button
+                  >${listItemConsole} Logs &amp; Console</ew-text-button
                 >
               </div>
             `
@@ -1063,7 +1078,7 @@ export class EwtInstallDialog extends LitElement {
                     this._state = "LOGS";
                     this._busy = false;
                   }}
-                  >Open Console</ew-text-button
+                  >${listItemConsole} Open Console</ew-text-button
                 >
               </div>
             `
@@ -1594,7 +1609,7 @@ export class EwtInstallDialog extends LitElement {
 
           this.shadowRoot!.querySelector("ew-console")!.reset();
         }}
-        >Download Logs</ew-text-button
+        >${downloadIcon} Download Logs</ew-text-button
       >
       <ew-text-button
         slot="actions"
@@ -3000,6 +3015,13 @@ export class EwtInstallDialog extends LitElement {
       .dashboard-buttons div {
         display: block;
         margin: 4px 0;
+      }
+      ew-text-button svg {
+        width: 18px;
+        height: 18px;
+        vertical-align: middle;
+        margin-right: 4px;
+        margin-bottom: 2px;
       }
       a.has-button {
         text-decoration: none;

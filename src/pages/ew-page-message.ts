@@ -3,7 +3,7 @@ import { property } from "lit/decorators.js";
 import "../components/ew-circular-progress";
 
 class EwtPageMessage extends LitElement {
-  @property() icon!: string;
+  @property() icon!: string | TemplateResult;
 
   @property() label!: string | TemplateResult;
 
@@ -24,6 +24,11 @@ class EwtPageMessage extends LitElement {
       font-size: 50px;
       line-height: 80px;
       color: black;
+    }
+    .icon svg {
+      width: 64px;
+      height: 64px;
+      vertical-align: middle;
     }
     ew-circular-progress {
       margin-bottom: 16px;
