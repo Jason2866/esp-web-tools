@@ -676,7 +676,11 @@ export class EwtInstallDialog extends LitElement {
 
                   // Device is in firmware mode - open URL
                   if (this._client && this._client.nextUrl) {
-                    window.open(this._client.nextUrl, "_blank", "noopener,noreferrer");
+                    window.open(
+                      this._client.nextUrl,
+                      "_blank",
+                      "noopener,noreferrer",
+                    );
                   }
                   this._busy = false;
                 }}
