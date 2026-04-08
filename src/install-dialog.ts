@@ -733,9 +733,7 @@ export class EwtInstallDialog extends LitElement {
                   }
 
                   // Device is in firmware mode
-                  this.logger.log(
-                    "Device is running firmware for Wi-Fi setup",
-                  );
+                  this.logger.log("Device is running firmware for Wi-Fi setup");
 
                   // Close Improv client and re-initialize for WiFi setup
                   if (this._client) {
@@ -843,9 +841,7 @@ export class EwtInstallDialog extends LitElement {
                     // CRITICAL: Recreate streams after failed Improv init
                     try {
                       await this._releaseReaderWriter();
-                      this.logger.log(
-                        "Streams recreated after Improv failure",
-                      );
+                      this.logger.log("Streams recreated after Improv failure");
                     } catch (releaseErr: any) {
                       this.logger.log(
                         `Failed to recreate streams: ${releaseErr.message}`,
