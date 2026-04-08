@@ -121,7 +121,11 @@ class EwtNoPortPickedDialog extends LitElement {
                 <ew-text-button @click=${this._handleClose}
                   >Cancel</ew-text-button
                 >
-                <ew-text-button @click=${async () => { await this._handleClose(); this.doTryAgain!(); }}
+                <ew-text-button
+                  @click=${async () => {
+                    await this._handleClose();
+                    this.doTryAgain!();
+                  }}
                   >Try Again</ew-text-button
                 >
               `

@@ -1,4 +1,4 @@
-import{y as e,z as t,k as o,_ as l,t as i,b as a,h as s}from"./styles-D69gtq6_.js";const n=e`
+import{y as e,z as t,k as o,_ as l,t as a,b as i,h as s}from"./styles-D69gtq6_.js";const n=e`
   <svg
     version="1.1"
     id="Capa_1"
@@ -17,7 +17,7 @@ import{y as e,z as t,k as o,_ as l,t as i,b as a,h as s}from"./styles-D69gtq6_.j
       />
     </g>
   </svg>
-`;let r=class extends a{render(){return s`
+`;let r=class extends i{render(){return s`
       <ew-dialog
         open
         @cancel=${this._preventDefault}
@@ -107,7 +107,8 @@ import{y as e,z as t,k as o,_ as l,t as i,b as a,h as s}from"./styles-D69gtq6_.j
                 <ew-text-button @click=${this._handleClose}
                   >Cancel</ew-text-button
                 >
-                <ew-text-button @click=${this.doTryAgain}
+                <ew-text-button
+                  @click=${async()=>{await this._handleClose(),this.doTryAgain()}}
                   >Try Again</ew-text-button
                 >
               `:s`
@@ -117,7 +118,7 @@ import{y as e,z as t,k as o,_ as l,t as i,b as a,h as s}from"./styles-D69gtq6_.j
               `}
         </div>
       </ew-dialog>
-    `}_preventDefault(e){e.preventDefault()}async _handleClose(){this.parentNode.removeChild(this)}};r.styles=[t,o`
+    `}_preventDefault(e){e.preventDefault()}async _handleClose(){this.remove()}};r.styles=[t,o`
       li + li,
       li > ul {
         margin-top: 8px;
@@ -127,4 +128,4 @@ import{y as e,z as t,k as o,_ as l,t as i,b as a,h as s}from"./styles-D69gtq6_.j
         margin-bottom: 0;
         padding-left: 1.5em;
       }
-    `],r=l([i("ewt-no-port-picked-dialog")],r);const d=async e=>{const t=document.createElement("ewt-no-port-picked-dialog");return t.doTryAgain=e,document.body.append(t),!0};export{d as openNoPortPickedDialog};
+    `],r=l([a("ewt-no-port-picked-dialog")],r);const d=async e=>{const t=document.createElement("ewt-no-port-picked-dialog");return t.doTryAgain=e,document.body.append(t),!0};export{d as openNoPortPickedDialog};
