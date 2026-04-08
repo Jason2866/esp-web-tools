@@ -1,4 +1,4 @@
-import{y as e,z as t,k as o,_ as l,t as i,b as a,h as s}from"./styles-D69gtq6_.js";const n=e`
+import{y as e,z as t,k as o,_ as l,t as r,b as i,h as a}from"./styles-D69gtq6_.js";const n=e`
   <svg
     version="1.1"
     id="Capa_1"
@@ -17,7 +17,7 @@ import{y as e,z as t,k as o,_ as l,t as i,b as a,h as s}from"./styles-D69gtq6_.j
       />
     </g>
   </svg>
-`;let r=class extends a{render(){return s`
+`;let s=class extends i{render(){return a`
       <ew-dialog
         open
         @cancel=${this._preventDefault}
@@ -103,7 +103,7 @@ import{y as e,z as t,k as o,_ as l,t as i,b as a,h as s}from"./styles-D69gtq6_.j
           </ol>
         </div>
         <div slot="actions">
-          ${this.doTryAgain?s`
+          ${this.doTryAgain?a`
                 <ew-text-button @click=${this._handleClose}
                   >Cancel</ew-text-button
                 >
@@ -111,14 +111,14 @@ import{y as e,z as t,k as o,_ as l,t as i,b as a,h as s}from"./styles-D69gtq6_.j
                   @click=${async()=>{await this._handleClose(),this.doTryAgain()}}
                   >Try Again</ew-text-button
                 >
-              `:s`
+              `:a`
                 <ew-text-button @click=${this._handleClose}
                   >Close</ew-text-button
                 >
               `}
         </div>
       </ew-dialog>
-    `}_preventDefault(e){e.preventDefault()}async _handleClose(){this.remove()}};r.styles=[t,o`
+    `}_preventDefault(e){e.preventDefault()}async _handleClose(){this.remove()}};s.styles=[t,o`
       li + li,
       li > ul {
         margin-top: 8px;
@@ -128,4 +128,4 @@ import{y as e,z as t,k as o,_ as l,t as i,b as a,h as s}from"./styles-D69gtq6_.j
         margin-bottom: 0;
         padding-left: 1.5em;
       }
-    `],r=l([i("ewt-no-port-picked-dialog")],r);const d=async e=>{const t=document.createElement("ewt-no-port-picked-dialog");return t.doTryAgain=e,document.body.append(t),!0};export{d as openNoPortPickedDialog};
+    `],s=l([r("ewt-no-port-picked-dialog")],s);const d=async e=>{const t=document.createElement("ewt-no-port-picked-dialog");return t.doTryAgain=e,document.body.append(t),!0};export{d as openNoPortPickedDialog};
