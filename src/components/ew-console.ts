@@ -202,7 +202,7 @@ export class EwtConsole extends HTMLElement {
       try {
         writer.releaseLock();
       } catch (err) {
-        console.error("Ignoring release lock error", err);
+        this.logger.error("Ignoring release lock error", err);
       }
     }
   }
@@ -234,7 +234,7 @@ export class EwtConsole extends HTMLElement {
         this.logger.error("Reset callback failed:", err);
       }
     }
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await sleep(1000);
   }
 }
 

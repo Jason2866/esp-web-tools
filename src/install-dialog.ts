@@ -2944,7 +2944,7 @@ export class EwtInstallDialog extends LitElement {
     if (this._client) {
       await this._closeClientWithoutEvents(this._client);
     }
-    document.body.style.overflow = this._bodyOverflow!;
+    document.body.style.overflow = this._bodyOverflow ?? "";
     fireEvent(this, "closed" as any);
     this.parentNode!.removeChild(this);
   }
