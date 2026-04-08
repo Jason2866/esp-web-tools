@@ -12,6 +12,7 @@ export class EwtConsole extends HTMLElement {
 
   private _console?: ColoredConsole;
   private _cancelConnection?: () => Promise<void>;
+  private _clickHandler?: (ev: MouseEvent) => void;
   private _commandHistory: string[] = [];
   private _historyIndex = -1;
   private _currentInput = "";
@@ -71,12 +72,13 @@ export class EwtConsole extends HTMLElement {
     if (this.allowInput) {
       const input = this.shadowRoot!.querySelector("input")!;
 
-      this.addEventListener("click", () => {
+      this._clickHandler = () => {
         // Only focus input if user didn't select some text
         if (getSelection()?.toString() === "") {
           input.focus();
         }
-      });
+      };
+      this.addEventListener("click", this._clickHandler);
 
       input.addEventListener("keydown", (ev) => {
         if (ev.key === "Enter") {
