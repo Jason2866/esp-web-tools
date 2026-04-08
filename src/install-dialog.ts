@@ -712,7 +712,8 @@ export class EwtInstallDialog extends LitElement {
                     }
                     this._busy = false;
                   }}
-                  >${listItemHomeAssistant} Add to Home Assistant</ew-text-button
+                  >${listItemHomeAssistant} Add to Home
+                  Assistant</ew-text-button
                 >
               </div>
             `}
@@ -864,7 +865,8 @@ export class EwtInstallDialog extends LitElement {
                     this._provisionForce = true;
                     this._busy = false;
                   }}
-                  >${listItemWifi}${this._client.state === ImprovSerialCurrentState.READY
+                  >${listItemWifi}${this._client.state ===
+                  ImprovSerialCurrentState.READY
                     ? " Connect to Wi-Fi"
                     : " Change Wi-Fi"}</ew-text-button
                 >
@@ -974,7 +976,9 @@ export class EwtInstallDialog extends LitElement {
                   href=${this._manifest.funding_url}
                   target="_blank"
                 >
-                  <ew-text-button>${listItemFundDevelopment} Fund Development</ew-text-button>
+                  <ew-text-button
+                    >${listItemFundDevelopment} Fund Development</ew-text-button
+                  >
                 </a>
               </div>
             `
@@ -1015,7 +1019,8 @@ export class EwtInstallDialog extends LitElement {
                 this._startInstall(true);
               }
             }}
-            >${listItemInstallIcon} Install ${this._manifest.name}</ew-text-button
+            >${listItemInstallIcon} Install
+            ${this._manifest.name}</ew-text-button
           >
         </div>
 
