@@ -628,7 +628,6 @@ export class EwtInstallDialog extends LitElement {
               <div>
                 <ew-text-button
                   ?disabled=${this._busy}
-                  text-left
                   @click=${() => {
                     if (this._isSameFirmware) {
                       this._startInstall(false);
@@ -651,7 +650,6 @@ export class EwtInstallDialog extends LitElement {
               <div>
                 <ew-text-button
                   ?disabled=${this._busy}
-                  label="Visit Device"
                   @click=${async () => {
                     this._busy = true;
 
@@ -668,7 +666,8 @@ export class EwtInstallDialog extends LitElement {
                     }
                     this._busy = false;
                   }}
-                ></ew-text-button>
+                  >Visit Device</ew-text-button
+                >
               </div>
             `}
         ${!this._client ||
@@ -679,7 +678,6 @@ export class EwtInstallDialog extends LitElement {
               <div>
                 <ew-text-button
                   ?disabled=${this._busy}
-                  label="Add to Home Assistant"
                   @click=${async () => {
                     this._busy = true;
 
@@ -699,7 +697,8 @@ export class EwtInstallDialog extends LitElement {
                     }
                     this._busy = false;
                   }}
-                ></ew-text-button>
+                  >Add to Home Assistant</ew-text-button
+                >
               </div>
             `}
         ${this._client
@@ -862,7 +861,6 @@ export class EwtInstallDialog extends LitElement {
               <div>
                 <ew-text-button
                   ?disabled=${this._busy}
-                  label="Open Console"
                   @click=${async () => {
                     this._busy = true;
 
@@ -890,7 +888,8 @@ export class EwtInstallDialog extends LitElement {
                     this._state = "LOGS";
                     this._busy = false;
                   }}
-                ></ew-text-button>
+                  >Open Console</ew-text-button
+                >
               </div>
             `
           : ""}
@@ -899,7 +898,6 @@ export class EwtInstallDialog extends LitElement {
               <div>
                 <ew-text-button
                   ?disabled=${this._busy}
-                  label="Logs & Console"
                   @click=${async () => {
                     const client = this._client;
                     if (client) {
@@ -911,14 +909,14 @@ export class EwtInstallDialog extends LitElement {
 
                     this._state = "LOGS";
                   }}
-                ></ew-text-button>
+                  >Logs &amp; Console</ew-text-button
+                >
               </div>
             `
           : ""}
         <div>
           <ew-text-button
             ?disabled=${this._busy}
-            label="Manage Filesystem"
             @click=${async () => {
               // Filesystem management requires bootloader mode
               // Close Improv client if active (it locks the reader)
@@ -950,7 +948,8 @@ export class EwtInstallDialog extends LitElement {
               this._state = "PARTITIONS";
               this._readPartitionTable();
             }}
-          ></ew-text-button>
+            >Manage Filesystem</ew-text-button
+          >
         </div>
         ${this._isSameFirmware && this._manifest.funding_url
           ? html`
@@ -971,9 +970,9 @@ export class EwtInstallDialog extends LitElement {
                 <ew-text-button
                   ?disabled=${this._busy}
                   class="danger"
-                  label="Erase User Data"
                   @click=${() => this._startInstall(true)}
-                ></ew-text-button>
+                  >Erase User Data</ew-text-button
+                >
               </div>
             `
           : ""}
@@ -993,7 +992,6 @@ export class EwtInstallDialog extends LitElement {
         <div>
           <ew-text-button
             ?disabled=${this._busy}
-            text-left
             @click=${() => {
               if (this._manifest.new_install_prompt_erase) {
                 this._state = "ASK_ERASE";
@@ -1010,7 +1008,6 @@ export class EwtInstallDialog extends LitElement {
           ? html`
               <div>
                 <ew-text-button
-                  label="Logs & Console"
                   ?disabled=${this._busy}
                   @click=${async () => {
                     this._busy = true;
@@ -1029,7 +1026,8 @@ export class EwtInstallDialog extends LitElement {
                     this._state = "LOGS";
                     this._busy = false;
                   }}
-                ></ew-text-button>
+                  >Logs &amp; Console</ew-text-button
+                >
               </div>
             `
           : ""}
@@ -1038,7 +1036,6 @@ export class EwtInstallDialog extends LitElement {
               <div>
                 <ew-text-button
                   ?disabled=${this._busy}
-                  label="Open Console"
                   @click=${async () => {
                     this._busy = true;
 
@@ -1066,14 +1063,14 @@ export class EwtInstallDialog extends LitElement {
                     this._state = "LOGS";
                     this._busy = false;
                   }}
-                ></ew-text-button>
+                  >Open Console</ew-text-button
+                >
               </div>
             `
           : ""}
 
         <div>
           <ew-text-button
-            label="Manage Filesystem"
             ?disabled=${this._busy}
             @click=${async () => {
               // Filesystem management requires bootloader mode
@@ -1107,7 +1104,8 @@ export class EwtInstallDialog extends LitElement {
               this._state = "PARTITIONS";
               this._readPartitionTable();
             }}
-          ></ew-text-button>
+            >Manage Filesystem</ew-text-button
+          >
         </div>
       </div>
     `;
@@ -1231,7 +1229,6 @@ export class EwtInstallDialog extends LitElement {
                     `}
                 <div>
                   <ew-text-button
-                    label="Skip"
                     @click=${async () => {
                       // After WiFi provisioning: Device stays in firmware mode
                       // Close Improv client first
@@ -1254,14 +1251,14 @@ export class EwtInstallDialog extends LitElement {
 
                       this._state = "DASHBOARD";
                     }}
-                  ></ew-text-button>
+                    >Skip</ew-text-button
+                  >
                 </div>
               </div>
             `
           : html`
               <ew-text-button
                 slot="actions"
-                label="Continue"
                 @click=${async () => {
                   // After WiFi provisioning: Device stays in firmware mode
                   // Close Improv client first
@@ -1284,7 +1281,8 @@ export class EwtInstallDialog extends LitElement {
 
                   this._state = "DASHBOARD";
                 }}
-              ></ew-text-button>
+                >Continue</ew-text-button
+              >
             `}
       `;
     } else {
@@ -1406,19 +1404,19 @@ export class EwtInstallDialog extends LitElement {
       </label>
       <ew-text-button
         slot="actions"
-        label="Next"
         @click=${() => {
           const checkbox = this.shadowRoot!.querySelector("ew-checkbox")!;
           this._startInstall(checkbox.checked);
         }}
-      ></ew-text-button>
+        >Next</ew-text-button
+      >
       <ew-text-button
         slot="actions"
-        label="Back"
         @click=${() => {
           this._state = "DASHBOARD";
         }}
-      ></ew-text-button>
+        >Back</ew-text-button
+      >
     `;
 
     return [heading, content];
@@ -1462,11 +1460,11 @@ export class EwtInstallDialog extends LitElement {
         >
         <ew-text-button
           slot="actions"
-          label="Back"
           @click=${() => {
             this._state = "DASHBOARD";
           }}
-        ></ew-text-button>
+          >Back</ew-text-button
+        >
       `;
     } else if (
       !this._installState ||
@@ -1529,12 +1527,12 @@ export class EwtInstallDialog extends LitElement {
         ></ewt-page-message>
         <ew-text-button
           slot="actions"
-          label="Next"
           @click=${() => {
             this._state =
               supportsImprov && this._installErase ? "PROVISION" : "DASHBOARD";
           }}
-        ></ew-text-button>
+          >Next</ew-text-button
+        >
       `;
     } else if (this._installState.state === FlashStateType.ERROR) {
       heading = "Installation failed";
@@ -1545,13 +1543,13 @@ export class EwtInstallDialog extends LitElement {
         ></ewt-page-message>
         <ew-text-button
           slot="actions"
-          label="Back"
           @click=${async () => {
             this._improvChecked = false; // Force Improv re-test
             await this._initialize(); // Re-test Improv after failed flash
             this._state = "DASHBOARD";
           }}
-        ></ew-text-button>
+          >Back</ew-text-button
+        >
       `;
     }
     return [heading, content!, hideActions, allowClosing];
@@ -1570,7 +1568,6 @@ export class EwtInstallDialog extends LitElement {
       ></ew-console>
       <ew-text-button
         slot="actions"
-        label="Back"
         @click=${async () => {
           await this.shadowRoot!.querySelector("ew-console")!.disconnect();
 
@@ -1585,10 +1582,10 @@ export class EwtInstallDialog extends LitElement {
           // Don't reset _improvChecked - console only reads, doesn't change firmware
           await this._initialize();
         }}
-      ></ew-text-button>
+        >Back</ew-text-button
+      >
       <ew-text-button
         slot="actions"
-        label="Download Logs"
         @click=${() => {
           textDownload(
             this.shadowRoot!.querySelector("ew-console")!.logs(),
@@ -1597,14 +1594,15 @@ export class EwtInstallDialog extends LitElement {
 
           this.shadowRoot!.querySelector("ew-console")!.reset();
         }}
-      ></ew-text-button>
+        >Download Logs</ew-text-button
+      >
       <ew-text-button
         slot="actions"
-        label="Reset Device"
         @click=${async () => {
           await this.shadowRoot!.querySelector("ew-console")!.reset();
         }}
-      ></ew-text-button>
+        >Reset Device</ew-text-button
+      >
     `;
 
     return [heading, content!, hideActions];
@@ -1625,7 +1623,6 @@ export class EwtInstallDialog extends LitElement {
         ></ewt-page-message>
         <ew-text-button
           slot="actions"
-          label="Back"
           @click=${async () => {
             // Just release locks and go back to dashboard
             // Device stays in firmware mode (no need to switch)
@@ -1633,7 +1630,8 @@ export class EwtInstallDialog extends LitElement {
             this._state = "DASHBOARD";
             // Don't reset _improvChecked - status is still valid after console operations
           }}
-        ></ew-text-button>
+          >Back</ew-text-button
+        >
       `;
     } else {
       content = html`
@@ -1662,9 +1660,9 @@ export class EwtInstallDialog extends LitElement {
                       ${partition.type === 0x01 && partition.subtype === 0x82
                         ? html`
                             <ew-text-button
-                              label="Open FS"
                               @click=${() => this._openFilesystem(partition)}
-                            ></ew-text-button>
+                              >Open FS</ew-text-button
+                            >
                           `
                         : ""}
                     </td>
@@ -1676,7 +1674,6 @@ export class EwtInstallDialog extends LitElement {
         </div>
         <ew-text-button
           slot="actions"
-          label="Back"
           @click=${async () => {
             try {
               // For USB-JTAG/OTG: Need to re-initialize after port changes
@@ -1697,7 +1694,8 @@ export class EwtInstallDialog extends LitElement {
               this._busy = false;
             }
           }}
-        ></ew-text-button>
+          >Back</ew-text-button
+        >
       `;
     }
 
