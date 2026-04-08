@@ -1401,7 +1401,7 @@ import{e,i as t,_ as i,n as r,m as o,a as s,b as a,r as l,c as n,d,f as c,g as h
       }
       ew-dialog {
         min-width: min(340px, 100% - 48px);
-        max-width: min(600px, 100% - 48px);
+        max-width: min(500px, 100% - 48px);
       }
       div[slot="headline"] {
         flex: 1;
