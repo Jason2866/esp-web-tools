@@ -872,7 +872,7 @@ export class EwtLittleFSManager extends LitElement {
     }
 
     .danger {
-      --mdc-theme-primary: var(--improv-danger-color, #db4437);
+      --md-sys-color-primary: var(--danger-color, #db4437);
     }
   `;
 }

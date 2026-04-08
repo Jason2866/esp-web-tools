@@ -629,9 +629,6 @@ export class EwtInstallDialog extends LitElement {
                 <ew-text-button
                   ?disabled=${this._busy}
                   text-left
-                  .label=${!this._isSameFirmware
-                    ? `Install ${this._manifest.name}`
-                    : `Update ${this._manifest.name}`}
                   @click=${() => {
                     if (this._isSameFirmware) {
                       this._startInstall(false);
@@ -641,7 +638,9 @@ export class EwtInstallDialog extends LitElement {
                       this._startInstall(true);
                     }
                   }}
-                ></ew-text-button>
+                >${!this._isSameFirmware
+                    ? `Install ${this._manifest.name}`
+                    : `Update ${this._manifest.name}`}</ew-text-button>
               </div>
             `
           : ""}
@@ -707,9 +706,6 @@ export class EwtInstallDialog extends LitElement {
               <div>
                 <ew-text-button
                   ?disabled=${this._busy}
-                  .label=${this._client.state === ImprovSerialCurrentState.READY
-                    ? "Connect to Wi-Fi"
-                    : "Change Wi-Fi"}
                   @click=${async () => {
                     this._busy = true;
 
@@ -853,7 +849,9 @@ export class EwtInstallDialog extends LitElement {
                     this._provisionForce = true;
                     this._busy = false;
                   }}
-                ></ew-text-button>
+                >${this._client.state === ImprovSerialCurrentState.READY
+                    ? "Connect to Wi-Fi"
+                    : "Change Wi-Fi"}</ew-text-button>
               </div>
             `
           : ""}
@@ -994,7 +992,6 @@ export class EwtInstallDialog extends LitElement {
           <ew-text-button
             ?disabled=${this._busy}
             text-left
-            .label=${`Install ${this._manifest.name}`}
             @click=${() => {
               if (this._manifest.new_install_prompt_erase) {
                 this._state = "ASK_ERASE";
@@ -1003,7 +1000,7 @@ export class EwtInstallDialog extends LitElement {
                 this._startInstall(true);
               }
             }}
-          ></ew-text-button>
+          >Install ${this._manifest.name}</ew-text-button>
         </div>
 
         ${!this._isUsbJtagOrOtgDevice
@@ -1364,7 +1361,6 @@ export class EwtInstallDialog extends LitElement {
         >
         <ew-text-button
           slot="actions"
-          .label=${this._installState && this._installErase ? "Skip" : "Back"}
           @click=${async () => {
             // When going back from provision: Device stays in firmware mode
             // Close Improv client first
@@ -1385,7 +1381,7 @@ export class EwtInstallDialog extends LitElement {
 
             this._state = "DASHBOARD";
           }}
-        ></ew-text-button>
+        >${this._installState && this._installErase ? "Skip" : "Back"}</ew-text-button>
       `;
     }
     return [heading, content, hideActions];
