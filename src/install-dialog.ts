@@ -3003,11 +3003,8 @@ export class EwtInstallDialog extends LitElement {
   static styles = [
     dialogStyles,
     css`
-      :host {
-        --md-dialog-container-max-inline-size: 420px;
-      }
       ew-dialog {
-        max-width: min(420px, 100% - 48px);
+        max-width: min(450px, 100% - 48px);
       }
       ew-icon-button {
         position: absolute;
