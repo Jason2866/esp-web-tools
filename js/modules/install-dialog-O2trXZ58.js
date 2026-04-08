@@ -875,7 +875,6 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
               <div>
                 <ew-text-button
                   ?disabled=${this._busy}
-                  text-left
                   @click=${()=>{this._isSameFirmware?this._startInstall(!1):this._manifest.new_install_prompt_erase?this._state="ASK_ERASE":this._startInstall(!0)}}
                   >${this._isSameFirmware?`Update ${this._manifest.name}`:`Install ${this._manifest.name}`}</ew-text-button
                 >
@@ -885,18 +884,18 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
               <div>
                 <ew-text-button
                   ?disabled=${this._busy}
-                  label="Visit Device"
                   @click=${async()=>{this._busy=!0;await this._switchToFirmwareMode("visit")||(this._client&&this._client.nextUrl&&window.open(this._client.nextUrl,"_blank"),this._busy=!1)}}
-                ></ew-text-button>
+                  >Visit Device</ew-text-button
+                >
               </div>
             `:""}
         ${this._client&&this._manifest.home_assistant_domain&&this._client.state===pi.PROVISIONED?p`
               <div>
                 <ew-text-button
                   ?disabled=${this._busy}
-                  label="Add to Home Assistant"
                   @click=${async()=>{this._busy=!0;await this._switchToFirmwareMode("homeassistant")||(this._manifest.home_assistant_domain&&window.open(`https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`,"_blank"),this._busy=!1)}}
-                ></ew-text-button>
+                  >Add to Home Assistant</ew-text-button
+                >
               </div>
             `:""}
         ${this._client?p`
@@ -912,26 +911,26 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
               <div>
                 <ew-text-button
                   ?disabled=${this._busy}
-                  label="Open Console"
                   @click=${async()=>{if(this._busy=!0,this._client)try{await this._closeClientWithoutEvents(this._client)}catch(e){this.logger.log("Failed to close Improv client:",e)}await this._switchToFirmwareMode("console")||(this.logger.log("Opening console for USB-JTAG/OTG device (in firmware mode)"),this._state="LOGS",this._busy=!1)}}
-                ></ew-text-button>
+                  >Open Console</ew-text-button
+                >
               </div>
             `:""}
         ${this._isUsbJtagOrOtgDevice?"":p`
               <div>
                 <ew-text-button
                   ?disabled=${this._busy}
-                  label="Logs & Console"
                   @click=${async()=>{const e=this._client;e&&await this._closeClientWithoutEvents(e),await this._switchToFirmwareMode("console"),this._state="LOGS"}}
-                ></ew-text-button>
+                  >Logs &amp; Console</ew-text-button
+                >
               </div>
             `}
         <div>
           <ew-text-button
             ?disabled=${this._busy}
-            label="Manage Filesystem"
             @click=${async()=>{if(this._client)try{await this._closeClientWithoutEvents(this._client)}catch(e){this.logger.log("Failed to close Improv client:",e)}this.logger.log("Preparing device for filesystem operations (switching to bootloader mode)...");try{await this._prepareForFlashOperations(),await this._ensureStub()}catch(e){return this.logger.log(`Failed to prepare for filesystem: ${e.message}`),this._state="ERROR",void(this._error=`Failed to enter bootloader mode: ${e.message}`)}this._state="PARTITIONS",this._readPartitionTable()}}
-          ></ew-text-button>
+            >Manage Filesystem</ew-text-button
+          >
         </div>
         ${this._isSameFirmware&&this._manifest.funding_url?p`
               <div>
@@ -949,9 +948,9 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
                 <ew-text-button
                   ?disabled=${this._busy}
                   class="danger"
-                  label="Erase User Data"
                   @click=${()=>this._startInstall(!0)}
-                ></ew-text-button>
+                  >Erase User Data</ew-text-button
+                >
               </div>
             `:""}
       </div>
@@ -960,7 +959,6 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
         <div>
           <ew-text-button
             ?disabled=${this._busy}
-            text-left
             @click=${()=>{this._manifest.new_install_prompt_erase?this._state="ASK_ERASE":this._startInstall(!0)}}
             >Install ${this._manifest.name}</ew-text-button
           >
@@ -969,28 +967,28 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
         ${this._isUsbJtagOrOtgDevice?"":p`
               <div>
                 <ew-text-button
-                  label="Logs & Console"
                   ?disabled=${this._busy}
                   @click=${async()=>{this._busy=!0;const e=this._client;e&&await this._closeClientWithoutEvents(e);await this._switchToFirmwareMode("console")||(this._state="LOGS",this._busy=!1)}}
-                ></ew-text-button>
+                  >Logs &amp; Console</ew-text-button
+                >
               </div>
             `}
         ${this._isUsbJtagOrOtgDevice?p`
               <div>
                 <ew-text-button
                   ?disabled=${this._busy}
-                  label="Open Console"
                   @click=${async()=>{if(this._busy=!0,this._client)try{await this._closeClientWithoutEvents(this._client)}catch(e){this.logger.log("Failed to close Improv client:",e)}await this._switchToFirmwareMode("console")||(this.logger.log("Opening console for USB-JTAG/OTG device (in firmware mode)"),this._state="LOGS",this._busy=!1)}}
-                ></ew-text-button>
+                  >Open Console</ew-text-button
+                >
               </div>
             `:""}
 
         <div>
           <ew-text-button
-            label="Manage Filesystem"
             ?disabled=${this._busy}
             @click=${async()=>{if(this._client)try{await this._closeClientWithoutEvents(this._client)}catch(e){this.logger.log("Failed to close Improv client:",e)}this.logger.log("Preparing device for filesystem operations (switching to bootloader mode)...");try{await this._prepareForFlashOperations(),await this._ensureStub()}catch(e){return this.logger.log(`Failed to prepare for filesystem: ${e.message}`),this._state="ERROR",void(this._error=`Failed to enter bootloader mode: ${e.message}`)}this._state="PARTITIONS",this._readPartitionTable()}}
-          ></ew-text-button>
+            >Manage Filesystem</ew-text-button
+          >
         </div>
       </div>
     `,["Device Dashboard",e,!0,!0]}_renderProvision(){let e,t="Configure Wi-Fi",i=!1;if(this._busy)return[t,this._renderProgress(void 0===this._ssids?"Scanning for networks":"Trying to connect"),!0];if(this._provisionForce||this._client.state!==pi.PROVISIONED){let t;switch(this._client.error){case 3:t="Unable to connect";break;case 0:case 2:break;default:t=`Unknown error (${this._client.error})`}e=p`
@@ -1075,17 +1073,17 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
                     `:""}
                 <div>
                   <ew-text-button
-                    label="Skip"
                     @click=${async()=>{if(this._client)try{await this._closeClientWithoutEvents(this._client),this.logger.log("Improv client closed after provisioning")}catch(e){this.logger.log("Failed to close Improv client:",e)}await this._releaseReaderWriter(),this.logger.log("Returning to dashboard (device stays in firmware mode)"),this._state="DASHBOARD"}}
-                  ></ew-text-button>
+                    >Skip</ew-text-button
+                  >
                 </div>
               </div>
             `:p`
               <ew-text-button
                 slot="actions"
-                label="Continue"
                 @click=${async()=>{if(this._client)try{await this._closeClientWithoutEvents(this._client),this.logger.log("Improv client closed after provisioning")}catch(e){this.logger.log("Failed to close Improv client:",e)}await this._releaseReaderWriter(),this.logger.log("Returning to dashboard (device stays in firmware mode)"),this._state="DASHBOARD"}}
-              ></ew-text-button>
+                >Continue</ew-text-button
+              >
             `}
       `}return[t,e,i]}_renderAskErase(){return["Erase device",p`
       <div>
@@ -1098,14 +1096,14 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
       </label>
       <ew-text-button
         slot="actions"
-        label="Next"
         @click=${()=>{const e=this.shadowRoot.querySelector("ew-checkbox");this._startInstall(e.checked)}}
-      ></ew-text-button>
+        >Next</ew-text-button
+      >
       <ew-text-button
         slot="actions"
-        label="Back"
         @click=${()=>{this._state="DASHBOARD"}}
-      ></ew-text-button>
+        >Back</ew-text-button
+      >
     `]}_renderInstall(){let e,t,i=!1;const r=!this._installErase&&this._isSameFirmware;if(!this._installConfirmed&&this._isSameVersion)e="Erase User Data",t=p`
         Do you want to reset your device and erase all user data from your
         device?
@@ -1127,9 +1125,9 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
         ></ewt-page-message>
         <ew-text-button
           slot="actions"
-          label="Back"
           @click=${async()=>{this._improvChecked=!1,await this._initialize(),this._state="DASHBOARD"}}
-        ></ew-text-button>
+          >Back</ew-text-button
+        >
       `);else{e=void 0;const i=null!==this._client;t=p`
         <ewt-page-message
           .icon=${"🎉"}
@@ -1137,9 +1135,9 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
         ></ewt-page-message>
         <ew-text-button
           slot="actions"
-          label="Next"
           @click=${()=>{this._state=i&&this._installErase?"PROVISION":"DASHBOARD"}}
-        ></ew-text-button>
+          >Next</ew-text-button
+        >
       `}else e="Installing",t=this._renderProgress("Preparing installation"),i=!0;else{e="Confirm Installation";const i=r?"update to":"install";t=p`
         ${r?p`Your device is running
               ${this._info.firmware}&nbsp;${this._info.version}.<br /><br />`:""}
@@ -1151,9 +1149,9 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
         >
         <ew-text-button
           slot="actions"
-          label="Back"
           @click=${()=>{this._state="DASHBOARD"}}
-        ></ew-text-button>
+          >Back</ew-text-button
+        >
       `}return[e,t,i,!1]}_renderLogs(){let e;return e=p`
       <ew-console
         .port=${this._port}
@@ -1162,19 +1160,19 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
       ></ew-console>
       <ew-text-button
         slot="actions"
-        label="Back"
         @click=${async()=>{await this.shadowRoot.querySelector("ew-console").disconnect(),await this._releaseReaderWriter(),this.logger.log("Returning to dashboard (device stays in firmware mode)"),this._state="DASHBOARD",await this._initialize()}}
-      ></ew-text-button>
+        >Back</ew-text-button
+      >
       <ew-text-button
         slot="actions"
-        label="Download Logs"
         @click=${()=>{yi(this.shadowRoot.querySelector("ew-console").logs(),"esp-web-tools-logs.txt"),this.shadowRoot.querySelector("ew-console").reset()}}
-      ></ew-text-button>
+        >Download Logs</ew-text-button
+      >
       <ew-text-button
         slot="actions"
-        label="Reset Device"
         @click=${async()=>{await this.shadowRoot.querySelector("ew-console").reset()}}
-      ></ew-text-button>
+        >Reset Device</ew-text-button
+      >
     `,["Logs",e,!1]}_renderPartitions(){let e;return e=this._busy?this._renderProgress("Reading partition table..."):this._partitions&&0!==this._partitions.length?p`
         <div class="partition-list">
           <table class="partition-table">
@@ -1199,9 +1197,9 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
                     <td>
                       ${1===e.type&&130===e.subtype?p`
                             <ew-text-button
-                              label="Open FS"
                               @click=${()=>this._openFilesystem(e)}
-                            ></ew-text-button>
+                              >Open FS</ew-text-button
+                            >
                           `:""}
                     </td>
                   </tr>
@@ -1211,9 +1209,9 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
         </div>
         <ew-text-button
           slot="actions"
-          label="Back"
           @click=${async()=>{try{this._isUsbJtagOrOtgDevice?(this._state="DASHBOARD",await this._initialize()):(this._state="DASHBOARD",this._busy=!1)}catch(e){this.logger.error(`Partitions Back error: ${e.message}`),this._state="ERROR",this._error=`Failed to return to dashboard: ${e.message}`,this._busy=!1}}}
-        ></ew-text-button>
+          >Back</ew-text-button
+        >
       `:p`
         <ewt-page-message
           .icon=${Si}
@@ -1221,9 +1219,9 @@ import{e,i as t,_ as i,n as r,r as o,a as s,b as a,c as l,d as n,f as d,g as c,A
         ></ewt-page-message>
         <ew-text-button
           slot="actions"
-          label="Back"
           @click=${async()=>{await this._releaseReaderWriter(),this._state="DASHBOARD"}}
-        ></ew-text-button>
+          >Back</ew-text-button
+        >
       `,["Partition Table",e,!1]}_renderLittleFS(){return[void 0,p`
       <ewt-littlefs-manager
         .partition=${this._selectedPartition}
