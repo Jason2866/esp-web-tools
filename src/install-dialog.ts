@@ -3063,7 +3063,8 @@ export class EwtInstallDialog extends LitElement {
         cursor: pointer;
       }
       ew-dialog {
-        max-width: min(560px, 100% - 48px);
+        max-width: min(700px, 100% - 48px);
+        max-height: 80vh;
       }
       :host([state="LOGS"]) ew-dialog {
         max-width: 90vw;
