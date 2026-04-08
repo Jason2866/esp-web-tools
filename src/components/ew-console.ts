@@ -34,7 +34,6 @@ export class EwtConsole extends HTMLElement {
           display: flex;
           flex-direction: column;
           overflow: hidden;
-          height: var(--ew-console-height, 400px);
         }
         form {
           display: flex;
