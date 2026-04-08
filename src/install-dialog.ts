@@ -3029,17 +3029,20 @@ export class EwtInstallDialog extends LitElement {
         cursor: pointer;
       }
       :host([state="LOGS"]) ew-dialog {
-        --md-dialog-container-max-inline-size: 90vw;
+        --ew-dialog-max-width: min(90vw, 100% - 48px);
+        --ew-dialog-max-height: min(90vh, 100% - 48px);
       }
       ew-console {
-        width: calc(80vw - 48px);
-        height: 80vh;
+        width: calc(min(90vw, 100% - 48px) - 48px);
+        height: calc(min(90vh, 100% - 48px) - 140px);
       }
       :host([state="PARTITIONS"]) ew-dialog {
-        --md-dialog-container-max-inline-size: 800px;
+        --ew-dialog-max-width: min(800px, 100% - 48px);
+        --ew-dialog-max-height: min(80vh, 100% - 48px);
       }
       :host([state="LITTLEFS"]) ew-dialog {
-        --md-dialog-container-max-inline-size: 95vw;
+        --ew-dialog-max-width: min(95vw, 100% - 48px);
+        --ew-dialog-max-height: min(90vh, 100% - 48px);
       }
       :host([state="LITTLEFS"]) ewt-littlefs-manager {
         display: block;
