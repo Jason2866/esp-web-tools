@@ -1400,7 +1400,15 @@ import{e,i as t,_ as i,n as r,m as o,a as s,b as a,r as l,c as n,d,f as c,g as h
         cursor: pointer;
       }
       ew-dialog {
+        min-width: min(460px, 100% - 48px);
         max-width: min(700px, 100% - 48px);
+      }
+      div[slot="headline"] {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       :host([state="LOGS"]) ew-dialog {
         max-width: 90vw;
