@@ -12,6 +12,9 @@ export class EwtConsole extends HTMLElement {
 
   private _console?: ColoredConsole;
   private _cancelConnection?: () => Promise<void>;
+  private _commandHistory: string[] = [];
+  private _historyIndex = -1;
+  private _currentInput = "";
 
   public logs(): string {
     return this._console?.logs() || "";
@@ -21,11 +24,12 @@ export class EwtConsole extends HTMLElement {
     if (this._console) {
       return;
     }
-    const shadowRoot = this.attachShadow({ mode: "open" });
+    // attachShadow throws if a shadow root already exists; reuse it on reattach
+    const shadowRoot = this.shadowRoot ?? this.attachShadow({ mode: "open" });
 
     shadowRoot.innerHTML = `
       <style>
-        :host {
+        :host, input {
           background-color: #1c1c1c;
           color: #ddd;
           font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier,
@@ -42,10 +46,6 @@ export class EwtConsole extends HTMLElement {
           flex-shrink: 0;
         }
         input {
-          background-color: #1c1c1c;
-          color: #ddd;
-          font-family: inherit;
-          line-height: 1.45;
           flex: 1;
           padding: 4px;
           margin: 0 8px;
@@ -53,11 +53,6 @@ export class EwtConsole extends HTMLElement {
           outline: none;
         }
         ${coloredConsoleStyles}
-        .log {
-          flex: 1;
-          overflow-y: auto;
-          min-height: 0;
-        }
       </style>
       <div class="log"></div>
       ${
@@ -88,6 +83,15 @@ export class EwtConsole extends HTMLElement {
           ev.preventDefault();
           ev.stopPropagation();
           this._sendCommand();
+        } else if (ev.key === "ArrowUp") {
+          ev.preventDefault();
+          this._navigateHistory(input, 1);
+        } else if (ev.key === "ArrowDown") {
+          ev.preventDefault();
+          this._navigateHistory(input, -1);
+        } else {
+          // User is editing — reset history navigation
+          this._historyIndex = -1;
         }
       });
     }
@@ -100,15 +104,15 @@ export class EwtConsole extends HTMLElement {
     };
   }
 
-  private async _connect(abortSignal: AbortSignal) {
+  private async _connect(signal: AbortSignal) {
     this.logger.debug("Starting console read loop");
-
-    // Check if port.readable is available
+    // Capture a stable reference; addLine() becomes a no-op after destroy()
+    const consoleView = this._console;
     if (!this.port.readable) {
-      this._console!.addLine("");
-      this._console!.addLine("");
-      this._console!.addLine(
-        `Terminal disconnected: Port readable stream not available`,
+      consoleView?.addLine("");
+      consoleView?.addLine("");
+      consoleView?.addLine(
+        "Terminal disconnected: Port readable stream not available",
       );
       this.logger.error(
         "Port readable stream not available - port may need to be reopened at correct baudrate",
@@ -117,50 +121,89 @@ export class EwtConsole extends HTMLElement {
     }
 
     try {
-      await this.port
-        .readable!.pipeThrough(
+      await this.port.readable
+        .pipeThrough(
           new TextDecoderStream() as ReadableWritablePair<string, Uint8Array>,
-          {
-            signal: abortSignal,
-          },
+          { signal },
         )
         .pipeThrough(new TransformStream(new LineBreakTransformer()))
         .pipeThrough(new TransformStream(new TimestampTransformer()))
         .pipeTo(
           new WritableStream({
-            write: (chunk) => {
-              this._console!.addLine(chunk.replace("\r", ""));
+            write: (line: string) => {
+              consoleView?.addLine(line);
             },
           }),
         );
-      if (!abortSignal.aborted) {
-        this._console!.addLine("");
-        this._console!.addLine("");
-        this._console!.addLine("Terminal disconnected");
+      if (!signal.aborted) {
+        consoleView?.addLine("");
+        consoleView?.addLine("");
+        consoleView?.addLine("Terminal disconnected");
       }
-    } catch (e) {
-      this._console!.addLine("");
-      this._console!.addLine("");
-      this._console!.addLine(`Terminal disconnected: ${e}`);
+    } catch (err) {
+      if (!signal.aborted) {
+        consoleView?.addLine("");
+        consoleView?.addLine("");
+        consoleView?.addLine(`Terminal disconnected: ${err}`);
+      }
     } finally {
       await sleep(100);
       this.logger.debug("Finished console read loop");
     }
   }
 
+  private _navigateHistory(input: HTMLInputElement, direction: 1 | -1) {
+    if (this._commandHistory.length === 0) return;
+
+    // Save current input before navigating away
+    if (this._historyIndex === -1) {
+      this._currentInput = input.value;
+    }
+
+    const newIndex = this._historyIndex + direction;
+
+    if (newIndex < 0) {
+      // Back to current (unsent) input
+      this._historyIndex = -1;
+      input.value = this._currentInput;
+    } else if (newIndex < this._commandHistory.length) {
+      this._historyIndex = newIndex;
+      input.value = this._commandHistory[this._historyIndex];
+    }
+
+    // Move cursor to end
+    const len = input.value.length;
+    input.setSelectionRange(len, len);
+  }
+
   private async _sendCommand() {
-    const input = this.shadowRoot!.querySelector("input")!;
-    const command = input.value;
-    const encoder = new TextEncoder();
-    const writer = this.port.writable!.getWriter();
-    await writer.write(encoder.encode(command + "\r\n"));
-    this._console!.addLine(`> ${command}\r\n`);
-    input.value = "";
-    input.focus();
+    const input = this.shadowRoot?.querySelector("input");
+    if (!input || !this.port.writable) return;
+
+    const value = input.value;
+    const writer = this.port.writable.getWriter();
     try {
-      writer.releaseLock();
-    } catch (err) {
-      console.error("Ignoring release lock error", err);
+      await writer.write(new TextEncoder().encode(`${value}\r\n`));
+      this._console?.addLine(`> ${value}\r\n`);
+      if (input.isConnected) {
+        // Add to history (skip empty, skip consecutive duplicates, cap at 100)
+        if (value && value !== this._commandHistory[0]) {
+          this._commandHistory.unshift(value);
+          if (this._commandHistory.length > 100) {
+            this._commandHistory.pop();
+          }
+        }
+        this._historyIndex = -1;
+        this._currentInput = "";
+        input.value = "";
+        input.focus();
+      }
+    } finally {
+      try {
+        writer.releaseLock();
+      } catch (err) {
+        console.error("Ignoring release lock error", err);
+      }
     }
   }
 
@@ -169,6 +212,17 @@ export class EwtConsole extends HTMLElement {
       await this._cancelConnection();
       this._cancelConnection = undefined;
     }
+    this._console?.destroy();
+    this._console = undefined;
+  }
+
+  public disconnectedCallback() {
+    if (this._cancelConnection) {
+      this._cancelConnection();
+      this._cancelConnection = undefined;
+    }
+    this._console?.destroy();
+    this._console = undefined;
   }
 
   public async reset() {

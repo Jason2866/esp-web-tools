@@ -12,6 +12,8 @@ interface ConsoleState {
   rapidBlink: boolean;
 }
 
+const MAX_LINES = 2000;
+
 export class ColoredConsole {
   public state: ConsoleState = {
     bold: false,
@@ -27,10 +29,72 @@ export class ColoredConsole {
     rapidBlink: false,
   };
 
-  constructor(public targetElement: HTMLElement) {}
+  private _destroyed = false;
+  private _rafId = 0;
+  private _timeoutId = 0;
+  private _atBottom = true;
+  private _intersectionObserver?: IntersectionObserver;
+  private _sentinel: HTMLElement | null = null;
+  // Full history for log export — never trimmed, unlike the DOM cap
+  private _exportLines: string[] = [];
+  private _visibilityHandler: (() => void) | null = null;
+
+  constructor(public targetElement: HTMLElement) {
+    // Track whether the user is scrolled to the bottom via IntersectionObserver
+    // on a sentinel element, avoiding forced reflows on every processLines call.
+    const sentinel = document.createElement("div");
+    sentinel.style.height = "1px";
+    this._sentinel = sentinel;
+    targetElement.appendChild(sentinel);
+
+    this._intersectionObserver = new IntersectionObserver(
+      (entries) => {
+        this._atBottom = entries[0].isIntersecting;
+      },
+      { root: targetElement, threshold: 0 },
+    );
+    this._intersectionObserver.observe(sentinel);
+
+    // When the page becomes hidden, rAF is paused. Switch any pending rAF to
+    // a timeout so state.lines doesn't accumulate unbounded while backgrounded.
+    this._visibilityHandler = () => {
+      if (document.hidden && this._rafId) {
+        cancelAnimationFrame(this._rafId);
+        this._rafId = 0;
+        if (!this._timeoutId) {
+          this._timeoutId = window.setTimeout(() => this.processLines(), 50);
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", this._visibilityHandler);
+  }
 
   logs(): string {
-    return this.targetElement.innerText;
+    return this._exportLines.join("");
+  }
+
+  destroy() {
+    this._destroyed = true;
+    this.state.carriageReturn = false;
+    this.state.lines = [];
+    this._intersectionObserver?.disconnect();
+    if (this._visibilityHandler) {
+      document.removeEventListener("visibilitychange", this._visibilityHandler);
+      this._visibilityHandler = null;
+    }
+    // Remove the sentinel from the DOM to avoid leaking it on teardown
+    if (this._sentinel) {
+      this._sentinel.remove();
+      this._sentinel = null;
+    }
+    if (this._rafId) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = 0;
+    }
+    if (this._timeoutId) {
+      clearTimeout(this._timeoutId);
+      this._timeoutId = 0;
+    }
   }
 
   processLine(line: string): Element {
@@ -79,7 +143,6 @@ export class ColoredConsole {
       for (const colorCode of match[1].split(";")) {
         switch (parseInt(colorCode)) {
           case 0:
-            // reset
             this.state.bold = false;
             this.state.italic = false;
             this.state.underline = false;
@@ -190,15 +253,15 @@ export class ColoredConsole {
   }
 
   processLines() {
-    const atBottom =
-      this.targetElement.scrollTop >
-      this.targetElement.scrollHeight - this.targetElement.offsetHeight - 50;
-    const prevCarriageReturn = this.state.carriageReturn;
-    const fragment = document.createDocumentFragment();
+    this._rafId = 0;
+    this._timeoutId = 0;
 
-    if (this.state.lines.length == 0) {
+    if (this._destroyed || this.state.lines.length === 0) {
       return;
     }
+
+    const prevCarriageReturn = this.state.carriageReturn;
+    const fragment = document.createDocumentFragment();
 
     for (const line of this.state.lines) {
       if (this.state.carriageReturn && line !== "\n") {
@@ -206,34 +269,66 @@ export class ColoredConsole {
           fragment.removeChild(fragment.lastChild!);
         }
       }
-      fragment.appendChild(this.processLine(line));
-      this.state.carriageReturn = line.includes("\r");
+      const hadCarriageReturn = line.endsWith("\r");
+      fragment.appendChild(this.processLine(line.replace(/\r/g, "")));
+      this.state.carriageReturn = hadCarriageReturn;
+    }
+
+    const sentinel = this._sentinel;
+    if (!sentinel) {
+      this.state.lines = [];
+      return;
     }
 
     if (
       prevCarriageReturn &&
       this.state.lines[0] !== "\n" &&
-      this.targetElement.lastChild
+      sentinel.previousSibling
     ) {
-      this.targetElement.replaceChild(fragment, this.targetElement.lastChild!);
+      this.targetElement.replaceChild(fragment, sentinel.previousSibling);
     } else {
-      this.targetElement.appendChild(fragment);
+      this.targetElement.insertBefore(fragment, sentinel);
     }
 
     this.state.lines = [];
 
-    // Keep scroll at bottom
-    if (atBottom) {
+    // Trim oldest line-spans when DOM grows too large
+    const children = this.targetElement.children;
+    const excess = children.length - 1 - MAX_LINES;
+    if (excess > 0) {
+      if (!this._atBottom) {
+        let removedHeight = 0;
+        for (let i = 0; i < excess; i++) {
+          removedHeight += (children[i] as HTMLElement).getBoundingClientRect()
+            .height;
+        }
+        for (let i = 0; i < excess; i++) {
+          this.targetElement.removeChild(children[0]);
+        }
+        this.targetElement.scrollTop -= removedHeight;
+      } else {
+        for (let i = 0; i < excess; i++) {
+          this.targetElement.removeChild(children[0]);
+        }
+      }
+    }
+
+    if (this._atBottom) {
       this.targetElement.scrollTop = this.targetElement.scrollHeight;
     }
   }
 
   addLine(line: string) {
-    // Processing of lines is deferred for performance reasons
-    if (this.state.lines.length == 0) {
-      setTimeout(() => this.processLines(), 0);
-    }
+    if (this._destroyed) return;
+    this._exportLines.push(line);
     this.state.lines.push(line);
+    if (!this._rafId && !this._timeoutId) {
+      if (document.hidden) {
+        this._timeoutId = window.setTimeout(() => this.processLines(), 50);
+      } else {
+        this._rafId = requestAnimationFrame(() => this.processLines());
+      }
+    }
   }
 }
 
@@ -246,7 +341,6 @@ export const coloredConsoleStyles = `
     font-size: 12px;
     padding: 16px;
     overflow: auto;
-    min-height: 0;
     line-height: 1.45;
     border-radius: 3px;
     white-space: pre-wrap;
@@ -254,89 +348,35 @@ export const coloredConsoleStyles = `
     color: #ddd;
   }
 
-  .log-bold {
-    font-weight: bold;
-  }
-  .log-italic {
-    font-style: italic;
-  }
-  .log-underline {
-    text-decoration: underline;
-  }
-  .log-strikethrough {
-    text-decoration: line-through;
-  }
-  .log-underline.log-strikethrough {
-    text-decoration: underline line-through;
-  }
-  .log-blink {
-    animation: blink 1s step-end infinite;
-  }
-  .log-rapid-blink {
-    animation: blink 0.4s step-end infinite;
-  }
-  @keyframes blink {
-    50% {
-      opacity: 0;
-    }
-  }
+  .log-bold { font-weight: bold; }
+  .log-italic { font-style: italic; }
+  .log-underline { text-decoration: underline; }
+  .log-strikethrough { text-decoration: line-through; }
+  .log-underline.log-strikethrough { text-decoration: underline line-through; }
+  .log-blink { animation: blink 1s step-end infinite; }
+  .log-rapid-blink { animation: blink 0.4s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
   .log-secret {
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
   }
-  .log-secret-redacted {
-    opacity: 0;
-    width: 1px;
-    font-size: 1px;
-  }
-  .log-fg-black {
-    color: rgb(128, 128, 128);
-  }
-  .log-fg-red {
-    color: rgb(255, 0, 0);
-  }
-  .log-fg-green {
-    color: rgb(0, 255, 0);
-  }
-  .log-fg-yellow {
-    color: rgb(255, 255, 0);
-  }
-  .log-fg-blue {
-    color: rgb(0, 0, 255);
-  }
-  .log-fg-magenta {
-    color: rgb(255, 0, 255);
-  }
-  .log-fg-cyan {
-    color: rgb(0, 255, 255);
-  }
-  .log-fg-white {
-    color: rgb(187, 187, 187);
-  }
-  .log-bg-black {
-    background-color: rgb(0, 0, 0);
-  }
-  .log-bg-red {
-    background-color: rgb(255, 0, 0);
-  }
-  .log-bg-green {
-    background-color: rgb(0, 255, 0);
-  }
-  .log-bg-yellow {
-    background-color: rgb(255, 255, 0);
-  }
-  .log-bg-blue {
-    background-color: rgb(0, 0, 255);
-  }
-  .log-bg-magenta {
-    background-color: rgb(255, 0, 255);
-  }
-  .log-bg-cyan {
-    background-color: rgb(0, 255, 255);
-  }
-  .log-bg-white {
-    background-color: rgb(255, 255, 255);
-  }
+  .log-secret-redacted { opacity: 0; width: 1px; font-size: 1px; }
+  .log-fg-black { color: rgb(128, 128, 128); }
+  .log-fg-red { color: rgb(255, 0, 0); }
+  .log-fg-green { color: rgb(0, 255, 0); }
+  .log-fg-yellow { color: rgb(255, 255, 0); }
+  .log-fg-blue { color: rgb(0, 0, 255); }
+  .log-fg-magenta { color: rgb(255, 0, 255); }
+  .log-fg-cyan { color: rgb(0, 255, 255); }
+  .log-fg-white { color: rgb(187, 187, 187); }
+  .log-bg-black { background-color: rgb(0, 0, 0); }
+  .log-bg-red { background-color: rgb(255, 0, 0); }
+  .log-bg-green { background-color: rgb(0, 255, 0); }
+  .log-bg-yellow { background-color: rgb(255, 255, 0); }
+  .log-bg-blue { background-color: rgb(0, 0, 255); }
+  .log-bg-magenta { background-color: rgb(255, 0, 255); }
+  .log-bg-cyan { background-color: rgb(0, 255, 255); }
+  .log-bg-white { background-color: rgb(255, 255, 255); }
 `;
