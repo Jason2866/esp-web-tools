@@ -1,8 +1,7 @@
 import { LitElement, html, css } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { Partition } from "../partition.js";
-import "./ewt-button";
-import "./ewt-textfield";
+import "./ew-text-button";
 
 // Dynamic import for LittleFS WASM module
 let _wasmBasePath: string | null = null;
@@ -538,37 +537,31 @@ export class EwtLittleFSManager extends LitElement {
         </div>
 
         <div class="littlefs-controls">
-          <ewt-button
-            label="Refresh"
-            @click=${this._refreshFiles}
-            ?disabled=${this._busy}
-          ></ewt-button>
-          <ewt-button
-            label="Backup Image"
-            @click=${this._backupImage}
-            ?disabled=${this._busy}
-          ></ewt-button>
-          <ewt-button
-            label="Write to Flash"
-            @click=${this._writeToFlash}
-            ?disabled=${this._busy}
-          ></ewt-button>
-          <ewt-button
-            label="Close"
+          <ew-text-button @click=${this._refreshFiles} ?disabled=${this._busy}
+            >Refresh</ew-text-button
+          >
+          <ew-text-button @click=${this._backupImage} ?disabled=${this._busy}
+            >Backup Image</ew-text-button
+          >
+          <ew-text-button @click=${this._writeToFlash} ?disabled=${this._busy}
+            >Write to Flash</ew-text-button
+          >
+          <ew-text-button
             @click=${() => {
               this._cleanup();
               if (this.onClose) this.onClose();
             }}
             ?disabled=${this._busy}
-          ></ewt-button>
+            >Close</ew-text-button
+          >
         </div>
 
         <div class="littlefs-breadcrumb">
-          <ewt-button
-            label="↑ Up"
+          <ew-text-button
             @click=${this._navigateUp}
             ?disabled=${this._currentPath === "/" || this._busy}
-          ></ewt-button>
+            >↑ Up</ew-text-button
+          >
           <span>${this._currentPath || "/"}</span>
         </div>
 
@@ -578,16 +571,14 @@ export class EwtLittleFSManager extends LitElement {
             @change=${this._handleFileSelect}
             ?disabled=${this._busy}
           />
-          <ewt-button
-            label="Upload File"
+          <ew-text-button
             @click=${this._uploadFile}
             ?disabled=${!this._selectedFile || this._busy}
-          ></ewt-button>
-          <ewt-button
-            label="New Folder"
-            @click=${this._createFolder}
-            ?disabled=${this._busy}
-          ></ewt-button>
+            >Upload File</ew-text-button
+          >
+          <ew-text-button @click=${this._createFolder} ?disabled=${this._busy}
+            >New Folder</ew-text-button
+          >
         </div>
 
         <div class="littlefs-files">
@@ -640,21 +631,21 @@ export class EwtLittleFSManager extends LitElement {
                           <div class="file-actions">
                             ${entry.type === "file"
                               ? html`
-                                  <ewt-button
-                                    label="Download"
+                                  <ew-text-button
                                     @click=${() =>
                                       this._downloadFile(entry.path)}
                                     ?disabled=${this._busy}
-                                  ></ewt-button>
+                                    >Download</ew-text-button
+                                  >
                                 `
                               : ""}
-                            <ewt-button
+                            <ew-text-button
                               class="danger"
-                              label="Delete"
                               @click=${() =>
                                 this._deleteFile(entry.path, entry.type)}
                               ?disabled=${this._busy}
-                            ></ewt-button>
+                              >Delete</ew-text-button
+                            >
                           </div>
                         </td>
                       </tr>
@@ -677,7 +668,7 @@ export class EwtLittleFSManager extends LitElement {
       max-width: 100%;
       margin: 0 auto;
       padding: 15px;
-      border: 2px solid var(--mdc-theme-primary, #03a9f4);
+      border: 2px solid var(--md-sys-color-primary, #03a9f4);
       border-radius: 10px;
       background-color: rgba(3, 169, 244, 0.05);
       box-sizing: border-box;
@@ -685,7 +676,7 @@ export class EwtLittleFSManager extends LitElement {
 
     h3 {
       margin: 0 0 15px 0;
-      color: var(--mdc-theme-primary, #03a9f4);
+      color: var(--md-sys-color-primary, #03a9f4);
       font-size: 18px;
       font-weight: 600;
     }
@@ -724,8 +715,8 @@ export class EwtLittleFSManager extends LitElement {
       height: 100%;
       background: linear-gradient(
         90deg,
-        var(--mdc-theme-primary, #03a9f4) 0%,
-        var(--mdc-theme-primary, #03a9f4) 100%
+        var(--md-sys-color-primary, #03a9f4) 0%,
+        var(--md-sys-color-primary, #03a9f4) 100%
       );
       transition: width 0.3s ease;
     }
@@ -763,7 +754,7 @@ export class EwtLittleFSManager extends LitElement {
     .disk-version {
       font-size: 11px;
       padding: 2px 6px;
-      background-color: var(--mdc-theme-primary, #03a9f4);
+      background-color: var(--md-sys-color-primary, #03a9f4);
       color: white;
       border-radius: 4px;
     }
@@ -866,7 +857,7 @@ export class EwtLittleFSManager extends LitElement {
     }
 
     .file-name.clickable:hover {
-      color: var(--mdc-theme-primary, #03a9f4);
+      color: var(--md-sys-color-primary, #03a9f4);
       text-decoration: underline;
     }
 
@@ -880,7 +871,7 @@ export class EwtLittleFSManager extends LitElement {
     }
 
     .danger {
-      --mdc-theme-primary: var(--improv-danger-color, #db4437);
+      --md-sys-color-primary: var(--danger-color, #db4437);
     }
   `;
 }

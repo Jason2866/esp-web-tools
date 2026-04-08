@@ -2,6 +2,7 @@ import nodeResolve from "@rollup/plugin-node-resolve";
 import json from "@rollup/plugin-json";
 import terser from "@rollup/plugin-terser";
 import babel from "@rollup/plugin-babel";
+import commonjs from "@rollup/plugin-commonjs";
 import { copyFileSync, mkdirSync, existsSync } from "fs";
 import { dirname } from "path";
 
@@ -83,6 +84,7 @@ const config = {
       browser: true,
       preferBuiltins: false,
     }),
+    commonjs(),
     babel({
       babelHelpers: "bundled",
       plugins: ["@babel/plugin-proposal-class-properties"],
