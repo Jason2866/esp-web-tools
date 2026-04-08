@@ -1,4 +1,4 @@
-import{y as e,z as t,k as o,_ as l,t as a,b as i,h as s}from"./styles-D69gtq6_.js";const n=e`
+import{y as e,z as t,k as o,_ as l,t as i,b as a,h as s}from"./styles-D69gtq6_.js";const n=e`
   <svg
     version="1.1"
     id="Capa_1"
@@ -17,7 +17,7 @@ import{y as e,z as t,k as o,_ as l,t as a,b as i,h as s}from"./styles-D69gtq6_.j
       />
     </g>
   </svg>
-`;let r=class extends i{render(){return s`
+`;let r=class extends a{render(){return s`
       <ew-dialog
         open
         @cancel=${this._preventDefault}
@@ -95,7 +95,7 @@ import{y as e,z as t,k as o,_ as l,t as a,b as i,h as s}from"./styles-D69gtq6_.j
               If you are using a Linux flavor, add your username to the dialout
               group so you have the appropriate permissions on the device.
               <ul>
-                <code>sudo usermod -a -G dialout YourUserName</code>
+                <li><code>sudo usermod -a -G dialout YourUserName</code></li>
               </ul>
               You may need to logout & back in or reboot to activate the new
               group access.
@@ -128,4 +128,4 @@ import{y as e,z as t,k as o,_ as l,t as a,b as i,h as s}from"./styles-D69gtq6_.j
         margin-bottom: 0;
         padding-left: 1.5em;
       }
-    `],r=l([a("ewt-no-port-picked-dialog")],r);const d=async e=>{const t=document.createElement("ewt-no-port-picked-dialog");return t.doTryAgain=e,document.body.append(t),!0};export{d as openNoPortPickedDialog};
+    `],r=l([i("ewt-no-port-picked-dialog")],r);const d=async e=>{const t=document.createElement("ewt-no-port-picked-dialog");return t.doTryAgain=e,document.body.append(t),!0};export{d as openNoPortPickedDialog};
