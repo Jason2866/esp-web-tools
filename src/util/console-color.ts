@@ -246,6 +246,7 @@ export const coloredConsoleStyles = `
     font-size: 12px;
     padding: 16px;
     overflow: auto;
+    min-height: 0;
     line-height: 1.45;
     border-radius: 3px;
     white-space: pre-wrap;

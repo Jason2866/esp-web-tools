@@ -25,7 +25,7 @@ export class EwtConsole extends HTMLElement {
 
     shadowRoot.innerHTML = `
       <style>
-        :host, input {
+        :host {
           background-color: #1c1c1c;
           color: #ddd;
           font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier,
@@ -33,13 +33,20 @@ export class EwtConsole extends HTMLElement {
           line-height: 1.45;
           display: flex;
           flex-direction: column;
+          overflow: hidden;
+          height: var(--ew-console-height, 400px);
         }
         form {
           display: flex;
           align-items: center;
           padding: 0 8px 0 16px;
+          flex-shrink: 0;
         }
         input {
+          background-color: #1c1c1c;
+          color: #ddd;
+          font-family: inherit;
+          line-height: 1.45;
           flex: 1;
           padding: 4px;
           margin: 0 8px;
@@ -47,6 +54,11 @@ export class EwtConsole extends HTMLElement {
           outline: none;
         }
         ${coloredConsoleStyles}
+        .log {
+          flex: 1;
+          overflow-y: auto;
+          min-height: 0;
+        }
       </style>
       <div class="log"></div>
       ${

@@ -3033,8 +3033,9 @@ export class EwtInstallDialog extends LitElement {
         --ew-dialog-max-height: min(90vh, 100% - 48px);
       }
       ew-console {
-        width: calc(min(90vw, 100% - 48px) - 48px);
-        height: calc(min(90vh, 100% - 48px) - 140px);
+        --ew-console-height: calc(min(90vh, 100% - 48px) - 140px);
+        width: calc(100% + 48px);
+        margin: -24px;
       }
       :host([state="PARTITIONS"]) ew-dialog {
         --ew-dialog-max-width: min(800px, 100% - 48px);
