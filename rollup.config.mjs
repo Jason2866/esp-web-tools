@@ -80,11 +80,11 @@ const config = {
   ],
   preserveEntrySignatures: false,
   plugins: [
-    commonjs(),
     nodeResolve({
       browser: true,
       preferBuiltins: false,
     }),
+    commonjs(),
     babel({
       babelHelpers: "bundled",
       plugins: ["@babel/plugin-proposal-class-properties"],

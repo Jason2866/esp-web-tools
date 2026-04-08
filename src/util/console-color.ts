@@ -70,7 +70,10 @@ export class ColoredConsole {
   }
 
   logs(): string {
-    return this._exportLines.join("");
+    // Strip ANSI/CSI escape sequences (SGR colour codes, cursor moves, etc.)
+    // before exporting so the downloaded log file contains plain text.
+    const ansiRe = /(?:\x1B|\x9B)(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\))/g;
+    return this._exportLines.map((l) => l.replace(ansiRe, "")).join("");
   }
 
   destroy() {

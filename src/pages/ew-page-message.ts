@@ -25,7 +25,7 @@ class EwtPageMessage extends LitElement {
       line-height: 80px;
       color: black;
     }
-    ewt-circular-progress {
+    ew-circular-progress {
       margin-bottom: 16px;
     }
   `;

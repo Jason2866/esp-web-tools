@@ -2,7 +2,6 @@ import { LitElement, html, css } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { Partition } from "../partition.js";
 import "./ew-text-button";
-import "./ew-filled-text-field";
 
 // Dynamic import for LittleFS WASM module
 let _wasmBasePath: string | null = null;
