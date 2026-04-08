@@ -37,6 +37,8 @@ export class ColoredConsole {
   private _sentinel: HTMLElement | null = null;
   // Full history for log export — never trimmed, unlike the DOM cap
   private _exportLines: string[] = [];
+  // Redacted plain-text version of _exportLines for logs() export
+  private _redactedLines: string[] = [];
   private _visibilityHandler: (() => void) | null = null;
 
   constructor(public targetElement: HTMLElement) {
@@ -70,7 +72,47 @@ export class ColoredConsole {
   }
 
   logs(): string {
-    return this._exportLines.join("");
+    return this._redactedLines.join("");
+  }
+
+  private _redactLine(line: string): string {
+    // Mirrors the SGR state machine in processLine but produces plain text,
+    // replacing concealed (SGR 8) spans with "[redacted]" and stripping all
+    // other ANSI sequences so the export never leaks hidden content.
+    const re = /(?:\x1B|\\x1B)(?:\[(.*?)[@-~]|\].*?(?:\x07|\x1B\\))/g;
+    let i = 0;
+    let secret = false;
+    let out = "";
+
+    while (true) {
+      const match = re.exec(line);
+      if (match === null) break;
+
+      const j = match.index;
+      const text = line.substring(i, j);
+      if (text) out += secret ? "[redacted]" : text;
+      i = j + match[0].length;
+
+      if (match[1] === undefined) continue;
+
+      for (const colorCode of match[1].split(";")) {
+        switch (parseInt(colorCode)) {
+          case 0:
+            secret = false;
+            break;
+          case 8:
+            secret = true;
+            break;
+          case 28:
+            secret = false;
+            break;
+        }
+      }
+    }
+
+    const tail = line.substring(i);
+    if (tail) out += secret ? "[redacted]" : tail;
+    return out;
   }
 
   destroy() {
@@ -107,12 +149,19 @@ export class ColoredConsole {
     const addSpan = (content: string) => {
       if (content === "") return;
 
+      if (this.state.secret) {
+        const redacted = document.createElement("span");
+        redacted.classList.add("log-secret-redacted");
+        redacted.appendChild(document.createTextNode("[redacted]"));
+        lineSpan.appendChild(redacted);
+        return;
+      }
+
       const span = document.createElement("span");
       if (this.state.bold) span.classList.add("log-bold");
       if (this.state.italic) span.classList.add("log-italic");
       if (this.state.underline) span.classList.add("log-underline");
       if (this.state.strikethrough) span.classList.add("log-strikethrough");
-      if (this.state.secret) span.classList.add("log-secret");
       if (this.state.blink) span.classList.add("log-blink");
       if (this.state.rapidBlink) span.classList.add("log-rapid-blink");
       if (this.state.foregroundColor !== null)
@@ -121,13 +170,6 @@ export class ColoredConsole {
         span.classList.add(`log-bg-${this.state.backgroundColor}`);
       span.appendChild(document.createTextNode(content));
       lineSpan.appendChild(span);
-
-      if (this.state.secret) {
-        const redacted = document.createElement("span");
-        redacted.classList.add("log-secret-redacted");
-        redacted.appendChild(document.createTextNode("[redacted]"));
-        lineSpan.appendChild(redacted);
-      }
     };
 
     while (true) {
@@ -143,7 +185,6 @@ export class ColoredConsole {
       for (const colorCode of match[1].split(";")) {
         switch (parseInt(colorCode)) {
           case 0:
-            // reset
             this.state.bold = false;
             this.state.italic = false;
             this.state.underline = false;
@@ -221,6 +262,9 @@ export class ColoredConsole {
           case 39:
             this.state.foregroundColor = null;
             break;
+          case 40:
+            this.state.backgroundColor = "black";
+            break;
           case 41:
             this.state.backgroundColor = "red";
             break;
@@ -242,7 +286,6 @@ export class ColoredConsole {
           case 47:
             this.state.backgroundColor = "white";
             break;
-          case 40:
           case 49:
             this.state.backgroundColor = null;
             break;
@@ -275,8 +318,6 @@ export class ColoredConsole {
       this.state.carriageReturn = hadCarriageReturn;
     }
 
-    // Use the tracked sentinel reference instead of lastChild! so this is
-    // safe even if the container is empty or the sentinel was removed.
     const sentinel = this._sentinel;
     if (!sentinel) {
       this.state.lines = [];
@@ -297,12 +338,9 @@ export class ColoredConsole {
 
     // Trim oldest line-spans when DOM grows too large
     const children = this.targetElement.children;
-    // -1 to exclude the sentinel div
     const excess = children.length - 1 - MAX_LINES;
     if (excess > 0) {
       if (!this._atBottom) {
-        // Anchor the viewport: subtract the height of removed nodes so the
-        // visible content doesn't jump when we're not scrolled to the bottom.
         let removedHeight = 0;
         for (let i = 0; i < excess; i++) {
           removedHeight += (children[i] as HTMLElement).getBoundingClientRect()
@@ -327,12 +365,10 @@ export class ColoredConsole {
   addLine(line: string) {
     if (this._destroyed) return;
     this._exportLines.push(line);
+    this._redactedLines.push(this._redactLine(line));
     this.state.lines.push(line);
-    // Schedule a flush if none is pending yet
     if (!this._rafId && !this._timeoutId) {
       if (document.hidden) {
-        // rAF is paused when the page is hidden — use a timeout fallback
-        // so state.lines doesn't accumulate unbounded while backgrounded
         this._timeoutId = window.setTimeout(() => this.processLines(), 50);
       } else {
         this._rafId = requestAnimationFrame(() => this.processLines());
@@ -357,89 +393,35 @@ export const coloredConsoleStyles = `
     color: #ddd;
   }
 
-  .log-bold {
-    font-weight: bold;
-  }
-  .log-italic {
-    font-style: italic;
-  }
-  .log-underline {
-    text-decoration: underline;
-  }
-  .log-strikethrough {
-    text-decoration: line-through;
-  }
-  .log-underline.log-strikethrough {
-    text-decoration: underline line-through;
-  }
-  .log-blink {
-    animation: blink 1s step-end infinite;
-  }
-  .log-rapid-blink {
-    animation: blink 0.4s step-end infinite;
-  }
-  @keyframes blink {
-    50% {
-      opacity: 0;
-    }
-  }
+  .log-bold { font-weight: bold; }
+  .log-italic { font-style: italic; }
+  .log-underline { text-decoration: underline; }
+  .log-strikethrough { text-decoration: line-through; }
+  .log-underline.log-strikethrough { text-decoration: underline line-through; }
+  .log-blink { animation: blink 1s step-end infinite; }
+  .log-rapid-blink { animation: blink 0.4s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
   .log-secret {
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
   }
-  .log-secret-redacted {
-    opacity: 0;
-    width: 1px;
-    font-size: 1px;
-  }
-  .log-fg-black {
-    color: rgb(128, 128, 128);
-  }
-  .log-fg-red {
-    color: rgb(255, 0, 0);
-  }
-  .log-fg-green {
-    color: rgb(0, 255, 0);
-  }
-  .log-fg-yellow {
-    color: rgb(255, 255, 0);
-  }
-  .log-fg-blue {
-    color: rgb(0, 0, 255);
-  }
-  .log-fg-magenta {
-    color: rgb(255, 0, 255);
-  }
-  .log-fg-cyan {
-    color: rgb(0, 255, 255);
-  }
-  .log-fg-white {
-    color: rgb(187, 187, 187);
-  }
-  .log-bg-black {
-    background-color: rgb(0, 0, 0);
-  }
-  .log-bg-red {
-    background-color: rgb(255, 0, 0);
-  }
-  .log-bg-green {
-    background-color: rgb(0, 255, 0);
-  }
-  .log-bg-yellow {
-    background-color: rgb(255, 255, 0);
-  }
-  .log-bg-blue {
-    background-color: rgb(0, 0, 255);
-  }
-  .log-bg-magenta {
-    background-color: rgb(255, 0, 255);
-  }
-  .log-bg-cyan {
-    background-color: rgb(0, 255, 255);
-  }
-  .log-bg-white {
-    background-color: rgb(255, 255, 255);
-  }
+  .log-secret-redacted { opacity: 0; width: 1px; font-size: 1px; }
+  .log-fg-black { color: rgb(128, 128, 128); }
+  .log-fg-red { color: rgb(255, 0, 0); }
+  .log-fg-green { color: rgb(0, 255, 0); }
+  .log-fg-yellow { color: rgb(255, 255, 0); }
+  .log-fg-blue { color: rgb(0, 0, 255); }
+  .log-fg-magenta { color: rgb(255, 0, 255); }
+  .log-fg-cyan { color: rgb(0, 255, 255); }
+  .log-fg-white { color: rgb(187, 187, 187); }
+  .log-bg-black { background-color: rgb(0, 0, 0); }
+  .log-bg-red { background-color: rgb(255, 0, 0); }
+  .log-bg-green { background-color: rgb(0, 255, 0); }
+  .log-bg-yellow { background-color: rgb(255, 255, 0); }
+  .log-bg-blue { background-color: rgb(0, 0, 255); }
+  .log-bg-magenta { background-color: rgb(255, 0, 255); }
+  .log-bg-cyan { background-color: rgb(0, 255, 255); }
+  .log-bg-white { background-color: rgb(255, 255, 255); }
 `;
