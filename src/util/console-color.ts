@@ -111,12 +111,19 @@ export class ColoredConsole {
     const addSpan = (content: string) => {
       if (content === "") return;
 
+      if (this.state.secret) {
+        const redacted = document.createElement("span");
+        redacted.classList.add("log-secret-redacted");
+        redacted.appendChild(document.createTextNode("[redacted]"));
+        lineSpan.appendChild(redacted);
+        return;
+      }
+
       const span = document.createElement("span");
       if (this.state.bold) span.classList.add("log-bold");
       if (this.state.italic) span.classList.add("log-italic");
       if (this.state.underline) span.classList.add("log-underline");
       if (this.state.strikethrough) span.classList.add("log-strikethrough");
-      if (this.state.secret) span.classList.add("log-secret");
       if (this.state.blink) span.classList.add("log-blink");
       if (this.state.rapidBlink) span.classList.add("log-rapid-blink");
       if (this.state.foregroundColor !== null)
@@ -125,13 +132,6 @@ export class ColoredConsole {
         span.classList.add(`log-bg-${this.state.backgroundColor}`);
       span.appendChild(document.createTextNode(content));
       lineSpan.appendChild(span);
-
-      if (this.state.secret) {
-        const redacted = document.createElement("span");
-        redacted.classList.add("log-secret-redacted");
-        redacted.appendChild(document.createTextNode("[redacted]"));
-        lineSpan.appendChild(redacted);
-      }
     };
 
     while (true) {
@@ -224,6 +224,9 @@ export class ColoredConsole {
           case 39:
             this.state.foregroundColor = null;
             break;
+          case 40:
+            this.state.backgroundColor = "black";
+            break;
           case 41:
             this.state.backgroundColor = "red";
             break;
@@ -245,7 +248,6 @@ export class ColoredConsole {
           case 47:
             this.state.backgroundColor = "white";
             break;
-          case 40:
           case 49:
             this.state.backgroundColor = null;
             break;

@@ -108,7 +108,7 @@ class EwtNoPortPickedDialog extends LitElement {
               If you are using a Linux flavor, add your username to the dialout
               group so you have the appropriate permissions on the device.
               <ul>
-                <code>sudo usermod -a -G dialout YourUserName</code>
+                <li><code>sudo usermod -a -G dialout YourUserName</code></li>
               </ul>
               You may need to logout & back in or reboot to activate the new
               group access.

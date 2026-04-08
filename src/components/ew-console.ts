@@ -210,6 +210,10 @@ export class EwtConsole extends HTMLElement {
   }
 
   public async disconnect() {
+    if (this._clickHandler) {
+      this.removeEventListener("click", this._clickHandler);
+      this._clickHandler = undefined;
+    }
     if (this._cancelConnection) {
       await this._cancelConnection();
       this._cancelConnection = undefined;
@@ -219,6 +223,10 @@ export class EwtConsole extends HTMLElement {
   }
 
   public disconnectedCallback() {
+    if (this._clickHandler) {
+      this.removeEventListener("click", this._clickHandler);
+      this._clickHandler = undefined;
+    }
     if (this._cancelConnection) {
       this._cancelConnection();
       this._cancelConnection = undefined;
