@@ -1463,6 +1463,13 @@ export class EwtInstallDialog extends LitElement {
         Do you want to reset your device and erase all user data from your
         device?
         <ew-text-button
+          slot="actions"
+          @click=${() => {
+            this._state = "DASHBOARD";
+          }}
+          >Back</ew-text-button
+        >
+        <ew-text-button
           class="danger"
           slot="actions"
           @click=${this._confirmInstall}
