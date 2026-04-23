@@ -1142,13 +1142,13 @@ import{e,i as t,_ as i,n as r,m as o,a as s,b as a,r as l,c as n,d,f as c,g as h
           name="password"
           type="password"
         ></ew-filled-text-field>
-        <ew-text-button slot="actions" @click=${this._doProvision}
-          >Connect</ew-text-button
-        >
         <ew-text-button
           slot="actions"
           @click=${async()=>{if(this._client)try{await this._closeClientWithoutEvents(this._client),this.logger.log("Improv client closed")}catch(e){this.logger.log("Failed to close Improv client:",e)}await this._releaseReaderWriter(),this.logger.log("Returning to dashboard (device stays in firmware mode)"),this._state="DASHBOARD"}}
           >${this._installState&&this._installErase?"Skip":"Back"}</ew-text-button
+        >
+        <ew-text-button slot="actions" @click=${this._doProvision}
+          >Connect</ew-text-button
         >
       `}else{t=void 0;const r=!this._wasProvisioned&&(void 0!==this._client.nextUrl||"home_assistant_domain"in this._manifest);i=r,e=u`
         <ewt-page-message
@@ -1206,13 +1206,13 @@ import{e,i as t,_ as i,n as r,m as o,a as s,b as a,r as l,c as n,d,f as c,g as h
       </label>
       <ew-text-button
         slot="actions"
-        @click=${()=>{const e=this.shadowRoot.querySelector("ew-checkbox");this._startInstall(e.checked)}}
-        >Next</ew-text-button
+        @click=${()=>{this._state="DASHBOARD"}}
+        >Back</ew-text-button
       >
       <ew-text-button
         slot="actions"
-        @click=${()=>{this._state="DASHBOARD"}}
-        >Back</ew-text-button
+        @click=${()=>{const e=this.shadowRoot.querySelector("ew-checkbox");this._startInstall(e.checked)}}
+        >Next</ew-text-button
       >
     `]}_renderInstall(){let e,t,i=!1;const r=!this._installErase&&this._isSameFirmware;if(!this._installConfirmed&&this._isSameVersion)e="Erase User Data",t=u`
         Do you want to reset your device and erase all user data from your
@@ -1254,13 +1254,13 @@ import{e,i as t,_ as i,n as r,m as o,a as s,b as a,r as l,c as n,d,f as c,g as h
         Do you want to ${i}
         ${this._manifest.name}&nbsp;${this._manifest.version}?
         ${this._installErase?u`<br /><br />All data on the device will be erased.`:""}
-        <ew-text-button slot="actions" @click=${this._confirmInstall}
-          >Install</ew-text-button
-        >
         <ew-text-button
           slot="actions"
           @click=${()=>{this._state="DASHBOARD"}}
           >Back</ew-text-button
+        >
+        <ew-text-button slot="actions" @click=${this._confirmInstall}
+          >Install</ew-text-button
         >
       `}return[e,t,i,!1]}_renderLogs(){let e;return e=u`
       <ew-console
