@@ -140,7 +140,7 @@ export class EwtLittleFSManager extends LitElement {
             `Successfully mounted LittleFS with block size ${bs}`,
           );
           break;
-        } catch (err) {
+        } catch (_err) {
           // Try next block size
           fs = null;
         }
@@ -161,14 +161,14 @@ export class EwtLittleFSManager extends LitElement {
         } else {
           this._diskVersion = "Unknown";
         }
-      } catch (e: any) {
+      } catch (_e: any) {
         this._diskVersion = "Unknown";
       }
 
       this._refreshFiles();
       this.logger.log("LittleFS filesystem opened successfully");
-    } catch (e: any) {
-      this.logger.error(`Failed to open LittleFS: ${e.message || e}`);
+    } catch (_e: any) {
+      this.logger.error(`Failed to open LittleFS: ${_e.message || _e}`);
       if (this.onClose) {
         this.onClose();
       }
@@ -208,8 +208,8 @@ export class EwtLittleFSManager extends LitElement {
       });
 
       this._files = entries;
-    } catch (e: any) {
-      this.logger.error(`Failed to refresh file list: ${e.message || e}`);
+    } catch (_e: any) {
+      this.logger.error(`Failed to refresh file list: ${_e.message || _e}`);
       this._files = [];
     }
   }
@@ -282,7 +282,7 @@ export class EwtLittleFSManager extends LitElement {
           built += `/${segments[i]}`;
           try {
             this._fs.mkdir(built);
-          } catch (e) {
+          } catch (_e) {
             // Ignore if directory already exists
           }
         }
@@ -307,8 +307,8 @@ export class EwtLittleFSManager extends LitElement {
       this._refreshFiles();
 
       this.logger.log(`File "${uploadedFileName}" uploaded successfully`);
-    } catch (e: any) {
-      this.logger.error(`Failed to upload file: ${e.message || e}`);
+    } catch (_e: any) {
+      this.logger.error(`Failed to upload file: ${_e.message || _e}`);
     } finally {
       this._busy = false;
     }
@@ -329,8 +329,8 @@ export class EwtLittleFSManager extends LitElement {
       this._refreshFiles();
 
       this.logger.log(`Directory "${dirName}" created successfully`);
-    } catch (e: any) {
-      this.logger.error(`Failed to create directory: ${e.message || e}`);
+    } catch (_e: any) {
+      this.logger.error(`Failed to create directory: ${_e.message || _e}`);
     }
   }
 
@@ -355,8 +355,8 @@ export class EwtLittleFSManager extends LitElement {
       URL.revokeObjectURL(url);
 
       this.logger.log(`File "${filename}" downloaded successfully`);
-    } catch (e: any) {
-      this.logger.error(`Failed to download file: ${e.message || e}`);
+    } catch (_e: any) {
+      this.logger.error(`Failed to download file: ${_e.message || _e}`);
     }
   }
 
@@ -379,8 +379,8 @@ export class EwtLittleFSManager extends LitElement {
       this.logger.log(
         `${type === "dir" ? "Directory" : "File"} "${name}" deleted successfully`,
       );
-    } catch (e: any) {
-      this.logger.error(`Failed to delete ${type}: ${e.message || e}`);
+    } catch (_e: any) {
+      this.logger.error(`Failed to delete ${type}: ${_e.message || _e}`);
     }
   }
 
@@ -405,8 +405,8 @@ export class EwtLittleFSManager extends LitElement {
       URL.revokeObjectURL(url);
 
       this.logger.log(`LittleFS backup saved as "${filename}"`);
-    } catch (e: any) {
-      this.logger.error(`Failed to backup LittleFS: ${e.message || e}`);
+    } catch (_e: any) {
+      this.logger.error(`Failed to backup LittleFS: ${_e.message || _e}`);
     }
   }
 
@@ -462,8 +462,10 @@ export class EwtLittleFSManager extends LitElement {
 
       this.logger.log(`✓ LittleFS successfully written to flash!`);
       this.logger.log(`To use the new filesystem, reset your device.`);
-    } catch (e: any) {
-      this.logger.error(`Failed to write LittleFS to flash: ${e.message || e}`);
+    } catch (_e: any) {
+      this.logger.error(
+        `Failed to write LittleFS to flash: ${_e.message || _e}`,
+      );
     } finally {
       this._busy = false;
       this._isFlashing = false;
@@ -476,8 +478,8 @@ export class EwtLittleFSManager extends LitElement {
     if (this._fs) {
       try {
         // Don't call destroy() - just let garbage collection handle it
-      } catch (e) {
-        console.error("Error cleaning up LittleFS:", e);
+      } catch (_e: any) {
+        console.error("Error cleaning up LittleFS:", _e);
       }
       this._fs = null;
     }

@@ -99,7 +99,7 @@ export const connect = async (button: InstallButton) => {
     async () => {
       try {
         await esploader.disconnect();
-      } catch (err) {
+      } catch (_err) {
         // Ignore disconnect errors
       }
     },

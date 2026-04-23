@@ -14,6 +14,16 @@ export default tseslint.config(
     rules: {
       "no-console": "warn",
       "prettier/prettier": "error",
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
+      ],
+      "@typescript-eslint/ban-ts-comment": "off",
+      "no-control-regex": "off",
+      "prefer-const": "warn",
+      "no-var": "warn",
+      "no-fallthrough": "warn",
     },
   },
   {

@@ -622,8 +622,8 @@ export class EwtInstallDialog extends LitElement {
   _renderDashboard(): [string, TemplateResult, boolean, boolean] {
     const heading = this._info!.name;
     let content: TemplateResult;
-    let hideActions = true;
-    let allowClosing = true;
+    const hideActions = true;
+    const allowClosing = true;
 
     content = html`
       <ew-list>
@@ -1008,8 +1008,8 @@ export class EwtInstallDialog extends LitElement {
   _renderDashboardNoImprov(): [string, TemplateResult, boolean, boolean] {
     const heading = "Device Dashboard";
     let content: TemplateResult;
-    let hideActions = true;
-    let allowClosing = true;
+    const hideActions = true;
+    const allowClosing = true;
 
     content = html`
       <ew-list>
@@ -1590,9 +1590,9 @@ export class EwtInstallDialog extends LitElement {
   }
 
   _renderLogs(): [string | undefined, TemplateResult, boolean] {
-    let heading: string | undefined = `Logs`;
+    const heading: string | undefined = `Logs`;
     let content: TemplateResult;
-    let hideActions = false;
+    const hideActions = false;
 
     content = html`
       <ew-console
@@ -1786,17 +1786,17 @@ export class EwtInstallDialog extends LitElement {
         this.logger.log(`Found ${partitions.length} partition(s)`);
         this._partitions = partitions;
       }
-    } catch (e: any) {
-      this.logger.error(`Failed to read partition table: ${e.message || e}`);
+    } catch (_e: any) {
+      this.logger.error(`Failed to read partition table: ${_e.message || _e}`);
 
-      if (e.message === "Port selection cancelled") {
+      if (_e.message === "Port selection cancelled") {
         await this._releaseReaderWriter();
         this._error = "Port selection cancelled";
         this._state = "ERROR";
-      } else if (e.message && e.message.includes("Failed to connect")) {
+      } else if (_e.message && _e.message.includes("Failed to connect")) {
         // Connection error - show error state so user can retry
         await this._releaseReaderWriter();
-        this._error = e.message;
+        this._error = _e.message;
         this._state = "ERROR";
       } else {
         // Other errors (like parsing errors) - just show empty partition list
@@ -1851,9 +1851,9 @@ export class EwtInstallDialog extends LitElement {
         this._error = "Unknown filesystem type";
         this._state = "ERROR";
       }
-    } catch (e: any) {
-      this.logger.error(`Failed to open filesystem: ${e.message || e}`);
-      this._error = `Failed to open filesystem: ${e.message || e}`;
+    } catch (_e: any) {
+      this.logger.error(`Failed to open filesystem: ${_e.message || _e}`);
+      this._error = `Failed to open filesystem: ${_e.message || _e}`;
       this._state = "ERROR";
     } finally {
       this._busy = false;
@@ -1900,7 +1900,7 @@ export class EwtInstallDialog extends LitElement {
     let ssids: Ssid[];
     try {
       ssids = await this._client!.scan();
-    } catch (err) {
+    } catch (_err) {
       // When we fail while loading, pick "Join other"
       if (this._ssids === undefined) {
         this._ssids = null;
@@ -2006,7 +2006,7 @@ export class EwtInstallDialog extends LitElement {
       // Standard procedure - download manifest.json with provided URL
       try {
         this._manifest = await downloadManifest(this.manifestPath);
-      } catch (err: any) {
+      } catch (_err: any) {
         this._state = "ERROR";
         this._error = "Failed to download manifest";
         this._busy = false;
@@ -2476,7 +2476,7 @@ export class EwtInstallDialog extends LitElement {
     ).value;
     try {
       await this._client!.provision(ssid, password);
-    } catch (err: any) {
+    } catch (_err: any) {
       return;
     } finally {
       this._busy = false;
