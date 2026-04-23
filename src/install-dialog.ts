@@ -1384,9 +1384,6 @@ export class EwtInstallDialog extends LitElement {
           name="password"
           type="password"
         ></ew-filled-text-field>
-        <ew-text-button slot="actions" @click=${this._doProvision}
-          >Connect</ew-text-button
-        >
         <ew-text-button
           slot="actions"
           @click=${async () => {
@@ -1413,6 +1410,9 @@ export class EwtInstallDialog extends LitElement {
             ? "Skip"
             : "Back"}</ew-text-button
         >
+        <ew-text-button slot="actions" @click=${this._doProvision}
+          >Connect</ew-text-button
+        >
       `;
     }
     return [heading, content, hideActions];
@@ -1432,17 +1432,17 @@ export class EwtInstallDialog extends LitElement {
       <ew-text-button
         slot="actions"
         @click=${() => {
-          const checkbox = this.shadowRoot!.querySelector("ew-checkbox")!;
-          this._startInstall(checkbox.checked);
+          this._state = "DASHBOARD";
         }}
-        >Next</ew-text-button
+        >Back</ew-text-button
       >
       <ew-text-button
         slot="actions"
         @click=${() => {
-          this._state = "DASHBOARD";
+          const checkbox = this.shadowRoot!.querySelector("ew-checkbox")!;
+          this._startInstall(checkbox.checked);
         }}
-        >Back</ew-text-button
+        >Next</ew-text-button
       >
     `;
 
@@ -1482,15 +1482,15 @@ export class EwtInstallDialog extends LitElement {
         ${this._installErase
           ? html`<br /><br />All data on the device will be erased.`
           : ""}
-        <ew-text-button slot="actions" @click=${this._confirmInstall}
-          >Install</ew-text-button
-        >
         <ew-text-button
           slot="actions"
           @click=${() => {
             this._state = "DASHBOARD";
           }}
           >Back</ew-text-button
+        >
+        <ew-text-button slot="actions" @click=${this._confirmInstall}
+          >Install</ew-text-button
         >
       `;
     } else if (
