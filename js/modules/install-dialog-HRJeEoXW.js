@@ -1218,6 +1218,11 @@ import{e,i as t,_ as i,n as r,m as o,a as s,b as a,r as l,c as n,d,f as c,g as h
         Do you want to reset your device and erase all user data from your
         device?
         <ew-text-button
+          slot="actions"
+          @click=${()=>{this._state="DASHBOARD"}}
+          >Back</ew-text-button
+        >
+        <ew-text-button
           class="danger"
           slot="actions"
           @click=${this._confirmInstall}
