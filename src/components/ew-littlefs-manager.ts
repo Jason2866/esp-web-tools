@@ -167,8 +167,8 @@ export class EwtLittleFSManager extends LitElement {
 
       this._refreshFiles();
       this.logger.log("LittleFS filesystem opened successfully");
-    } catch (_e: any) {
-      this.logger.error(`Failed to open LittleFS: ${_e.message || _e}`);
+    } catch (e: any) {
+      this.logger.error(`Failed to open LittleFS: ${e.message || e}`);
       if (this.onClose) {
         this.onClose();
       }
@@ -208,8 +208,8 @@ export class EwtLittleFSManager extends LitElement {
       });
 
       this._files = entries;
-    } catch (_e: any) {
-      this.logger.error(`Failed to refresh file list: ${_e.message || _e}`);
+    } catch (e: any) {
+      this.logger.error(`Failed to refresh file list: ${e.message || e}`);
       this._files = [];
     }
   }
@@ -307,8 +307,8 @@ export class EwtLittleFSManager extends LitElement {
       this._refreshFiles();
 
       this.logger.log(`File "${uploadedFileName}" uploaded successfully`);
-    } catch (_e: any) {
-      this.logger.error(`Failed to upload file: ${_e.message || _e}`);
+    } catch (e: any) {
+      this.logger.error(`Failed to upload file: ${e.message || e}`);
     } finally {
       this._busy = false;
     }
@@ -329,8 +329,8 @@ export class EwtLittleFSManager extends LitElement {
       this._refreshFiles();
 
       this.logger.log(`Directory "${dirName}" created successfully`);
-    } catch (_e: any) {
-      this.logger.error(`Failed to create directory: ${_e.message || _e}`);
+    } catch (e: any) {
+      this.logger.error(`Failed to create directory: ${e.message || e}`);
     }
   }
 
@@ -355,8 +355,8 @@ export class EwtLittleFSManager extends LitElement {
       URL.revokeObjectURL(url);
 
       this.logger.log(`File "${filename}" downloaded successfully`);
-    } catch (_e: any) {
-      this.logger.error(`Failed to download file: ${_e.message || _e}`);
+    } catch (e: any) {
+      this.logger.error(`Failed to download file: ${e.message || e}`);
     }
   }
 
@@ -379,8 +379,8 @@ export class EwtLittleFSManager extends LitElement {
       this.logger.log(
         `${type === "dir" ? "Directory" : "File"} "${name}" deleted successfully`,
       );
-    } catch (_e: any) {
-      this.logger.error(`Failed to delete ${type}: ${_e.message || _e}`);
+    } catch (e: any) {
+      this.logger.error(`Failed to delete ${type}: ${e.message || e}`);
     }
   }
 
@@ -405,8 +405,8 @@ export class EwtLittleFSManager extends LitElement {
       URL.revokeObjectURL(url);
 
       this.logger.log(`LittleFS backup saved as "${filename}"`);
-    } catch (_e: any) {
-      this.logger.error(`Failed to backup LittleFS: ${_e.message || _e}`);
+    } catch (e: any) {
+      this.logger.error(`Failed to backup LittleFS: ${e.message || e}`);
     }
   }
 
@@ -462,10 +462,8 @@ export class EwtLittleFSManager extends LitElement {
 
       this.logger.log(`✓ LittleFS successfully written to flash!`);
       this.logger.log(`To use the new filesystem, reset your device.`);
-    } catch (_e: any) {
-      this.logger.error(
-        `Failed to write LittleFS to flash: ${_e.message || _e}`,
-      );
+    } catch (e: any) {
+      this.logger.error(`Failed to write LittleFS to flash: ${e.message || e}`);
     } finally {
       this._busy = false;
       this._isFlashing = false;
@@ -478,8 +476,8 @@ export class EwtLittleFSManager extends LitElement {
     if (this._fs) {
       try {
         // Don't call destroy() - just let garbage collection handle it
-      } catch (_e: any) {
-        console.error("Error cleaning up LittleFS:", _e);
+      } catch (e: any) {
+        console.error("Error cleaning up LittleFS:", e);
       }
       this._fs = null;
     }

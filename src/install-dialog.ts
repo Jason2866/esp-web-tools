@@ -1786,17 +1786,17 @@ export class EwtInstallDialog extends LitElement {
         this.logger.log(`Found ${partitions.length} partition(s)`);
         this._partitions = partitions;
       }
-    } catch (_e: any) {
-      this.logger.error(`Failed to read partition table: ${_e.message || _e}`);
+    } catch (e: any) {
+      this.logger.error(`Failed to read partition table: ${e.message || e}`);
 
-      if (_e.message === "Port selection cancelled") {
+      if (e.message === "Port selection cancelled") {
         await this._releaseReaderWriter();
         this._error = "Port selection cancelled";
         this._state = "ERROR";
-      } else if (_e.message && _e.message.includes("Failed to connect")) {
+      } else if (e.message && e.message.includes("Failed to connect")) {
         // Connection error - show error state so user can retry
         await this._releaseReaderWriter();
-        this._error = _e.message;
+        this._error = e.message;
         this._state = "ERROR";
       } else {
         // Other errors (like parsing errors) - just show empty partition list
@@ -1851,9 +1851,9 @@ export class EwtInstallDialog extends LitElement {
         this._error = "Unknown filesystem type";
         this._state = "ERROR";
       }
-    } catch (_e: any) {
-      this.logger.error(`Failed to open filesystem: ${_e.message || _e}`);
-      this._error = `Failed to open filesystem: ${_e.message || _e}`;
+    } catch (e: any) {
+      this.logger.error(`Failed to open filesystem: ${e.message || e}`);
+      this._error = `Failed to open filesystem: ${e.message || e}`;
       this._state = "ERROR";
     } finally {
       this._busy = false;
