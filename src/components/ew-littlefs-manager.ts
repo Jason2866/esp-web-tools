@@ -474,11 +474,7 @@ export class EwtLittleFSManager extends LitElement {
 
   private _cleanup() {
     if (this._fs) {
-      try {
-        // Don't call destroy() - just let garbage collection handle it
-      } catch (e: any) {
-        console.error("Error cleaning up LittleFS:", e);
-      }
+      // Don't call destroy() - just let garbage collection handle it
       this._fs = null;
     }
   }
