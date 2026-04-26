@@ -1320,8 +1320,8 @@ export class EwtInstallDialog extends LitElement {
           error = "Unable to connect";
           break;
 
+        // UNKNOWN_RPC_COMMAND happens when list SSIDs not supported.
         case ImprovSerialErrorState.NO_ERROR:
-        // Happens when list SSIDs not supported.
         case ImprovSerialErrorState.UNKNOWN_RPC_COMMAND:
           break;
 

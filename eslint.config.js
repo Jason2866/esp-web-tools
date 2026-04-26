@@ -28,7 +28,7 @@ export default tseslint.config(
       "no-control-regex": "off",
       "prefer-const": "warn",
       "no-var": "warn",
-      "no-fallthrough": "warn",
+      "no-fallthrough": "error",
     },
   },
   {
