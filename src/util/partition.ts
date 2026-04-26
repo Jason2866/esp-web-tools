@@ -47,7 +47,7 @@ export async function detectFilesystemType(
               }
             }
           }
-        } catch (e) {
+        } catch (_e) {
           // Continue checking other methods
         }
       }

@@ -17,7 +17,7 @@ export const flash = async (
   manifestPath: string,
   eraseFirst: boolean,
   firmwareBuffer: Uint8Array,
-  baudRate?: number,
+  _baudRate?: number,
 ) => {
   let manifest: Manifest;
   let build: Build | undefined;
@@ -33,8 +33,8 @@ export const flash = async (
       chipVariant,
     });
 
-  var manifestProm = null;
-  var manifestURL: string = "";
+  let manifestProm = null;
+  let manifestURL: string = "";
 
   try {
     manifestProm = JSON.parse(manifestPath);
@@ -250,7 +250,7 @@ export const flash = async (
 
       await espStub.flashData(
         data,
-        (bytesWritten: number, bytesTotal: number) => {
+        (bytesWritten: number, _bytesTotal: number) => {
           const newPct = Math.floor(
             ((totalBytesWritten + bytesWritten) / totalSize) * 100,
           );

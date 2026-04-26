@@ -140,7 +140,7 @@ export class EwtLittleFSManager extends LitElement {
             `Successfully mounted LittleFS with block size ${bs}`,
           );
           break;
-        } catch (err) {
+        } catch (_err) {
           // Try next block size
           fs = null;
         }
@@ -161,7 +161,7 @@ export class EwtLittleFSManager extends LitElement {
         } else {
           this._diskVersion = "Unknown";
         }
-      } catch (e: any) {
+      } catch (_e: any) {
         this._diskVersion = "Unknown";
       }
 
@@ -282,7 +282,7 @@ export class EwtLittleFSManager extends LitElement {
           built += `/${segments[i]}`;
           try {
             this._fs.mkdir(built);
-          } catch (e) {
+          } catch (_e) {
             // Ignore if directory already exists
           }
         }
@@ -474,11 +474,7 @@ export class EwtLittleFSManager extends LitElement {
 
   private _cleanup() {
     if (this._fs) {
-      try {
-        // Don't call destroy() - just let garbage collection handle it
-      } catch (e) {
-        console.error("Error cleaning up LittleFS:", e);
-      }
+      // Don't call destroy() - just let garbage collection handle it
       this._fs = null;
     }
   }

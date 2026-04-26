@@ -622,8 +622,8 @@ export class EwtInstallDialog extends LitElement {
   _renderDashboard(): [string, TemplateResult, boolean, boolean] {
     const heading = this._info!.name;
     let content: TemplateResult;
-    let hideActions = true;
-    let allowClosing = true;
+    const hideActions = true;
+    const allowClosing = true;
 
     content = html`
       <ew-list>
@@ -1008,8 +1008,8 @@ export class EwtInstallDialog extends LitElement {
   _renderDashboardNoImprov(): [string, TemplateResult, boolean, boolean] {
     const heading = "Device Dashboard";
     let content: TemplateResult;
-    let hideActions = true;
-    let allowClosing = true;
+    const hideActions = true;
+    const allowClosing = true;
 
     content = html`
       <ew-list>
@@ -1320,8 +1320,8 @@ export class EwtInstallDialog extends LitElement {
           error = "Unable to connect";
           break;
 
+        // UNKNOWN_RPC_COMMAND happens when list SSIDs not supported.
         case ImprovSerialErrorState.NO_ERROR:
-        // Happens when list SSIDs not supported.
         case ImprovSerialErrorState.UNKNOWN_RPC_COMMAND:
           break;
 
@@ -1590,9 +1590,9 @@ export class EwtInstallDialog extends LitElement {
   }
 
   _renderLogs(): [string | undefined, TemplateResult, boolean] {
-    let heading: string | undefined = `Logs`;
+    const heading: string | undefined = `Logs`;
     let content: TemplateResult;
-    let hideActions = false;
+    const hideActions = false;
 
     content = html`
       <ew-console
@@ -1900,7 +1900,7 @@ export class EwtInstallDialog extends LitElement {
     let ssids: Ssid[];
     try {
       ssids = await this._client!.scan();
-    } catch (err) {
+    } catch (_err) {
       // When we fail while loading, pick "Join other"
       if (this._ssids === undefined) {
         this._ssids = null;
@@ -2006,7 +2006,7 @@ export class EwtInstallDialog extends LitElement {
       // Standard procedure - download manifest.json with provided URL
       try {
         this._manifest = await downloadManifest(this.manifestPath);
-      } catch (err: any) {
+      } catch (_err: any) {
         this._state = "ERROR";
         this._error = "Failed to download manifest";
         this._busy = false;
@@ -2476,7 +2476,7 @@ export class EwtInstallDialog extends LitElement {
     ).value;
     try {
       await this._client!.provision(ssid, password);
-    } catch (err: any) {
+    } catch (_err: any) {
       return;
     } finally {
       this._busy = false;

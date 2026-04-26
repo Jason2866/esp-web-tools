@@ -40,7 +40,11 @@ export const corsProxyFetch = async (
     // GitHub releases don't support CORS, use proxy directly
     if (url.includes("github.com") && url.includes("/releases/download/")) {
       const proxiedUrl = `${CORS_PROXY}/?url=${encodeURIComponent(url)}`;
-      const { headers, credentials, ...safeOptions } = options ?? {};
+      const {
+        headers: _headers,
+        credentials: _credentials,
+        ...safeOptions
+      } = options ?? {};
       return fetch(proxiedUrl, safeOptions);
     }
 
@@ -52,9 +56,13 @@ export const corsProxyFetch = async (
       // Direct fetch failed, try proxy
       try {
         const proxiedUrl = `${CORS_PROXY}/?url=${encodeURIComponent(url)}`;
-        const { headers, credentials, ...safeOptions } = options ?? {};
+        const {
+          headers: _headers,
+          credentials: _credentials,
+          ...safeOptions
+        } = options ?? {};
         return await fetch(proxiedUrl, safeOptions);
-      } catch (proxyError) {
+      } catch (_proxyError) {
         // Both failed, throw the original error
         throw directError;
       }
