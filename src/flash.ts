@@ -76,7 +76,6 @@ export const flash = async (
   _baudRate?: number,
 ) => {
   let manifest: Manifest;
-  // eslint-disable-next-line prefer-const
   let build: Build | undefined;
   // eslint-disable-next-line prefer-const
   let chipFamily: ReturnType<typeof getChipFamilyName>;
@@ -194,10 +193,10 @@ export const flash = async (
     (b) => b.chipVariant === undefined,
   );
 
-  build = selectBestBuild(
-    exactVariantBuilds.length ? exactVariantBuilds : variantAgnosticBuilds,
-    flashSizeMB,
-  );
+  build = selectBestBuild(exactVariantBuilds, flashSizeMB);
+  if (!build) {
+    build = selectBestBuild(variantAgnosticBuilds, flashSizeMB);
+  }
 
   if (!build) {
     fireStateEvent({

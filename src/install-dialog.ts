@@ -2147,22 +2147,22 @@ export class EwtInstallDialog extends LitElement {
             this.logger.log(`Chip detected: ${this.esploader.chipFamily}`);
           }
 
-          // Detect flash size if available (we're in bootloader mode)
-          if (this.esploader.detectFlashSize && !this._flashSize) {
-            try {
-              await this.esploader.detectFlashSize();
-              this._flashSize = this.esploader.flashSize;
-              this.logger.log(`Flash size detected: ${this._flashSize}`);
-            } catch (err: any) {
-              this.logger.debug("Failed to detect flash size:", err);
-            }
-          }
-
           // CRITICAL: Create stub before reset
           if (!this._espStub) {
             this.logger.log("Creating stub for firmware mode switch...");
             this._espStub = await this.esploader.runStub();
             this.logger.log(`Stub created: IS_STUB=${this._espStub.IS_STUB}`);
+          }
+
+          // Detect flash size after stub is running
+          if (this._espStub.detectFlashSize && !this._flashSize) {
+            try {
+              await this._espStub.detectFlashSize();
+              this._flashSize = this._espStub.flashSize;
+              this.logger.log(`Flash size detected: ${this._flashSize}`);
+            } catch (err: any) {
+              this.logger.log(`Failed to detect flash size: ${err.message}`);
+            }
           }
 
           // CRITICAL: Save parent loader
@@ -2210,17 +2210,6 @@ export class EwtInstallDialog extends LitElement {
       } else {
         // External serial chip: Can reset to firmware without port change
         this.logger.log("External serial chip - resetting to firmware mode");
-
-        // Detect flash size before reset (we're in bootloader mode with stub)
-        if (this.esploader.detectFlashSize && !this._flashSize) {
-          try {
-            await this.esploader.detectFlashSize();
-            this._flashSize = this.esploader.flashSize;
-            this.logger.log(`Flash size detected: ${this._flashSize}`);
-          } catch (err: any) {
-            this.logger.debug("Failed to detect flash size:", err);
-          }
-        }
 
         try {
           await this._resetDeviceAndReleaseLocks();
