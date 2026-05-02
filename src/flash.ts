@@ -34,10 +34,9 @@ function selectBestBuild(
   detectedFlashSizeMB: number | undefined,
 ): Build | undefined {
   if (builds.length === 0) return undefined;
-  if (builds.length === 1) return builds[0];
 
   // Score builds: higher score = more specific match
-  let bestBuild = builds[0];
+  let bestBuild: Build | undefined;
   let bestScore = -Infinity;
 
   for (const build of builds) {
@@ -64,7 +63,7 @@ function selectBestBuild(
     }
   }
 
-  return bestBuild;
+  return bestScore >= 0 ? bestBuild : undefined;
 }
 
 export const flash = async (
@@ -82,6 +81,7 @@ export const flash = async (
   // eslint-disable-next-line prefer-const
   let chipFamily: ReturnType<typeof getChipFamilyName>;
   let chipVariant: string | null = null;
+  let flashSize: string | undefined;
 
   const fireStateEvent = (stateUpdate: FlashState) =>
     onEvent({
@@ -90,6 +90,7 @@ export const flash = async (
       build,
       chipFamily,
       chipVariant,
+      flashSize,
     });
 
   let manifestProm = null;
@@ -146,14 +147,12 @@ export const flash = async (
     }
   }
 
-  const flashSizeStr = esploader.flashSize; // e.g., "4MB", "8MB"
-  const flashSizeMB = flashSizeStr
-    ? parseFlashSizeToMB(flashSizeStr)
-    : undefined;
+  flashSize = esploader.flashSize; // e.g., "4MB", "8MB"
+  const flashSizeMB = flashSize ? parseFlashSizeToMB(flashSize) : undefined;
 
   fireStateEvent({
     state: FlashStateType.INITIALIZING,
-    message: `Initialized. Found ${chipFamily}${chipVariant ? ` (${chipVariant})` : ""}${flashSizeStr ? `, ${flashSizeStr}` : ""}`,
+    message: `Initialized. Found ${chipFamily}${chipVariant ? ` (${chipVariant})` : ""}${flashSize ? `, ${flashSize}` : ""}`,
     details: { done: true },
   });
   fireStateEvent({
@@ -175,7 +174,7 @@ export const flash = async (
   }
 
   // Filter builds by chipFamily and chipVariant
-  const matchingBuilds = manifest.builds.filter((b) => {
+  const compatibleBuilds = manifest.builds.filter((b) => {
     if (b.chipFamily !== chipFamily) {
       return false;
     }
@@ -187,7 +186,17 @@ export const flash = async (
 
   // Select the best build using most-specific-matching algorithm
   // Prefer builds with more matching qualifiers (flashSizeMB)
-  build = selectBestBuild(matchingBuilds, flashSizeMB);
+  const exactVariantBuilds = compatibleBuilds.filter(
+    (b) => b.chipVariant !== undefined && b.chipVariant === chipVariant,
+  );
+  const variantAgnosticBuilds = compatibleBuilds.filter(
+    (b) => b.chipVariant === undefined,
+  );
+
+  build = selectBestBuild(
+    exactVariantBuilds.length ? exactVariantBuilds : variantAgnosticBuilds,
+    flashSizeMB,
+  );
 
   if (!build) {
     fireStateEvent({
