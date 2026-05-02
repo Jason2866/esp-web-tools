@@ -108,6 +108,36 @@ The `chipVariant` field is optional. If omitted, the build will match any varian
 
 See [manifest-example-p4-variants.json](manifest-example-p4-variants.json) for a complete example.
 
+## Flash Size Support
+
+For chips with different flash sizes, you can specify `flashSizeMB` to target specific hardware configurations. This is useful for ESP32-S3 modules that come with various flash sizes.
+
+```json
+{
+  "name": "My Firmware",
+  "builds": [
+    {
+      "chipFamily": "ESP32-S3",
+      "flashSizeMB": 16,
+      "parts": [{ "path": "s3-16mb.bin", "offset": 0 }]
+    },
+    {
+      "chipFamily": "ESP32-S3",
+      "flashSizeMB": 4,
+      "parts": [{ "path": "s3-4mb.bin", "offset": 0 }]
+    },
+    {
+      "chipFamily": "ESP32-S3",
+      "parts": [{ "path": "s3-generic.bin", "offset": 0 }]
+    }
+  ]
+}
+```
+
+A device with ESP32-S3 and 16MB flash gets the first build, 4MB gets the second, and any other ESP32-S3 falls back to the third.
+
+The `flashSizeMB` field is **optional**. If omitted, the build will match any flash size. Builds with matching `flashSizeMB` are preferred over builds without it (most-specific-matching algorithm).
+
 ## Performance
 
 ESP Web Tools supports configurable baud rates for flashing. By default, it uses 115200 baud for maximum compatibility. You can increase the baud rate for significantly faster flashing speeds.

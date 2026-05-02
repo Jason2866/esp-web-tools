@@ -18,6 +18,7 @@ export interface Build {
     | "ESP32-H2"
     | "ESP32-P4";
   chipVariant?: string;
+  flashSizeMB?: number;
   parts: {
     path: string;
     offset: number;
