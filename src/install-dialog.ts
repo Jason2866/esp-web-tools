@@ -647,7 +647,9 @@ export class EwtInstallDialog extends LitElement {
           <div slot="headline">Connected to ${this._info!.name}</div>
           <div slot="supporting-text">
             ${this._info!.firmware}&nbsp;${this._info!.version}
-            (${this._info!.chipFamily}${this._flashSize ? `, ${this._flashSize}` : ""})
+            (${this._info!.chipFamily}${this._flashSize
+              ? `, ${this._flashSize}`
+              : ""})
           </div>
         </ew-list-item>
         ${!this._isSameVersion
@@ -1512,12 +1514,15 @@ export class EwtInstallDialog extends LitElement {
       const action = isUpdate ? "update to" : "install";
       // Build device info with flash size if available
       const deviceInfo = this._flashSize
-        ? html` (${this._info?.chipFamily || ""}${this._info?.chipFamily ? `, ${this._flashSize}` : this._flashSize})`
+        ? html` (${this._info?.chipFamily || ""}${this._info?.chipFamily
+            ? `, ${this._flashSize}`
+            : this._flashSize})`
         : "";
       content = html`
         ${isUpdate
           ? html`Your device is running
-              ${this._info!.firmware}&nbsp;${this._info!.version}${deviceInfo}.<br /><br />`
+              ${this._info!.firmware}&nbsp;${this._info!
+                .version}${deviceInfo}.<br /><br />`
           : deviceInfo
             ? html`Device detected: ${deviceInfo}<br /><br />`
             : ""}
@@ -1713,14 +1718,19 @@ export class EwtInstallDialog extends LitElement {
         ? getChipFamilyName(this.esploader)
         : null;
       this.logger.log(
-        `_renderPartitions: chipFamily=${chipFamily}, _flashSize=${this._flashSize}, chipFamily raw=${this.esploader.chipFamily}`
+        `_renderPartitions: chipFamily=${chipFamily}, _flashSize=${this._flashSize}, chipFamily raw=${this.esploader.chipFamily}`,
       );
       const deviceInfo = chipFamily
         ? `${chipFamily}${this._flashSize ? `, ${this._flashSize}` : ""}`
         : null;
       content = html`
         ${deviceInfo
-          ? html`<div class="device-info" style="margin-bottom: 16px; font-size: 14px; color: var(--md-sys-color-on-surface-variant, #666);">Device: ${deviceInfo}</div>`
+          ? html`<div
+              class="device-info"
+              style="margin-bottom: 16px; font-size: 14px; color: var(--md-sys-color-on-surface-variant, #666);"
+            >
+              Device: ${deviceInfo}
+            </div>`
           : ""}
         <div class="partition-list">
           <table class="partition-table">
@@ -1823,7 +1833,7 @@ export class EwtInstallDialog extends LitElement {
 
       // Log flash size status after stub initialization
       this.logger.log(
-        `After _ensureStub: _flashSize=${this._flashSize}, esploader.flashSize=${this.esploader.flashSize}`
+        `After _ensureStub: _flashSize=${this._flashSize}, esploader.flashSize=${this.esploader.flashSize}`,
       );
 
       // Add a small delay after stub is running

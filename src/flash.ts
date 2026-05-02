@@ -149,9 +149,7 @@ export const flash = async (
   }
 
   flashSize = esploader.flashSize; // e.g., "4MB", "8MB"
-  const flashSizeMB = flashSize
-    ? parseFlashSizeToMB(flashSize)
-    : undefined;
+  const flashSizeMB = flashSize ? parseFlashSizeToMB(flashSize) : undefined;
 
   fireStateEvent({
     state: FlashStateType.INITIALIZING,
