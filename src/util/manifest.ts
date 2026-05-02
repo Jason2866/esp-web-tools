@@ -10,6 +10,7 @@ export const downloadManifest = async (manifestPath: string) => {
   const manifest: Manifest = await resp.json();
 
   if ("new_install_skip_erase" in manifest) {
+    // eslint-disable-next-line no-console
     console.warn(
       'Manifest option "new_install_skip_erase" is deprecated. Use "new_install_prompt_erase" instead.',
     );

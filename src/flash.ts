@@ -38,7 +38,7 @@ function selectBestBuild(
 
   // Score builds: higher score = more specific match
   let bestBuild = builds[0];
-  let bestScore = 0;
+  let bestScore = -Infinity;
 
   for (const build of builds) {
     let score = 0;
@@ -47,13 +47,14 @@ function selectBestBuild(
     if (build.flashSizeMB !== undefined && detectedFlashSizeMB !== undefined) {
       if (build.flashSizeMB === detectedFlashSizeMB) {
         score += 100; // Exact flash size match
+      } else {
+        score -= 1; // Penalize non-matching specific builds
       }
+    } else if (build.flashSizeMB !== undefined) {
+      // flashSizeMB is defined but detectedFlashSizeMB is undefined
+      score -= 1; // Penalize non-matching specific builds
     }
-
-    // Having a qualifier adds to specificity (but less than matching)
-    if (build.flashSizeMB !== undefined) {
-      score += 1;
-    }
+    // Generic builds (flashSizeMB undefined) stay at score 0
 
     // Prefer this build if it has higher score
     // If same score, keep the first one (stable selection)
@@ -76,7 +77,9 @@ export const flash = async (
   _baudRate?: number,
 ) => {
   let manifest: Manifest;
+  // eslint-disable-next-line prefer-const
   let build: Build | undefined;
+  // eslint-disable-next-line prefer-const
   let chipFamily: ReturnType<typeof getChipFamilyName>;
   let chipVariant: string | null = null;
 

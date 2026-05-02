@@ -621,11 +621,10 @@ export class EwtInstallDialog extends LitElement {
 
   _renderDashboard(): [string, TemplateResult, boolean, boolean] {
     const heading = this._info!.name;
-    let content: TemplateResult;
     const hideActions = true;
     const allowClosing = true;
 
-    content = html`
+    const content = html`
       <ew-list>
         <ew-list-item>
           <div slot="headline">Connected to ${this._info!.name}</div>
@@ -1007,11 +1006,10 @@ export class EwtInstallDialog extends LitElement {
 
   _renderDashboardNoImprov(): [string, TemplateResult, boolean, boolean] {
     const heading = "Device Dashboard";
-    let content: TemplateResult;
     const hideActions = true;
     const allowClosing = true;
 
-    content = html`
+    const content = html`
       <ew-list>
         <ew-list-item
           type="button"
@@ -1591,10 +1589,9 @@ export class EwtInstallDialog extends LitElement {
 
   _renderLogs(): [string | undefined, TemplateResult, boolean] {
     const heading: string | undefined = `Logs`;
-    let content: TemplateResult;
     const hideActions = false;
 
-    content = html`
+    const content = html`
       <ew-console
         .port=${this._port}
         .logger=${this.logger}

@@ -27,10 +27,12 @@ async function loadLittleFS() {
   try {
     // Try to import from the calculated path
     const indexUrl = _wasmBasePath + "index.js";
+    // eslint-disable-next-line no-console
     console.log("[LittleFS] Loading module from:", indexUrl);
     _littleFSModule = await import(/* @vite-ignore */ indexUrl);
     return _littleFSModule;
   } catch (err) {
+    // eslint-disable-next-line no-console
     console.error(
       "[LittleFS] Failed to load from calculated path:",
       _wasmBasePath,
@@ -41,6 +43,7 @@ async function loadLittleFS() {
       _littleFSModule = await import("../wasm/littlefs/index.js");
       return _littleFSModule;
     } catch (fallbackErr) {
+      // eslint-disable-next-line no-console
       console.error("[LittleFS] Fallback import also failed:", fallbackErr);
       throw new Error(`Failed to load LittleFS module: ${err}`);
     }

@@ -59,6 +59,7 @@ export const connect = async (button: InstallButton) => {
     esploader = await esptoolConnect({
       log: () => {}, // Silent logger for connection
       debug: () => {},
+      // eslint-disable-next-line no-console
       error: (msg: string) => console.error(msg),
     });
   } catch (err: any) {
