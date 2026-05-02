@@ -81,7 +81,6 @@ export const flash = async (
   // eslint-disable-next-line prefer-const
   let chipFamily: ReturnType<typeof getChipFamilyName>;
   let chipVariant: string | null = null;
-  let flashSize: string | undefined;
 
   const fireStateEvent = (stateUpdate: FlashState) =>
     onEvent({
@@ -90,7 +89,6 @@ export const flash = async (
       build,
       chipFamily,
       chipVariant,
-      flashSize,
     });
 
   let manifestProm = null;
