@@ -202,15 +202,7 @@ export class EwtInstallDialog extends LitElement {
     this._espStub = espStub;
 
     // Detect flash size AFTER stub creation (flash size is only available after stub)
-    if (espStub.detectFlashSize && !this._flashSize) {
-      try {
-        await espStub.detectFlashSize();
-        this._flashSize = espStub.flashSize;
-        this.logger.log(`Flash size detected: ${this._flashSize}`);
-      } catch (err: any) {
-        this.logger.debug("Failed to detect flash size:", err);
-      }
-    }
+    await this._probeFlashSize(espStub);
 
     // Set baudrate BEFORE any operations (use user-selected baudrate if available)
     if (this.baudRate && this.baudRate > 115200) {
@@ -240,6 +232,19 @@ export class EwtInstallDialog extends LitElement {
   // Helper to get port from esploader
   private get _port(): SerialPort {
     return this.esploader.port;
+  }
+
+  // Helper to probe flash size from a running stub (only available after stub)
+  private async _probeFlashSize(espStub: any): Promise<void> {
+    if (espStub.detectFlashSize && !this._flashSize) {
+      try {
+        await espStub.detectFlashSize();
+        this._flashSize = espStub.flashSize;
+        this.logger.log(`Flash size detected: ${this._flashSize}`);
+      } catch (err: any) {
+        this.logger.debug("Failed to detect flash size:", err);
+      }
+    }
   }
 
   // Helper to check if device is using USB-JTAG or USB-OTG (not external serial chip)
@@ -1714,9 +1719,6 @@ export class EwtInstallDialog extends LitElement {
       const chipFamily = this.esploader.chipFamily
         ? getChipFamilyName(this.esploader)
         : null;
-      this.logger.log(
-        `_renderPartitions: chipFamily=${chipFamily}, _flashSize=${this._flashSize}, chipFamily raw=${this.esploader.chipFamily}`,
-      );
       const deviceInfo = chipFamily
         ? `${chipFamily}${this._flashSize ? `, ${this._flashSize}` : ""}`
         : null;
@@ -1827,6 +1829,13 @@ export class EwtInstallDialog extends LitElement {
 
       // Ensure stub is initialized
       const espStub = await this._ensureStub();
+
+      const chipFamily = this.esploader.chipFamily
+        ? getChipFamilyName(this.esploader)
+        : null;
+      this.logger.log(
+        `_readPartitionTable: chipFamily=${chipFamily}, _flashSize=${this._flashSize}, chipFamily raw=${this.esploader.chipFamily}`,
+      );
 
       // Add a small delay after stub is running
       await sleep(100);
@@ -2150,15 +2159,7 @@ export class EwtInstallDialog extends LitElement {
           }
 
           // Detect flash size after stub is running
-          if (this._espStub.detectFlashSize && !this._flashSize) {
-            try {
-              await this._espStub.detectFlashSize();
-              this._flashSize = this._espStub.flashSize;
-              this.logger.log(`Flash size detected: ${this._flashSize}`);
-            } catch (err: any) {
-              this.logger.log(`Failed to detect flash size: ${err.message}`);
-            }
-          }
+          await this._probeFlashSize(this._espStub);
 
           // CRITICAL: Save parent loader
           const loaderToSave = this._espStub._parent || this._espStub;

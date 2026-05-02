@@ -11,7 +11,6 @@ const DEVICE_TIMESTAMP_RE =
 
 // Matches leading ANSI SGR (color/style) codes at the start of a string
 // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape sequences
-
 const LEADING_ANSI_RE = /^(\x1b\[(?:\d+;)*\d*m)+/;
 
 export class TimestampTransformer implements Transformer<string, string> {
