@@ -13,7 +13,9 @@ export class LineBreakTransformer implements Transformer<string, string> {
     let lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = re.exec(this.chunks)) !== null) {
-      if (match[0] === "\r" && re.lastIndex === this.chunks.length) {
+      // If this is a lone \r at the very end of the buffer, leave it so it can
+      // be combined with a possible following \n in the next chunk.
+      if (match[0] === "\r" && match.index === this.chunks.length - 1) {
         break;
       }
       const line = this.chunks.substring(lastIndex, match.index);
