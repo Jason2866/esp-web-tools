@@ -393,7 +393,6 @@ export class EwtInstallDialog extends LitElement {
       this._espStub = undefined;
       this.esploader.IS_STUB = false;
       this.esploader.chipFamily = null;
-      this._flashSize = undefined;
       this._improvChecked = false; // Will check after user reconnects
       this._client = null; // Set to null (not undefined) to avoid "Wrapping up" UI state
       this._improvSupported = false; // Unknown until after reconnect
@@ -416,7 +415,6 @@ export class EwtInstallDialog extends LitElement {
     this._espStub = undefined;
     this.esploader.IS_STUB = false;
     this.esploader.chipFamily = null;
-    this._flashSize = undefined;
     this._improvChecked = false;
     this.esploader._reader = undefined;
     this.logger.log("ESP state reset for Improv test");
@@ -477,7 +475,6 @@ export class EwtInstallDialog extends LitElement {
     this._espStub = undefined;
     this.esploader.IS_STUB = false;
     this.esploader.chipFamily = null;
-    this._flashSize = undefined;
   }
 
   // Reset device to BOOTLOADER mode (for flashing)
@@ -2198,7 +2195,6 @@ export class EwtInstallDialog extends LitElement {
         this._espStub = undefined;
         this.esploader.IS_STUB = false;
         this.esploader.chipFamily = null;
-        this._flashSize = undefined;
         this._improvChecked = false; // Will check after user reconnects
         this._client = undefined;
         this._improvSupported = false;
@@ -2361,7 +2357,6 @@ export class EwtInstallDialog extends LitElement {
       this._espStub = undefined;
       this.esploader.IS_STUB = false;
       this.esploader.chipFamily = null;
-      this._flashSize = undefined;
       this._improvChecked = false;
       this._client = null;
       this._improvSupported = false;
@@ -2410,7 +2405,6 @@ export class EwtInstallDialog extends LitElement {
       this._espStub = undefined;
       this.esploader.IS_STUB = false;
       this.esploader.chipFamily = null;
-      this._flashSize = undefined;
 
       try {
         // Do a hardReset to start firmware
@@ -2580,6 +2574,8 @@ export class EwtInstallDialog extends LitElement {
   private _handleDisconnect = () => {
     this._state = "ERROR";
     this._error = "Disconnected";
+    // Reset flash size when device is actually disconnected
+    this._flashSize = undefined;
   };
 
   private async _handleSelectNewPort() {
@@ -3073,6 +3069,8 @@ export class EwtInstallDialog extends LitElement {
       await this._closeClientWithoutEvents(this._client);
     }
     document.body.style.overflow = this._bodyOverflow ?? "";
+    // Reset flash size when dialog is closed
+    this._flashSize = undefined;
     fireEvent(this, "closed" as any);
     this.parentNode!.removeChild(this);
   }
