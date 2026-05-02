@@ -45,6 +45,7 @@ export interface BaseFlashState {
   build?: Build;
   chipFamily?: Build["chipFamily"] | "Unknown Chip";
   chipVariant?: string | null;
+  flashSize?: string;
 }
 
 export interface InitializingState extends BaseFlashState {

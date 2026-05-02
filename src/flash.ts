@@ -82,6 +82,7 @@ export const flash = async (
   // eslint-disable-next-line prefer-const
   let chipFamily: ReturnType<typeof getChipFamilyName>;
   let chipVariant: string | null = null;
+  let flashSize: string | undefined;
 
   const fireStateEvent = (stateUpdate: FlashState) =>
     onEvent({
@@ -90,6 +91,7 @@ export const flash = async (
       build,
       chipFamily,
       chipVariant,
+      flashSize,
     });
 
   let manifestProm = null;
@@ -146,14 +148,14 @@ export const flash = async (
     }
   }
 
-  const flashSizeStr = esploader.flashSize; // e.g., "4MB", "8MB"
-  const flashSizeMB = flashSizeStr
-    ? parseFlashSizeToMB(flashSizeStr)
+  flashSize = esploader.flashSize; // e.g., "4MB", "8MB"
+  const flashSizeMB = flashSize
+    ? parseFlashSizeToMB(flashSize)
     : undefined;
 
   fireStateEvent({
     state: FlashStateType.INITIALIZING,
-    message: `Initialized. Found ${chipFamily}${chipVariant ? ` (${chipVariant})` : ""}${flashSizeStr ? `, ${flashSizeStr}` : ""}`,
+    message: `Initialized. Found ${chipFamily}${chipVariant ? ` (${chipVariant})` : ""}${flashSize ? `, ${flashSize}` : ""}`,
     details: { done: true },
   });
   fireStateEvent({

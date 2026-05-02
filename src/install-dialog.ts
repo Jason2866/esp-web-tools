@@ -121,6 +121,9 @@ export class EwtInstallDialog extends LitElement {
   // Track if device is using USB-JTAG or USB-OTG (not external serial chip)
   @state() private _isUsbJtagOrOtgDevice = false;
 
+  // Detected flash size (e.g., "4MB", "8MB")
+  @state() private _flashSize?: string;
+
   // Track action to perform after port reconnection (for USB-JTAG/OTG devices)
   private _openConsoleAfterReconnect = false;
   private _visitDeviceAfterReconnect = false;
@@ -197,6 +200,17 @@ export class EwtInstallDialog extends LitElement {
       `Stub created: IS_STUB=${espStub.IS_STUB}, chipFamily=${getChipFamilyName(espStub)}`,
     );
     this._espStub = espStub;
+
+    // Detect flash size AFTER stub creation (flash size is only available after stub)
+    if (espStub.detectFlashSize && !this._flashSize) {
+      try {
+        await espStub.detectFlashSize();
+        this._flashSize = espStub.flashSize;
+        this.logger.log(`Flash size detected: ${this._flashSize}`);
+      } catch (err: any) {
+        this.logger.debug("Failed to detect flash size:", err);
+      }
+    }
 
     // Set baudrate BEFORE any operations (use user-selected baudrate if available)
     if (this.baudRate && this.baudRate > 115200) {
@@ -379,6 +393,7 @@ export class EwtInstallDialog extends LitElement {
       this._espStub = undefined;
       this.esploader.IS_STUB = false;
       this.esploader.chipFamily = null;
+      this._flashSize = undefined;
       this._improvChecked = false; // Will check after user reconnects
       this._client = null; // Set to null (not undefined) to avoid "Wrapping up" UI state
       this._improvSupported = false; // Unknown until after reconnect
@@ -401,6 +416,7 @@ export class EwtInstallDialog extends LitElement {
     this._espStub = undefined;
     this.esploader.IS_STUB = false;
     this.esploader.chipFamily = null;
+    this._flashSize = undefined;
     this._improvChecked = false;
     this.esploader._reader = undefined;
     this.logger.log("ESP state reset for Improv test");
@@ -461,6 +477,7 @@ export class EwtInstallDialog extends LitElement {
     this._espStub = undefined;
     this.esploader.IS_STUB = false;
     this.esploader.chipFamily = null;
+    this._flashSize = undefined;
   }
 
   // Reset device to BOOTLOADER mode (for flashing)
@@ -630,7 +647,7 @@ export class EwtInstallDialog extends LitElement {
           <div slot="headline">Connected to ${this._info!.name}</div>
           <div slot="supporting-text">
             ${this._info!.firmware}&nbsp;${this._info!.version}
-            (${this._info!.chipFamily})
+            (${this._info!.chipFamily}${this._flashSize ? `, ${this._flashSize}` : ""})
           </div>
         </ew-list-item>
         ${!this._isSameVersion
@@ -1009,8 +1026,24 @@ export class EwtInstallDialog extends LitElement {
     const hideActions = true;
     const allowClosing = true;
 
+    // Build device info string if available
+    const chipFamily = this.esploader.chipFamily
+      ? getChipFamilyName(this.esploader)
+      : null;
+    const deviceInfo = chipFamily
+      ? `(${chipFamily}${this._flashSize ? `, ${this._flashSize}` : ""})`
+      : null;
+
     const content = html`
       <ew-list>
+        ${deviceInfo
+          ? html`
+              <ew-list-item>
+                <div slot="headline">${chipFamily}</div>
+                <div slot="supporting-text">${deviceInfo}</div>
+              </ew-list-item>
+            `
+          : ""}
         <ew-list-item
           type="button"
           ?disabled=${this._busy}
@@ -1477,11 +1510,17 @@ export class EwtInstallDialog extends LitElement {
     } else if (!this._installConfirmed) {
       heading = "Confirm Installation";
       const action = isUpdate ? "update to" : "install";
+      // Build device info with flash size if available
+      const deviceInfo = this._flashSize
+        ? html` (${this._info?.chipFamily || ""}${this._info?.chipFamily ? `, ${this._flashSize}` : this._flashSize})`
+        : "";
       content = html`
         ${isUpdate
           ? html`Your device is running
-              ${this._info!.firmware}&nbsp;${this._info!.version}.<br /><br />`
-          : ""}
+              ${this._info!.firmware}&nbsp;${this._info!.version}${deviceInfo}.<br /><br />`
+          : deviceInfo
+            ? html`Device detected: ${deviceInfo}<br /><br />`
+            : ""}
         Do you want to ${action}
         ${this._manifest.name}&nbsp;${this._manifest.version}?
         ${this._installErase
@@ -1505,7 +1544,11 @@ export class EwtInstallDialog extends LitElement {
       this._installState.state === FlashStateType.PREPARING
     ) {
       heading = "Installing";
-      content = this._renderProgress("Preparing installation");
+      // Show flash size in preparing message if available
+      const preparingMsg = this._installState?.flashSize
+        ? `Preparing installation (${this._installState.flashSize})`
+        : "Preparing installation";
+      content = this._renderProgress(preparingMsg);
       hideActions = true;
     } else if (this._installState.state === FlashStateType.ERASING) {
       heading = "Installing";
@@ -1665,7 +1708,20 @@ export class EwtInstallDialog extends LitElement {
         >
       `;
     } else {
+      // Build device info with flash size for partition view
+      const chipFamily = this.esploader.chipFamily
+        ? getChipFamilyName(this.esploader)
+        : null;
+      this.logger.log(
+        `_renderPartitions: chipFamily=${chipFamily}, _flashSize=${this._flashSize}, chipFamily raw=${this.esploader.chipFamily}`
+      );
+      const deviceInfo = chipFamily
+        ? `${chipFamily}${this._flashSize ? `, ${this._flashSize}` : ""}`
+        : null;
       content = html`
+        ${deviceInfo
+          ? html`<div class="device-info" style="margin-bottom: 16px; font-size: 14px; color: var(--md-sys-color-on-surface-variant, #666);">Device: ${deviceInfo}</div>`
+          : ""}
         <div class="partition-list">
           <table class="partition-table">
             <thead>
@@ -1764,6 +1820,11 @@ export class EwtInstallDialog extends LitElement {
 
       // Ensure stub is initialized
       const espStub = await this._ensureStub();
+
+      // Log flash size status after stub initialization
+      this.logger.log(
+        `After _ensureStub: _flashSize=${this._flashSize}, esploader.flashSize=${this.esploader.flashSize}`
+      );
 
       // Add a small delay after stub is running
       await sleep(100);
@@ -2079,6 +2140,17 @@ export class EwtInstallDialog extends LitElement {
             this.logger.log(`Chip detected: ${this.esploader.chipFamily}`);
           }
 
+          // Detect flash size if available (we're in bootloader mode)
+          if (this.esploader.detectFlashSize && !this._flashSize) {
+            try {
+              await this.esploader.detectFlashSize();
+              this._flashSize = this.esploader.flashSize;
+              this.logger.log(`Flash size detected: ${this._flashSize}`);
+            } catch (err: any) {
+              this.logger.debug("Failed to detect flash size:", err);
+            }
+          }
+
           // CRITICAL: Create stub before reset
           if (!this._espStub) {
             this.logger.log("Creating stub for firmware mode switch...");
@@ -2116,6 +2188,7 @@ export class EwtInstallDialog extends LitElement {
         this._espStub = undefined;
         this.esploader.IS_STUB = false;
         this.esploader.chipFamily = null;
+        this._flashSize = undefined;
         this._improvChecked = false; // Will check after user reconnects
         this._client = undefined;
         this._improvSupported = false;
@@ -2131,6 +2204,17 @@ export class EwtInstallDialog extends LitElement {
       } else {
         // External serial chip: Can reset to firmware without port change
         this.logger.log("External serial chip - resetting to firmware mode");
+
+        // Detect flash size before reset (we're in bootloader mode with stub)
+        if (this.esploader.detectFlashSize && !this._flashSize) {
+          try {
+            await this.esploader.detectFlashSize();
+            this._flashSize = this.esploader.flashSize;
+            this.logger.log(`Flash size detected: ${this._flashSize}`);
+          } catch (err: any) {
+            this.logger.debug("Failed to detect flash size:", err);
+          }
+        }
 
         try {
           await this._resetDeviceAndReleaseLocks();
@@ -2267,6 +2351,7 @@ export class EwtInstallDialog extends LitElement {
       this._espStub = undefined;
       this.esploader.IS_STUB = false;
       this.esploader.chipFamily = null;
+      this._flashSize = undefined;
       this._improvChecked = false;
       this._client = null;
       this._improvSupported = false;
@@ -2315,6 +2400,7 @@ export class EwtInstallDialog extends LitElement {
       this._espStub = undefined;
       this.esploader.IS_STUB = false;
       this.esploader.chipFamily = null;
+      this._flashSize = undefined;
 
       try {
         // Do a hardReset to start firmware
