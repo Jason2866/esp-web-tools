@@ -1828,11 +1828,6 @@ export class EwtInstallDialog extends LitElement {
       // Ensure stub is initialized
       const espStub = await this._ensureStub();
 
-      // Log flash size status after stub initialization
-      this.logger.log(
-        `After _ensureStub: _flashSize=${this._flashSize}, esploader.flashSize=${this.esploader.flashSize}`,
-      );
-
       // Add a small delay after stub is running
       await sleep(100);
 
