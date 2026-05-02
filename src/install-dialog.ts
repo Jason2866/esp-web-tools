@@ -1830,13 +1830,6 @@ export class EwtInstallDialog extends LitElement {
       // Ensure stub is initialized
       const espStub = await this._ensureStub();
 
-      const chipFamily = this.esploader.chipFamily
-        ? getChipFamilyName(this.esploader)
-        : null;
-      this.logger.log(
-        `_readPartitionTable: chipFamily=${chipFamily}, _flashSize=${this._flashSize}, chipFamily raw=${this.esploader.chipFamily}`,
-      );
-
       // Add a small delay after stub is running
       await sleep(100);
 
