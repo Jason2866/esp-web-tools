@@ -138,6 +138,38 @@ A device with ESP32-S3 and 16MB flash gets the first build, 4MB gets the second,
 
 The `flashSizeMB` field is **optional**. If omitted, the build will match any flash size. Builds with matching `flashSizeMB` are preferred over builds without it (most-specific-matching algorithm).
 
+## USB Interface Support (UART vs CDC)
+
+For chips that can be connected either through a native USB interface (USB-JTAG/USB-OTG, e.g. ESP32-S2/S3/C3/C6/...) or through an external USB-to-Serial bridge (CP210x, FTDI, CH340, ...), you can ship dedicated firmware variants by specifying `usbInterface`:
+
+- `"CDC"` – firmware built for native USB (CDC) console / programming
+- `"UART"` – firmware built for the regular UART console via an external USB-to-Serial chip
+
+```json
+{
+  "name": "My Firmware",
+  "builds": [
+    {
+      "chipFamily": "ESP32-S3",
+      "usbInterface": "CDC",
+      "parts": [{ "path": "s3-cdc.bin", "offset": 0 }]
+    },
+    {
+      "chipFamily": "ESP32-S3",
+      "usbInterface": "UART",
+      "parts": [{ "path": "s3-uart.bin", "offset": 0 }]
+    }
+  ]
+}
+```
+
+ESP Web Tools automatically detects how the device is connected:
+
+- If the device is reached via native USB (USB-JTAG/USB-OTG) the build with `usbInterface: "CDC"` is selected.
+- Otherwise (external USB-to-Serial bridge) the build with `usbInterface: "UART"` is selected.
+
+The `usbInterface` field is **optional**. If omitted, the build will match any USB interface and is used as a fallback. It can also be combined freely with `chipVariant` and `flashSizeMB`.
+
 ## Performance
 
 ESP Web Tools supports configurable baud rates for flashing. By default, it uses 115200 baud for maximum compatibility. You can increase the baud rate for significantly faster flashing speeds.

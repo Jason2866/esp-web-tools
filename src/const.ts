@@ -19,6 +19,13 @@ export interface Build {
     | "ESP32-P4";
   chipVariant?: string;
   flashSizeMB?: number;
+  /**
+   * Optional USB interface qualifier.
+   * - "CDC": native USB CDC (USB-JTAG/USB-OTG, e.g. direct USB on S2/S3/C3/C6/...)
+   * - "UART": external USB-to-Serial bridge (CP210x, FTDI, CH340, ...)
+   * If omitted, the build will match any USB interface.
+   */
+  usbInterface?: "UART" | "CDC";
   parts: {
     path: string;
     offset: number;

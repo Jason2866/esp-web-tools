@@ -25,13 +25,15 @@ function parseFlashSizeToMB(flashSize: string): number | undefined {
 
 /**
  * Select the best build using most-specific-matching algorithm
+ * - Builds with matching usbInterface are strongly preferred
  * - Builds with matching flashSizeMB are preferred
  * - Among builds with same specificity, first one wins
- * - Builds without flashSizeMB are fallback options
+ * - Builds without these qualifiers are fallback options
  */
 function selectBestBuild(
   builds: Build[],
   detectedFlashSizeMB: number | undefined,
+  detectedUsbInterface: "UART" | "CDC" | undefined,
 ): Build | undefined {
   if (builds.length === 0) return undefined;
 
@@ -42,7 +44,21 @@ function selectBestBuild(
   for (const build of builds) {
     let score = 0;
 
-    // Flash size match gives highest priority
+    // USB interface match - if specified, must match
+    if (build.usbInterface !== undefined) {
+      if (
+        detectedUsbInterface !== undefined &&
+        build.usbInterface === detectedUsbInterface
+      ) {
+        score += 1000; // Strong preference for explicit usbInterface match
+      } else {
+        // Mismatched usbInterface - disqualify this build
+        continue;
+      }
+    }
+    // Builds without usbInterface stay neutral (compatible with any)
+
+    // Flash size match gives second priority
     if (build.flashSizeMB !== undefined && detectedFlashSizeMB !== undefined) {
       if (build.flashSizeMB === detectedFlashSizeMB) {
         score += 100; // Exact flash size match
@@ -150,6 +166,20 @@ export const flash = async (
   flashSize = esploader.flashSize; // e.g., "4MB", "8MB"
   const flashSizeMB = flashSize ? parseFlashSizeToMB(flashSize) : undefined;
 
+  // Detect USB connection type to pick CDC vs UART firmware variants
+  // - true: native USB (USB-JTAG/USB-OTG) -> CDC
+  // - false: external USB-to-Serial bridge -> UART
+  let detectedUsbInterface: "UART" | "CDC" | undefined;
+  if (typeof esploader.detectUsbConnectionType === "function") {
+    try {
+      const isUsbJtagOrOtg = await esploader.detectUsbConnectionType();
+      detectedUsbInterface = isUsbJtagOrOtg ? "CDC" : "UART";
+      logger.debug(`Detected USB interface: ${detectedUsbInterface}`);
+    } catch (err) {
+      logger.debug("Failed to detect USB connection type:", err);
+    }
+  }
+
   fireStateEvent({
     state: FlashStateType.INITIALIZING,
     message: `Initialized. Found ${chipFamily}${chipVariant ? ` (${chipVariant})` : ""}${flashSize ? `, ${flashSize}` : ""}`,
@@ -193,9 +223,17 @@ export const flash = async (
     (b) => b.chipVariant === undefined,
   );
 
-  build = selectBestBuild(exactVariantBuilds, flashSizeMB);
+  build = selectBestBuild(
+    exactVariantBuilds,
+    flashSizeMB,
+    detectedUsbInterface,
+  );
   if (!build) {
-    build = selectBestBuild(variantAgnosticBuilds, flashSizeMB);
+    build = selectBestBuild(
+      variantAgnosticBuilds,
+      flashSizeMB,
+      detectedUsbInterface,
+    );
   }
 
   if (!build) {
