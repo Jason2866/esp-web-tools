@@ -156,7 +156,7 @@ export function detectMatchingBuild(
   const flashSizeMB = flashSize ? parseFlashSizeToMB(flashSize) : undefined;
   const usbInterface: "UART" | "CDC" | undefined = isUsbJtagOrOtg
     ? "CDC"
-    : undefined;
+    : "UART";
   return findMatchingBuild(
     manifest,
     chipFamily,
