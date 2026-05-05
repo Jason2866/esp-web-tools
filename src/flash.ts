@@ -13,7 +13,7 @@ import { corsProxyFetch } from "./util/cors-proxy";
 /**
  * Parse flash size string (e.g., "4MB", "8MB", "16MB") to megabytes number
  */
-function parseFlashSizeToMB(flashSize: string): number | undefined {
+export function parseFlashSizeToMB(flashSize: string): number | undefined {
   if (!flashSize) return undefined;
   const match = flashSize.match(/^(\d+)(MB|GB)$/);
   if (!match) return undefined;
@@ -82,6 +82,90 @@ function selectBestBuild(
   return bestScore >= 0 ? bestBuild : undefined;
 }
 
+/**
+ * Extract the most relevant firmware filename from a build's parts.
+ * Prefers parts with "factory" in the name.
+ * Ignores parts with "bootloader" or "partition" in the name.
+ * Returns just the basename (no path prefix).
+ */
+export function getFirmwareFileName(build: Build): string | undefined {
+  const candidates = build.parts
+    .map((p) => p.path)
+    .filter((path) => {
+      const lower = path.toLowerCase();
+      return !lower.includes("bootloader") && !lower.includes("partition");
+    });
+  if (candidates.length === 0) return undefined;
+  const factory = candidates.find((p) => p.toLowerCase().includes("factory"));
+  const chosen = factory ?? candidates[0];
+  // Return only the basename
+  return chosen.split("/").pop()!.split("\\").pop()!;
+}
+
+/**
+ * Find the best matching build for a given chip configuration.
+ * This is the single source of truth for build selection used by both
+ * the flash routine and the install dialog UI.
+ */
+export function findMatchingBuild(
+  manifest: Manifest,
+  chipFamily: string,
+  chipVariant: string | null,
+  flashSizeMB: number | undefined,
+  usbInterface: "UART" | "CDC" | undefined,
+): Build | undefined {
+  const compatible = manifest.builds.filter((b) => {
+    if (b.chipFamily !== chipFamily) return false;
+    if (b.chipVariant && b.chipVariant !== chipVariant) return false;
+    return true;
+  });
+
+  const exactVariant = compatible.filter(
+    (b) => b.chipVariant !== undefined && b.chipVariant === chipVariant,
+  );
+  const variantAgnostic = compatible.filter((b) => b.chipVariant === undefined);
+
+  return (
+    selectBestBuild(exactVariant, flashSizeMB, usbInterface) ||
+    selectBestBuild(variantAgnostic, flashSizeMB, usbInterface)
+  );
+}
+
+/**
+ * Detect the matching build for the currently connected device.
+ * Extracts chip info directly from the esploader instance.
+ *
+ * @param manifest - The loaded firmware manifest
+ * @param esploader - ESPLoader instance (or stub) with chip info
+ * @param flashSize - Detected flash size string (e.g. "4MB"), or undefined
+ * @param isUsbJtagOrOtg - Whether the device uses native USB (CDC) instead of external serial
+ * @param improvChipFamily - Optional chipFamily from Improv Serial info (takes precedence)
+ */
+export function detectMatchingBuild(
+  manifest: Manifest,
+  esploader: any,
+  flashSize: string | undefined,
+  isUsbJtagOrOtg: boolean,
+  improvChipFamily?: string,
+): Build | undefined {
+  const chipFamily =
+    improvChipFamily ||
+    (esploader.chipFamily ? getChipFamilyName(esploader) : null);
+  if (!chipFamily) return undefined;
+  const chipVariant: string | null = esploader.chipVariant ?? null;
+  const flashSizeMB = flashSize ? parseFlashSizeToMB(flashSize) : undefined;
+  const usbInterface: "UART" | "CDC" | undefined = isUsbJtagOrOtg
+    ? "CDC"
+    : undefined;
+  return findMatchingBuild(
+    manifest,
+    chipFamily,
+    chipVariant,
+    flashSizeMB,
+    usbInterface,
+  );
+}
+
 export const flash = async (
   onEvent: (state: FlashState) => void,
   esploader: any, // ESPLoader instance from tasmota-webserial-esptool
@@ -92,6 +176,7 @@ export const flash = async (
   _baudRate?: number,
 ) => {
   let manifest: Manifest;
+  // eslint-disable-next-line prefer-const
   let build: Build | undefined;
   // eslint-disable-next-line prefer-const
   let chipFamily: ReturnType<typeof getChipFamilyName>;
@@ -203,38 +288,13 @@ export const flash = async (
     return;
   }
 
-  // Filter builds by chipFamily and chipVariant
-  const compatibleBuilds = manifest.builds.filter((b) => {
-    if (b.chipFamily !== chipFamily) {
-      return false;
-    }
-    if (b.chipVariant && b.chipVariant !== chipVariant) {
-      return false;
-    }
-    return true;
-  });
-
-  // Select the best build using most-specific-matching algorithm
-  // Prefer builds with more matching qualifiers (flashSizeMB)
-  const exactVariantBuilds = compatibleBuilds.filter(
-    (b) => b.chipVariant !== undefined && b.chipVariant === chipVariant,
-  );
-  const variantAgnosticBuilds = compatibleBuilds.filter(
-    (b) => b.chipVariant === undefined,
-  );
-
-  build = selectBestBuild(
-    exactVariantBuilds,
+  build = findMatchingBuild(
+    manifest,
+    chipFamily,
+    chipVariant,
     flashSizeMB,
     detectedUsbInterface,
   );
-  if (!build) {
-    build = selectBestBuild(
-      variantAgnosticBuilds,
-      flashSizeMB,
-      detectedUsbInterface,
-    );
-  }
 
   if (!build) {
     fireStateEvent({

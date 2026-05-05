@@ -29,13 +29,19 @@ import {
   firmwareIcon,
   downloadIcon,
 } from "./components/svg";
-import { Logger, Manifest, FlashStateType, FlashState } from "./const.js";
+import {
+  Logger,
+  Manifest,
+  Build,
+  FlashStateType,
+  FlashState,
+} from "./const.js";
 import { ImprovSerial, Ssid } from "improv-wifi-serial-sdk/dist/serial";
 import {
   ImprovSerialCurrentState,
   ImprovSerialErrorState,
 } from "improv-wifi-serial-sdk/dist/const";
-import { flash } from "./flash";
+import { flash, detectMatchingBuild, getFirmwareFileName } from "./flash";
 import { textDownload } from "./util/file-download";
 import { fireEvent } from "./util/fire-event";
 import { sleep } from "./util/sleep";
@@ -123,6 +129,9 @@ export class EwtInstallDialog extends LitElement {
 
   // Detected flash size (e.g., "4MB", "8MB")
   @state() private _flashSize?: string;
+
+  // Build from manifest that matches the current device (set once stub + flash size are known)
+  @state() private _detectedBuild?: Build;
 
   // Track action to perform after port reconnection (for USB-JTAG/OTG devices)
   private _openConsoleAfterReconnect = false;
@@ -245,6 +254,13 @@ export class EwtInstallDialog extends LitElement {
         this.logger.debug("Failed to detect flash size:", err);
       }
     }
+    this._detectedBuild = detectMatchingBuild(
+      this._manifest,
+      espStub,
+      this._flashSize,
+      this._isUsbJtagOrOtgDevice,
+      this._info?.chipFamily,
+    );
   }
 
   // Helper to check if device is using USB-JTAG or USB-OTG (not external serial chip)
@@ -675,6 +691,14 @@ export class EwtInstallDialog extends LitElement {
                     ? `Install ${this._manifest.name}`
                     : `Update ${this._manifest.name}`}
                 </div>
+                ${(() => {
+                  const label = this._detectedBuild
+                    ? this._buildVariantLabel(this._detectedBuild)
+                    : undefined;
+                  return label
+                    ? html`<div slot="supporting-text">Variant: ${label}</div>`
+                    : "";
+                })()}
               </ew-list-item>
             `
           : ""}
@@ -1062,6 +1086,14 @@ export class EwtInstallDialog extends LitElement {
         >
           ${listItemInstallIcon}
           <div slot="headline">Install ${this._manifest.name}</div>
+          ${(() => {
+            const label = this._detectedBuild
+              ? this._buildVariantLabel(this._detectedBuild)
+              : undefined;
+            return label
+              ? html`<div slot="supporting-text">Variant: ${label}</div>`
+              : "";
+          })()}
         </ew-list-item>
 
         ${!this._isUsbJtagOrOtgDevice
@@ -1520,6 +1552,10 @@ export class EwtInstallDialog extends LitElement {
             ? `, ${this._flashSize}`
             : this._flashSize})`
         : "";
+      const variantBuild = this._installState?.build ?? this._detectedBuild;
+      const variantLabel = variantBuild
+        ? this._buildVariantLabel(variantBuild)
+        : undefined;
       content = html`
         ${isUpdate
           ? html`Your device is running
@@ -1529,7 +1565,9 @@ export class EwtInstallDialog extends LitElement {
             ? html`Device detected: ${deviceInfo}<br /><br />`
             : ""}
         Do you want to ${action}
-        ${this._manifest.name}&nbsp;${this._manifest.version}?
+        ${this._manifest.name}&nbsp;${this._manifest.version}${variantLabel
+          ? html`&nbsp;<em>(${variantLabel})</em>`
+          : ""}?
         ${this._installErase
           ? html`<br /><br />All data on the device will be erased.`
           : ""}
@@ -2552,8 +2590,9 @@ export class EwtInstallDialog extends LitElement {
   private _handleDisconnect = () => {
     this._state = "ERROR";
     this._error = "Disconnected";
-    // Reset flash size when device is actually disconnected
+    // Reset flash size and detected build when device is actually disconnected
     this._flashSize = undefined;
+    this._detectedBuild = undefined;
   };
 
   private async _handleSelectNewPort() {
@@ -3047,10 +3086,27 @@ export class EwtInstallDialog extends LitElement {
       await this._closeClientWithoutEvents(this._client);
     }
     document.body.style.overflow = this._bodyOverflow ?? "";
-    // Reset flash size when dialog is closed
+    // Reset flash size and detected build when dialog is closed
     this._flashSize = undefined;
+    this._detectedBuild = undefined;
     fireEvent(this, "closed" as any);
     this.parentNode!.removeChild(this);
+  }
+
+  /**
+   * Return a human-readable label for the differentiating properties of a build.
+   * Shows the firmware filename from parts (factory preferred, no bootloader/partition).
+   * Falls back to chipVariant/flashSizeMB/usbInterface if no filename found.
+   */
+  private _buildVariantLabel(build: Build): string | undefined {
+    const filename = getFirmwareFileName(build);
+    if (filename) return filename;
+    // Fallback: structural qualifiers
+    const parts: string[] = [];
+    if (build.chipVariant) parts.push(build.chipVariant);
+    if (build.flashSizeMB) parts.push(`${build.flashSizeMB} MB`);
+    if (build.usbInterface) parts.push(build.usbInterface);
+    return parts.length > 0 ? parts.join(", ") : undefined;
   }
 
   /**
