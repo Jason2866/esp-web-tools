@@ -201,8 +201,8 @@ export const flash = async (
     manifestProm = JSON.parse(manifestPath);
   } catch {
     manifestURL = new URL(manifestPath, location.toString()).toString();
-    manifestProm = corsProxyFetch(manifestURL).then(
-      (resp): Promise<Manifest> => resp.json(),
+    manifestProm = corsProxyFetch(manifestURL).then((resp): Promise<Manifest> =>
+      resp.json(),
     );
   }
 

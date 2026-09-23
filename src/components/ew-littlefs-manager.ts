@@ -507,30 +507,36 @@ export class EwtLittleFSManager extends LitElement {
             <div class="usage-bar">
               <div
                 class="usage-fill ${this._isFlashing ? "flashing" : ""}"
-                style="width: ${this._isFlashing
-                  ? this._flashProgress
-                  : usedPercent}%"
+                style="width: ${
+                  this._isFlashing ? this._flashProgress : usedPercent
+                }%"
               ></div>
             </div>
             <div class="usage-text">
-              ${this._isFlashing
-                ? html`<span class="flash-status">
-                    ⚡
-                    ${this._flashOperation === "reading"
-                      ? "Reading from"
-                      : "Writing to"}
-                    flash: ${this._flashProgress}%
-                  </span>`
-                : html`<span
-                      >Used: ${this._formatSize(this._usage.usedBytes)} /
-                      ${this._formatSize(this._usage.capacityBytes)}
-                      (${usedPercent}%)</span
-                    >
-                    ${this._diskVersion
-                      ? html`<span class="disk-version"
-                          >${this._diskVersion}</span
-                        >`
-                      : ""}`}
+              ${
+                this._isFlashing
+                  ? html`<span class="flash-status">
+                      ⚡
+                      ${
+                        this._flashOperation === "reading"
+                          ? "Reading from"
+                          : "Writing to"
+                      }
+                      flash: ${this._flashProgress}%
+                    </span>`
+                  : html`<span
+                        >Used: ${this._formatSize(this._usage.usedBytes)} /
+                        ${this._formatSize(this._usage.capacityBytes)}
+                        (${usedPercent}%)</span
+                      >
+                      ${
+                        this._diskVersion
+                          ? html`<span class="disk-version"
+                              >${this._diskVersion}</span
+                            >`
+                          : ""
+                      }`
+              }
             </div>
           </div>
         </div>
@@ -591,65 +597,77 @@ export class EwtLittleFSManager extends LitElement {
               </tr>
             </thead>
             <tbody>
-              ${this._files.length === 0
-                ? html`
-                    <tr>
-                      <td colspan="4" class="empty-state">
-                        No files in this directory
-                      </td>
-                    </tr>
-                  `
-                : this._files.map(
-                    (entry) => html`
+              ${
+                this._files.length === 0
+                  ? html`
                       <tr>
-                        <td>
-                          <div
-                            class="file-name ${entry.type === "dir"
-                              ? "clickable"
-                              : ""}"
-                            @click=${entry.type === "dir"
-                              ? () => this._navigateTo(entry.path)
-                              : null}
-                          >
-                            <span class="file-icon"
-                              >${entry.type === "dir" ? "📁" : "📄"}</span
-                            >
-                            <span
-                              >${entry.path.split("/").filter(Boolean).pop() ||
-                              "/"}</span
-                            >
-                          </div>
-                        </td>
-                        <td>${entry.type === "dir" ? "Directory" : "File"}</td>
-                        <td>
-                          ${entry.type === "file"
-                            ? this._formatSize(entry.size)
-                            : "-"}
-                        </td>
-                        <td>
-                          <div class="file-actions">
-                            ${entry.type === "file"
-                              ? html`
-                                  <ew-text-button
-                                    @click=${() =>
-                                      this._downloadFile(entry.path)}
-                                    ?disabled=${this._busy}
-                                    >Download</ew-text-button
-                                  >
-                                `
-                              : ""}
-                            <ew-text-button
-                              class="danger"
-                              @click=${() =>
-                                this._deleteFile(entry.path, entry.type)}
-                              ?disabled=${this._busy}
-                              >Delete</ew-text-button
-                            >
-                          </div>
+                        <td colspan="4" class="empty-state">
+                          No files in this directory
                         </td>
                       </tr>
-                    `,
-                  )}
+                    `
+                  : this._files.map(
+                      (entry) => html`
+                        <tr>
+                          <td>
+                            <div
+                              class="file-name ${
+                                entry.type === "dir" ? "clickable" : ""
+                              }"
+                              @click=${
+                                entry.type === "dir"
+                                  ? () => this._navigateTo(entry.path)
+                                  : null
+                              }
+                            >
+                              <span class="file-icon"
+                                >${entry.type === "dir" ? "📁" : "📄"}</span
+                              >
+                              <span
+                                >${
+                                  entry.path.split("/").filter(Boolean).pop() ||
+                                  "/"
+                                }</span
+                              >
+                            </div>
+                          </td>
+                          <td>
+                            ${entry.type === "dir" ? "Directory" : "File"}
+                          </td>
+                          <td>
+                            ${
+                              entry.type === "file"
+                                ? this._formatSize(entry.size)
+                                : "-"
+                            }
+                          </td>
+                          <td>
+                            <div class="file-actions">
+                              ${
+                                entry.type === "file"
+                                  ? html`
+                                      <ew-text-button
+                                        @click=${() =>
+                                          this._downloadFile(entry.path)}
+                                        ?disabled=${this._busy}
+                                        >Download</ew-text-button
+                                      >
+                                    `
+                                  : ""
+                              }
+                              <ew-text-button
+                                class="danger"
+                                @click=${() =>
+                                  this._deleteFile(entry.path, entry.type)}
+                                ?disabled=${this._busy}
+                                >Delete</ew-text-button
+                              >
+                            </div>
+                          </td>
+                        </tr>
+                      `,
+                    )
+              }
             </tbody>
           </table>
         </div>

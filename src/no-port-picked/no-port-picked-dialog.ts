@@ -116,24 +116,26 @@ class EwtNoPortPickedDialog extends LitElement {
           </ol>
         </div>
         <div slot="actions">
-          ${this.doTryAgain
-            ? html`
-                <ew-text-button @click=${this._handleClose}
-                  >Cancel</ew-text-button
-                >
-                <ew-text-button
-                  @click=${async () => {
-                    await this._handleClose();
-                    this.doTryAgain!();
-                  }}
-                  >Try Again</ew-text-button
-                >
-              `
-            : html`
-                <ew-text-button @click=${this._handleClose}
-                  >Close</ew-text-button
-                >
-              `}
+          ${
+            this.doTryAgain
+              ? html`
+                  <ew-text-button @click=${this._handleClose}
+                    >Cancel</ew-text-button
+                  >
+                  <ew-text-button
+                    @click=${async () => {
+                      await this._handleClose();
+                      this.doTryAgain!();
+                    }}
+                    >Try Again</ew-text-button
+                  >
+                `
+              : html`
+                  <ew-text-button @click=${this._handleClose}
+                    >Close</ew-text-button
+                  >
+                `
+          }
         </div>
       </ew-dialog>
     `;

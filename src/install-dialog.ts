@@ -599,18 +599,25 @@ export class EwtInstallDialog extends LitElement {
         @cancel=${this._preventDefault}
         @closed=${this._handleClose}
       >
-        ${heading
-          ? html`
-              <div slot="headline">${heading}</div>
-              ${allowClosing
-                ? html`
-                    <ew-icon-button slot="headline" @click=${this._closeDialog}>
-                      ${closeIcon}
-                    </ew-icon-button>
-                  `
-                : ""}
-            `
-          : ""}
+        ${
+          heading
+            ? html`
+                <div slot="headline">${heading}</div>
+                ${
+                  allowClosing
+                    ? html`
+                        <ew-icon-button
+                          slot="headline"
+                          @click=${this._closeDialog}
+                        >
+                          ${closeIcon}
+                        </ew-icon-button>
+                      `
+                    : ""
+                }
+              `
+            : ""
+        }
         <div slot="content">${content!}</div>
       </ew-dialog>
     `;
@@ -665,321 +672,343 @@ export class EwtInstallDialog extends LitElement {
           <div slot="headline">Connected to ${this._info!.name}</div>
           <div slot="supporting-text">
             ${this._info!.firmware}&nbsp;${this._info!.version}
-            (${this._info!.chipFamily}${this._flashSize
-              ? `, ${this._flashSize}`
-              : ""})
+            (${this._info!.chipFamily}${
+              this._flashSize ? `, ${this._flashSize}` : ""
+            })
           </div>
         </ew-list-item>
-        ${!this._isSameVersion
-          ? html`
-              <ew-list-item
-                type="button"
-                ?disabled=${this._busy}
-                @click=${() => {
-                  if (this._isSameFirmware) {
-                    this._startInstall(false);
-                  } else if (this._manifest.new_install_prompt_erase) {
-                    this._state = "ASK_ERASE";
-                  } else {
-                    this._startInstall(true);
-                  }
-                }}
-              >
-                ${listItemInstallIcon}
-                <div slot="headline">
-                  ${!this._isSameFirmware
-                    ? `Install ${this._manifest.name}`
-                    : `Update ${this._manifest.name}`}
-                </div>
-                ${(() => {
-                  const label = this._detectedBuild
-                    ? this._buildVariantLabel(this._detectedBuild)
-                    : undefined;
-                  return label
-                    ? html`<div slot="supporting-text">Variant: ${label}</div>`
-                    : "";
-                })()}
-              </ew-list-item>
-            `
-          : ""}
-        ${!this._client || this._client.nextUrl === undefined
-          ? ""
-          : html`
-              <ew-list-item
-                type="button"
-                ?disabled=${this._busy}
-                @click=${async () => {
-                  this._busy = true;
-
-                  // Switch to firmware mode if needed
-                  const needsReconnect =
-                    await this._switchToFirmwareMode("visit");
-                  if (needsReconnect) {
-                    return; // Will continue after port reconnection
-                  }
-
-                  // Device is in firmware mode - open URL
-                  if (this._client && this._client.nextUrl) {
-                    window.open(
-                      this._client.nextUrl,
-                      "_blank",
-                      "noopener,noreferrer",
-                    );
-                  }
-                  this._busy = false;
-                }}
-              >
-                ${listItemVisitDevice}
-                <div slot="headline">Visit Device</div>
-              </ew-list-item>
-            `}
-        ${!this._client ||
-        !this._manifest.home_assistant_domain ||
-        this._client.state !== ImprovSerialCurrentState.PROVISIONED
-          ? ""
-          : html`
-              <ew-list-item
-                type="button"
-                ?disabled=${this._busy}
-                @click=${async () => {
-                  this._busy = true;
-
-                  // Switch to firmware mode if needed
-                  const needsReconnect =
-                    await this._switchToFirmwareMode("homeassistant");
-                  if (needsReconnect) {
-                    return; // Will continue after port reconnection
-                  }
-
-                  // Device is in firmware mode - open HA URL
-                  if (this._manifest.home_assistant_domain) {
-                    window.open(
-                      `https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`,
-                      "_blank",
-                      "noopener,noreferrer",
-                    );
-                  }
-                  this._busy = false;
-                }}
-              >
-                ${listItemHomeAssistant}
-                <div slot="headline">Add to Home Assistant</div>
-              </ew-list-item>
-            `}
-        ${this._client
-          ? html`
-              <ew-list-item
-                type="button"
-                ?disabled=${this._busy}
-                @click=${async () => {
-                  this._busy = true;
-
-                  // Switch to firmware mode if needed
-                  const needsReconnect =
-                    await this._switchToFirmwareMode("wifi");
-                  if (needsReconnect) {
-                    return; // Will continue after port reconnection
-                  }
-
-                  // Device is in firmware mode
-                  this.logger.log("Device is running firmware for Wi-Fi setup");
-
-                  // Close Improv client and re-initialize for WiFi setup
-                  if (this._client) {
-                    try {
-                      await this._closeClientWithoutEvents(this._client);
-                      this.logger.log("Improv client closed");
-                    } catch (e) {
-                      this.logger.log("Failed to close Improv client:", e);
-                    }
-                    this._client = undefined;
-
-                    // Wait longer for port to be fully released
-                    await sleep(500);
-                  }
-
-                  // Different handling for different device types:
-                  // - WebSerial: Just release locks
-                  // - WebUSB CDC: Release locks, hardReset, release locks again
-                  // - WebUSB external serial: Just release locks
-                  const isWebUsbExternal =
-                    await this._isWebUsbWithExternalSerial();
-                  const isWebUsbCdc =
-                    this.esploader.isWebUSB &&
-                    this.esploader.isWebUSB() &&
-                    !isWebUsbExternal;
-
-                  if (isWebUsbCdc) {
-                    // WebUSB CDC needs hardReset to ensure firmware is running
-                    this.logger.log(
-                      "WebUSB CDC: Resetting device for Wi-Fi setup...",
-                    );
-
-                    try {
-                      // Release locks BEFORE reset
-                      await this._releaseReaderWriter();
-
-                      // Reset device
-                      await this.esploader.hardReset(false);
-                      this.logger.log("Device reset completed");
-
-                      // CRITICAL: hardReset consumes streams, recreate them
-                      await this._releaseReaderWriter();
-                      this.logger.log("Streams recreated after reset");
-
-                      // Wait for device to boot
-                      await sleep(500);
-                    } catch (err: any) {
-                      this.logger.log(`Reset error: ${err.message}`);
-                    }
-                  } else {
-                    // WebSerial or WebUSB external serial: Just release locks
-                    if (isWebUsbExternal) {
-                      this.logger.log(
-                        "WebUSB external serial: Preparing port for Wi-Fi setup...",
-                      );
+        ${
+          !this._isSameVersion
+            ? html`
+                <ew-list-item
+                  type="button"
+                  ?disabled=${this._busy}
+                  @click=${() => {
+                    if (this._isSameFirmware) {
+                      this._startInstall(false);
+                    } else if (this._manifest.new_install_prompt_erase) {
+                      this._state = "ASK_ERASE";
                     } else {
-                      this.logger.log(
-                        "WebSerial: Preparing port for Wi-Fi setup...",
-                      );
+                      this._startInstall(true);
+                    }
+                  }}
+                >
+                  ${listItemInstallIcon}
+                  <div slot="headline">
+                    ${
+                      !this._isSameFirmware
+                        ? `Install ${this._manifest.name}`
+                        : `Update ${this._manifest.name}`
+                    }
+                  </div>
+                  ${(() => {
+                    const label = this._detectedBuild
+                      ? this._buildVariantLabel(this._detectedBuild)
+                      : undefined;
+                    return label
+                      ? html`<div slot="supporting-text">
+                          Variant: ${label}
+                        </div>`
+                      : "";
+                  })()}
+                </ew-list-item>
+              `
+            : ""
+        }
+        ${
+          !this._client || this._client.nextUrl === undefined
+            ? ""
+            : html`
+                <ew-list-item
+                  type="button"
+                  ?disabled=${this._busy}
+                  @click=${async () => {
+                    this._busy = true;
+
+                    // Switch to firmware mode if needed
+                    const needsReconnect =
+                      await this._switchToFirmwareMode("visit");
+                    if (needsReconnect) {
+                      return; // Will continue after port reconnection
                     }
 
-                    await this._releaseReaderWriter();
-                    await sleep(500);
-                  }
-
-                  this.logger.log("Port ready for new Improv client");
-
-                  // CRITICAL: Recreate streams one more time to flush any buffered firmware output
-                  // Firmware debug messages can interfere with Improv protocol
-                  this.logger.log(
-                    "Flushing serial buffer before Improv init...",
-                  );
-                  await this._releaseReaderWriter();
-                  await sleep(100);
-
-                  // Re-create Improv client (firmware is running at 115200 baud)
-                  const client = new ImprovSerial(this._port, this.logger);
-                  client.addEventListener("state-changed", () => {
-                    this.requestUpdate();
-                  });
-                  client.addEventListener("error-changed", () =>
-                    this.requestUpdate(),
-                  );
-                  try {
-                    // Use 10 second timeout to allow device to get IP address
-                    this._info = await client.initialize(10000);
-                    this._client = client;
-                    client.addEventListener(
-                      "disconnect",
-                      this._handleDisconnect,
-                    );
-                    this.logger.log(
-                      "Improv client ready for Wi-Fi provisioning",
-                    );
-                  } catch (improvErr: any) {
-                    try {
-                      await this._closeClientWithoutEvents(client);
-                    } catch (closeErr) {
-                      this.logger.log(
-                        "Failed to close Improv client after init error:",
-                        closeErr,
+                    // Device is in firmware mode - open URL
+                    if (this._client && this._client.nextUrl) {
+                      window.open(
+                        this._client.nextUrl,
+                        "_blank",
+                        "noopener,noreferrer",
                       );
                     }
-
-                    // CRITICAL: Recreate streams after failed Improv init
-                    try {
-                      await this._releaseReaderWriter();
-                      this.logger.log("Streams recreated after Improv failure");
-                    } catch (releaseErr: any) {
-                      this.logger.log(
-                        `Failed to recreate streams: ${releaseErr.message}`,
-                      );
-                    }
-
-                    this.logger.log(
-                      `Improv initialization failed: ${improvErr.message}`,
-                    );
-                    this._error = `Improv initialization failed: ${improvErr.message}`;
-                    this._state = "ERROR";
                     this._busy = false;
-                    return;
-                  }
+                  }}
+                >
+                  ${listItemVisitDevice}
+                  <div slot="headline">Visit Device</div>
+                </ew-list-item>
+              `
+        }
+        ${
+          !this._client ||
+          !this._manifest.home_assistant_domain ||
+          this._client.state !== ImprovSerialCurrentState.PROVISIONED
+            ? ""
+            : html`
+                <ew-list-item
+                  type="button"
+                  ?disabled=${this._busy}
+                  @click=${async () => {
+                    this._busy = true;
 
-                  this._state = "PROVISION";
-                  this._provisionForce = true;
-                  this._busy = false;
-                }}
-              >
-                ${listItemWifi}
-                <div slot="headline">
-                  ${this._client.state === ImprovSerialCurrentState.READY
-                    ? "Connect to Wi-Fi"
-                    : "Change Wi-Fi"}
-                </div>
-              </ew-list-item>
-            `
-          : ""}
-        ${this._isUsbJtagOrOtgDevice
-          ? html`
-              <ew-list-item
-                type="button"
-                ?disabled=${this._busy}
-                @click=${async () => {
-                  this._busy = true;
-
-                  // Close Improv client if active
-                  if (this._client) {
-                    try {
-                      await this._closeClientWithoutEvents(this._client);
-                    } catch (e) {
-                      this.logger.log("Failed to close Improv client:", e);
+                    // Switch to firmware mode if needed
+                    const needsReconnect =
+                      await this._switchToFirmwareMode("homeassistant");
+                    if (needsReconnect) {
+                      return; // Will continue after port reconnection
                     }
-                  }
 
-                  // Switch to firmware mode if needed
-                  const needsReconnect =
+                    // Device is in firmware mode - open HA URL
+                    if (this._manifest.home_assistant_domain) {
+                      window.open(
+                        `https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`,
+                        "_blank",
+                        "noopener,noreferrer",
+                      );
+                    }
+                    this._busy = false;
+                  }}
+                >
+                  ${listItemHomeAssistant}
+                  <div slot="headline">Add to Home Assistant</div>
+                </ew-list-item>
+              `
+        }
+        ${
+          this._client
+            ? html`
+                <ew-list-item
+                  type="button"
+                  ?disabled=${this._busy}
+                  @click=${async () => {
+                    this._busy = true;
+
+                    // Switch to firmware mode if needed
+                    const needsReconnect =
+                      await this._switchToFirmwareMode("wifi");
+                    if (needsReconnect) {
+                      return; // Will continue after port reconnection
+                    }
+
+                    // Device is in firmware mode
+                    this.logger.log(
+                      "Device is running firmware for Wi-Fi setup",
+                    );
+
+                    // Close Improv client and re-initialize for WiFi setup
+                    if (this._client) {
+                      try {
+                        await this._closeClientWithoutEvents(this._client);
+                        this.logger.log("Improv client closed");
+                      } catch (e) {
+                        this.logger.log("Failed to close Improv client:", e);
+                      }
+                      this._client = undefined;
+
+                      // Wait longer for port to be fully released
+                      await sleep(500);
+                    }
+
+                    // Different handling for different device types:
+                    // - WebSerial: Just release locks
+                    // - WebUSB CDC: Release locks, hardReset, release locks again
+                    // - WebUSB external serial: Just release locks
+                    const isWebUsbExternal =
+                      await this._isWebUsbWithExternalSerial();
+                    const isWebUsbCdc =
+                      this.esploader.isWebUSB &&
+                      this.esploader.isWebUSB() &&
+                      !isWebUsbExternal;
+
+                    if (isWebUsbCdc) {
+                      // WebUSB CDC needs hardReset to ensure firmware is running
+                      this.logger.log(
+                        "WebUSB CDC: Resetting device for Wi-Fi setup...",
+                      );
+
+                      try {
+                        // Release locks BEFORE reset
+                        await this._releaseReaderWriter();
+
+                        // Reset device
+                        await this.esploader.hardReset(false);
+                        this.logger.log("Device reset completed");
+
+                        // CRITICAL: hardReset consumes streams, recreate them
+                        await this._releaseReaderWriter();
+                        this.logger.log("Streams recreated after reset");
+
+                        // Wait for device to boot
+                        await sleep(500);
+                      } catch (err: any) {
+                        this.logger.log(`Reset error: ${err.message}`);
+                      }
+                    } else {
+                      // WebSerial or WebUSB external serial: Just release locks
+                      if (isWebUsbExternal) {
+                        this.logger.log(
+                          "WebUSB external serial: Preparing port for Wi-Fi setup...",
+                        );
+                      } else {
+                        this.logger.log(
+                          "WebSerial: Preparing port for Wi-Fi setup...",
+                        );
+                      }
+
+                      await this._releaseReaderWriter();
+                      await sleep(500);
+                    }
+
+                    this.logger.log("Port ready for new Improv client");
+
+                    // CRITICAL: Recreate streams one more time to flush any buffered firmware output
+                    // Firmware debug messages can interfere with Improv protocol
+                    this.logger.log(
+                      "Flushing serial buffer before Improv init...",
+                    );
+                    await this._releaseReaderWriter();
+                    await sleep(100);
+
+                    // Re-create Improv client (firmware is running at 115200 baud)
+                    const client = new ImprovSerial(this._port, this.logger);
+                    client.addEventListener("state-changed", () => {
+                      this.requestUpdate();
+                    });
+                    client.addEventListener("error-changed", () =>
+                      this.requestUpdate(),
+                    );
+                    try {
+                      // Use 10 second timeout to allow device to get IP address
+                      this._info = await client.initialize(10000);
+                      this._client = client;
+                      client.addEventListener(
+                        "disconnect",
+                        this._handleDisconnect,
+                      );
+                      this.logger.log(
+                        "Improv client ready for Wi-Fi provisioning",
+                      );
+                    } catch (improvErr: any) {
+                      try {
+                        await this._closeClientWithoutEvents(client);
+                      } catch (closeErr) {
+                        this.logger.log(
+                          "Failed to close Improv client after init error:",
+                          closeErr,
+                        );
+                      }
+
+                      // CRITICAL: Recreate streams after failed Improv init
+                      try {
+                        await this._releaseReaderWriter();
+                        this.logger.log(
+                          "Streams recreated after Improv failure",
+                        );
+                      } catch (releaseErr: any) {
+                        this.logger.log(
+                          `Failed to recreate streams: ${releaseErr.message}`,
+                        );
+                      }
+
+                      this.logger.log(
+                        `Improv initialization failed: ${improvErr.message}`,
+                      );
+                      this._error = `Improv initialization failed: ${improvErr.message}`;
+                      this._state = "ERROR";
+                      this._busy = false;
+                      return;
+                    }
+
+                    this._state = "PROVISION";
+                    this._provisionForce = true;
+                    this._busy = false;
+                  }}
+                >
+                  ${listItemWifi}
+                  <div slot="headline">
+                    ${
+                      this._client.state === ImprovSerialCurrentState.READY
+                        ? "Connect to Wi-Fi"
+                        : "Change Wi-Fi"
+                    }
+                  </div>
+                </ew-list-item>
+              `
+            : ""
+        }
+        ${
+          this._isUsbJtagOrOtgDevice
+            ? html`
+                <ew-list-item
+                  type="button"
+                  ?disabled=${this._busy}
+                  @click=${async () => {
+                    this._busy = true;
+
+                    // Close Improv client if active
+                    if (this._client) {
+                      try {
+                        await this._closeClientWithoutEvents(this._client);
+                      } catch (e) {
+                        this.logger.log("Failed to close Improv client:", e);
+                      }
+                    }
+
+                    // Switch to firmware mode if needed
+                    const needsReconnect =
+                      await this._switchToFirmwareMode("console");
+                    if (needsReconnect) {
+                      return; // Will continue after port reconnection
+                    }
+
+                    // Device is already in firmware mode
+                    this.logger.log(
+                      "Opening console for USB-JTAG/OTG device (in firmware mode)",
+                    );
+
+                    this._state = "LOGS";
+                    this._busy = false;
+                  }}
+                >
+                  ${listItemConsole}
+                  <div slot="headline">Open Console</div>
+                </ew-list-item>
+              `
+            : ""
+        }
+        ${
+          !this._isUsbJtagOrOtgDevice
+            ? html`
+                <ew-list-item
+                  type="button"
+                  ?disabled=${this._busy}
+                  @click=${async () => {
+                    const client = this._client;
+                    if (client) {
+                      await this._closeClientWithoutEvents(client);
+                    }
+
+                    // switch to Firmware mode for Console
                     await this._switchToFirmwareMode("console");
-                  if (needsReconnect) {
-                    return; // Will continue after port reconnection
-                  }
 
-                  // Device is already in firmware mode
-                  this.logger.log(
-                    "Opening console for USB-JTAG/OTG device (in firmware mode)",
-                  );
-
-                  this._state = "LOGS";
-                  this._busy = false;
-                }}
-              >
-                ${listItemConsole}
-                <div slot="headline">Open Console</div>
-              </ew-list-item>
-            `
-          : ""}
-        ${!this._isUsbJtagOrOtgDevice
-          ? html`
-              <ew-list-item
-                type="button"
-                ?disabled=${this._busy}
-                @click=${async () => {
-                  const client = this._client;
-                  if (client) {
-                    await this._closeClientWithoutEvents(client);
-                  }
-
-                  // switch to Firmware mode for Console
-                  await this._switchToFirmwareMode("console");
-
-                  this._state = "LOGS";
-                }}
-              >
-                ${listItemConsole}
-                <div slot="headline">Logs &amp; Console</div>
-              </ew-list-item>
-            `
-          : ""}
+                    this._state = "LOGS";
+                  }}
+                >
+                  ${listItemConsole}
+                  <div slot="headline">Logs &amp; Console</div>
+                </ew-list-item>
+              `
+            : ""
+        }
         <ew-list-item
           type="button"
           ?disabled=${this._busy}
@@ -1018,31 +1047,35 @@ export class EwtInstallDialog extends LitElement {
           ${firmwareIcon}
           <div slot="headline">Manage Filesystem</div>
         </ew-list-item>
-        ${this._isSameFirmware && this._manifest.funding_url
-          ? html`
-              <ew-list-item
-                type="link"
-                href=${this._manifest.funding_url}
-                target="_blank"
-              >
-                ${listItemFundDevelopment}
-                <div slot="headline">Fund Development</div>
-              </ew-list-item>
-            `
-          : ""}
-        ${this._isSameVersion
-          ? html`
-              <ew-list-item
-                type="button"
-                class="danger"
-                ?disabled=${this._busy}
-                @click=${() => this._startInstall(true)}
-              >
-                ${listItemEraseUserData}
-                <div slot="headline">Erase User Data</div>
-              </ew-list-item>
-            `
-          : ""}
+        ${
+          this._isSameFirmware && this._manifest.funding_url
+            ? html`
+                <ew-list-item
+                  type="link"
+                  href=${this._manifest.funding_url}
+                  target="_blank"
+                >
+                  ${listItemFundDevelopment}
+                  <div slot="headline">Fund Development</div>
+                </ew-list-item>
+              `
+            : ""
+        }
+        ${
+          this._isSameVersion
+            ? html`
+                <ew-list-item
+                  type="button"
+                  class="danger"
+                  ?disabled=${this._busy}
+                  @click=${() => this._startInstall(true)}
+                >
+                  ${listItemEraseUserData}
+                  <div slot="headline">Erase User Data</div>
+                </ew-list-item>
+              `
+            : ""
+        }
       </ew-list>
     `;
 
@@ -1064,14 +1097,16 @@ export class EwtInstallDialog extends LitElement {
 
     const content = html`
       <ew-list>
-        ${deviceInfo
-          ? html`
-              <ew-list-item>
-                <div slot="headline">${chipFamily}</div>
-                <div slot="supporting-text">${deviceInfo}</div>
-              </ew-list-item>
-            `
-          : ""}
+        ${
+          deviceInfo
+            ? html`
+                <ew-list-item>
+                  <div slot="headline">${chipFamily}</div>
+                  <div slot="supporting-text">${deviceInfo}</div>
+                </ew-list-item>
+              `
+            : ""
+        }
         <ew-list-item
           type="button"
           ?disabled=${this._busy}
@@ -1096,72 +1131,76 @@ export class EwtInstallDialog extends LitElement {
           })()}
         </ew-list-item>
 
-        ${!this._isUsbJtagOrOtgDevice
-          ? html`
-              <ew-list-item
-                type="button"
-                ?disabled=${this._busy}
-                @click=${async () => {
-                  this._busy = true;
-                  const client = this._client;
-                  if (client) {
-                    await this._closeClientWithoutEvents(client);
-                  }
-
-                  // switch to Firmware mode for Console
-                  const needsReconnect =
-                    await this._switchToFirmwareMode("console");
-                  if (needsReconnect) {
-                    return; // Will continue after port reconnection
-                  }
-
-                  this._state = "LOGS";
-                  this._busy = false;
-                }}
-              >
-                ${listItemConsole}
-                <div slot="headline">Logs &amp; Console</div>
-              </ew-list-item>
-            `
-          : ""}
-        ${this._isUsbJtagOrOtgDevice
-          ? html`
-              <ew-list-item
-                type="button"
-                ?disabled=${this._busy}
-                @click=${async () => {
-                  this._busy = true;
-
-                  // Close Improv client if active
-                  if (this._client) {
-                    try {
-                      await this._closeClientWithoutEvents(this._client);
-                    } catch (e) {
-                      this.logger.log("Failed to close Improv client:", e);
+        ${
+          !this._isUsbJtagOrOtgDevice
+            ? html`
+                <ew-list-item
+                  type="button"
+                  ?disabled=${this._busy}
+                  @click=${async () => {
+                    this._busy = true;
+                    const client = this._client;
+                    if (client) {
+                      await this._closeClientWithoutEvents(client);
                     }
-                  }
 
-                  // Switch to firmware mode if needed
-                  const needsReconnect =
-                    await this._switchToFirmwareMode("console");
-                  if (needsReconnect) {
-                    return; // Will continue after port reconnection
-                  }
+                    // switch to Firmware mode for Console
+                    const needsReconnect =
+                      await this._switchToFirmwareMode("console");
+                    if (needsReconnect) {
+                      return; // Will continue after port reconnection
+                    }
 
-                  // Device is already in firmware mode
-                  this.logger.log(
-                    "Opening console for USB-JTAG/OTG device (in firmware mode)",
-                  );
+                    this._state = "LOGS";
+                    this._busy = false;
+                  }}
+                >
+                  ${listItemConsole}
+                  <div slot="headline">Logs &amp; Console</div>
+                </ew-list-item>
+              `
+            : ""
+        }
+        ${
+          this._isUsbJtagOrOtgDevice
+            ? html`
+                <ew-list-item
+                  type="button"
+                  ?disabled=${this._busy}
+                  @click=${async () => {
+                    this._busy = true;
 
-                  this._state = "LOGS";
-                  this._busy = false;
-                }}
-              >
-                ${listItemConsole}
-                <div slot="headline">Open Console</div>
-              </ew-list-item>
-            `
-          : ""}
+                    // Close Improv client if active
+                    if (this._client) {
+                      try {
+                        await this._closeClientWithoutEvents(this._client);
+                      } catch (e) {
+                        this.logger.log("Failed to close Improv client:", e);
+                      }
+                    }
+
+                    // Switch to firmware mode if needed
+                    const needsReconnect =
+                      await this._switchToFirmwareMode("console");
+                    if (needsReconnect) {
+                      return; // Will continue after port reconnection
+                    }
+
+                    // Device is already in firmware mode
+                    this.logger.log(
+                      "Opening console for USB-JTAG/OTG device (in firmware mode)",
+                    );
+
+                    this._state = "LOGS";
+                    this._busy = false;
+                  }}
+                >
+                  ${listItemConsole}
+                  <div slot="headline">Open Console</div>
+                </ew-list-item>
+              `
+            : ""
+        }
 
         <ew-list-item
           type="button"
@@ -1239,145 +1278,172 @@ export class EwtInstallDialog extends LitElement {
           .icon=${OK_ICON}
           label="Device connected to the network!"
         ></ewt-page-message>
-        ${showSetupLinks
-          ? html`
-              <div class="dashboard-buttons">
-                ${this._client!.nextUrl === undefined
-                  ? ""
-                  : html`
-                      <div>
-                        <a
-                          href=${this._client!.nextUrl}
-                          class="has-button"
-                          target="_blank"
-                          @click=${async (ev: Event) => {
-                            ev.preventDefault();
-                            const url = this._client!.nextUrl!;
-                            // Preserve user gesture for popup blockers
-                            const popup = window.open("about:blank", "_blank");
-                            // Visit Device opens external page - firmware must running
-                            // Check if device is in bootloader mode
-                            // Switch to firmware mode if needed
-                            const needsReconnect =
-                              await this._switchToFirmwareMode("visit");
-                            if (needsReconnect) {
-                              popup?.close();
-                              return; // Will continue after port reconnection
-                            }
+        ${
+          showSetupLinks
+            ? html`
+                <div class="dashboard-buttons">
+                  ${
+                    this._client!.nextUrl === undefined
+                      ? ""
+                      : html`
+                          <div>
+                            <a
+                              href=${this._client!.nextUrl}
+                              class="has-button"
+                              target="_blank"
+                              @click=${async (ev: Event) => {
+                                ev.preventDefault();
+                                const url = this._client!.nextUrl!;
+                                // Preserve user gesture for popup blockers
+                                const popup = window.open(
+                                  "about:blank",
+                                  "_blank",
+                                );
+                                // Visit Device opens external page - firmware must running
+                                // Check if device is in bootloader mode
+                                // Switch to firmware mode if needed
+                                const needsReconnect =
+                                  await this._switchToFirmwareMode("visit");
+                                if (needsReconnect) {
+                                  popup?.close();
+                                  return; // Will continue after port reconnection
+                                }
 
-                            // Device is already in firmware mode
-                            this.logger.log(
-                              "Following Link (in firmware mode)",
-                            );
+                                // Device is already in firmware mode
+                                this.logger.log(
+                                  "Following Link (in firmware mode)",
+                                );
 
-                            if (popup) {
-                              popup.location.href = url;
-                            } else {
-                              window.open(url, "_blank", "noopener,noreferrer");
-                            }
-                            this._state = "DASHBOARD";
-                          }}
-                        >
-                          <ew-text-button>Visit Device</ew-text-button>
-                        </a>
-                      </div>
-                    `}
-                ${!this._manifest.home_assistant_domain
-                  ? ""
-                  : html`
-                      <div>
-                        <a
-                          href=${`https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`}
-                          class="has-button"
-                          target="_blank"
-                          @click=${async (ev: Event) => {
-                            ev.preventDefault();
-                            const url = `https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`;
-                            const popup = window.open("about:blank", "_blank");
-                            // Add to HA opens external page - firmware must running
-                            // Check if device is in bootloader mode
-                            // Switch to firmware mode if needed
-                            const needsReconnect =
-                              await this._switchToFirmwareMode("homeassistant");
-                            if (needsReconnect) {
-                              popup?.close();
-                              return; // Will continue after port reconnection
-                            }
-
-                            // Device is already in firmware mode
-                            this.logger.log(
-                              "Following Link (in firmware mode)",
-                            );
-
-                            if (popup) {
-                              popup.location.href = url;
-                            } else {
-                              window.open(url, "_blank", "noopener,noreferrer");
-                            }
-                            this._state = "DASHBOARD";
-                          }}
-                        >
-                          <ew-text-button>Add to Home Assistant</ew-text-button>
-                        </a>
-                      </div>
-                    `}
-                <div>
-                  <ew-text-button
-                    @click=${async () => {
-                      // After WiFi provisioning: Device stays in firmware mode
-                      // Close Improv client first
-                      if (this._client) {
-                        try {
-                          await this._closeClientWithoutEvents(this._client);
-                          this.logger.log(
-                            "Improv client closed after provisioning",
-                          );
-                        } catch (e) {
-                          this.logger.log("Failed to close Improv client:", e);
-                        }
-                      }
-
-                      // Release locks and stay in firmware mode
-                      await this._releaseReaderWriter();
-                      this.logger.log(
-                        "Returning to dashboard (device stays in firmware mode)",
-                      );
-
-                      this._state = "DASHBOARD";
-                    }}
-                    >Skip</ew-text-button
-                  >
-                </div>
-              </div>
-            `
-          : html`
-              <ew-text-button
-                slot="actions"
-                @click=${async () => {
-                  // After WiFi provisioning: Device stays in firmware mode
-                  // Close Improv client first
-                  if (this._client) {
-                    try {
-                      await this._closeClientWithoutEvents(this._client);
-                      this.logger.log(
-                        "Improv client closed after provisioning",
-                      );
-                    } catch (e) {
-                      this.logger.log("Failed to close Improv client:", e);
-                    }
+                                if (popup) {
+                                  popup.location.href = url;
+                                } else {
+                                  window.open(
+                                    url,
+                                    "_blank",
+                                    "noopener,noreferrer",
+                                  );
+                                }
+                                this._state = "DASHBOARD";
+                              }}
+                            >
+                              <ew-text-button>Visit Device</ew-text-button>
+                            </a>
+                          </div>
+                        `
                   }
+                  ${
+                    !this._manifest.home_assistant_domain
+                      ? ""
+                      : html`
+                          <div>
+                            <a
+                              href=${`https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`}
+                              class="has-button"
+                              target="_blank"
+                              @click=${async (ev: Event) => {
+                                ev.preventDefault();
+                                const url = `https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`;
+                                const popup = window.open(
+                                  "about:blank",
+                                  "_blank",
+                                );
+                                // Add to HA opens external page - firmware must running
+                                // Check if device is in bootloader mode
+                                // Switch to firmware mode if needed
+                                const needsReconnect =
+                                  await this._switchToFirmwareMode(
+                                    "homeassistant",
+                                  );
+                                if (needsReconnect) {
+                                  popup?.close();
+                                  return; // Will continue after port reconnection
+                                }
 
-                  // Release locks and stay in firmware mode
-                  await this._releaseReaderWriter();
-                  this.logger.log(
-                    "Returning to dashboard (device stays in firmware mode)",
-                  );
+                                // Device is already in firmware mode
+                                this.logger.log(
+                                  "Following Link (in firmware mode)",
+                                );
 
-                  this._state = "DASHBOARD";
-                }}
-                >Continue</ew-text-button
-              >
-            `}
+                                if (popup) {
+                                  popup.location.href = url;
+                                } else {
+                                  window.open(
+                                    url,
+                                    "_blank",
+                                    "noopener,noreferrer",
+                                  );
+                                }
+                                this._state = "DASHBOARD";
+                              }}
+                            >
+                              <ew-text-button
+                                >Add to Home Assistant</ew-text-button
+                              >
+                            </a>
+                          </div>
+                        `
+                  }
+                  <div>
+                    <ew-text-button
+                      @click=${async () => {
+                        // After WiFi provisioning: Device stays in firmware mode
+                        // Close Improv client first
+                        if (this._client) {
+                          try {
+                            await this._closeClientWithoutEvents(this._client);
+                            this.logger.log(
+                              "Improv client closed after provisioning",
+                            );
+                          } catch (e) {
+                            this.logger.log(
+                              "Failed to close Improv client:",
+                              e,
+                            );
+                          }
+                        }
+
+                        // Release locks and stay in firmware mode
+                        await this._releaseReaderWriter();
+                        this.logger.log(
+                          "Returning to dashboard (device stays in firmware mode)",
+                        );
+
+                        this._state = "DASHBOARD";
+                      }}
+                      >Skip</ew-text-button
+                    >
+                  </div>
+                </div>
+              `
+            : html`
+                <ew-text-button
+                  slot="actions"
+                  @click=${async () => {
+                    // After WiFi provisioning: Device stays in firmware mode
+                    // Close Improv client first
+                    if (this._client) {
+                      try {
+                        await this._closeClientWithoutEvents(this._client);
+                        this.logger.log(
+                          "Improv client closed after provisioning",
+                        );
+                      } catch (e) {
+                        this.logger.log("Failed to close Improv client:", e);
+                      }
+                    }
+
+                    // Release locks and stay in firmware mode
+                    await this._releaseReaderWriter();
+                    this.logger.log(
+                      "Returning to dashboard (device stays in firmware mode)",
+                    );
+
+                    this._state = "DASHBOARD";
+                  }}
+                  >Continue</ew-text-button
+                >
+              `
+        }
       `;
     } else {
       let error: string | undefined;
@@ -1401,40 +1467,44 @@ export class EwtInstallDialog extends LitElement {
           to connect to.
         </div>
         ${error ? html`<p class="error">${error}</p>` : ""}
-        ${this._ssids !== null
-          ? html`
-              <ew-filled-select
-                menu-positioning="fixed"
-                label="Network"
-                @change=${(ev: Event) => {
-                  const select = ev.target as any;
-                  const value = select.value;
-                  // The "Join Other" item has value "-1"
-                  this._selectedSsid =
-                    value === "-1" ? null : this._ssids![parseInt(value)].name;
-                }}
-                @closed=${(ev: Event) => ev.stopPropagation()}
-              >
-                ${this._ssids!.map(
-                  (info, idx) => html`
-                    <ew-select-option
-                      .selected=${this._selectedSsid === info.name}
-                      .value=${String(idx)}
-                    >
-                      ${info.name}
-                    </ew-select-option>
-                  `,
-                )}
-                <ew-divider></ew-divider>
-                <ew-select-option
-                  .selected=${this._selectedSsid === null}
-                  value="-1"
+        ${
+          this._ssids !== null
+            ? html`
+                <ew-filled-select
+                  menu-positioning="fixed"
+                  label="Network"
+                  @change=${(ev: Event) => {
+                    const select = ev.target as any;
+                    const value = select.value;
+                    // The "Join Other" item has value "-1"
+                    this._selectedSsid =
+                      value === "-1"
+                        ? null
+                        : this._ssids![parseInt(value)].name;
+                  }}
+                  @closed=${(ev: Event) => ev.stopPropagation()}
                 >
-                  Join other…
-                </ew-select-option>
-              </ew-filled-select>
-            `
-          : ""}
+                  ${this._ssids!.map(
+                    (info, idx) => html`
+                      <ew-select-option
+                        .selected=${this._selectedSsid === info.name}
+                        .value=${String(idx)}
+                      >
+                        ${info.name}
+                      </ew-select-option>
+                    `,
+                  )}
+                  <ew-divider></ew-divider>
+                  <ew-select-option
+                    .selected=${this._selectedSsid === null}
+                    value="-1"
+                  >
+                    Join other…
+                  </ew-select-option>
+                </ew-filled-select>
+              `
+            : ""
+        }
         ${
           // Show input box if command not supported or "Join Other" selected
           this._selectedSsid === null
@@ -1473,9 +1543,9 @@ export class EwtInstallDialog extends LitElement {
 
             this._state = "DASHBOARD";
           }}
-          >${this._installState && this._installErase
-            ? "Skip"
-            : "Back"}</ew-text-button
+          >${
+            this._installState && this._installErase ? "Skip" : "Back"
+          }</ew-text-button
         >
         <ew-text-button slot="actions" @click=${this._doProvision}
           >Connect</ew-text-button
@@ -1548,29 +1618,34 @@ export class EwtInstallDialog extends LitElement {
       const action = isUpdate ? "update to" : "install";
       // Build device info with flash size if available
       const deviceInfo = this._flashSize
-        ? html` (${this._info?.chipFamily || ""}${this._info?.chipFamily
-            ? `, ${this._flashSize}`
-            : this._flashSize})`
+        ? html` (${this._info?.chipFamily || ""}${
+            this._info?.chipFamily ? `, ${this._flashSize}` : this._flashSize
+          })`
         : "";
       const variantBuild = this._installState?.build ?? this._detectedBuild;
       const variantLabel = variantBuild
         ? this._buildVariantLabel(variantBuild)
         : undefined;
       content = html`
-        ${isUpdate
-          ? html`Your device is running
-              ${this._info!.firmware}&nbsp;${this._info!
-                .version}${deviceInfo}.<br /><br />`
-          : deviceInfo
-            ? html`Device detected: ${deviceInfo}<br /><br />`
-            : ""}
+        ${
+          isUpdate
+            ? html`Your device is running
+                ${this._info!.firmware}&nbsp;${
+                  this._info!.version
+                }${deviceInfo}.<br /><br />`
+            : deviceInfo
+              ? html`Device detected: ${deviceInfo}<br /><br />`
+              : ""
+        }
         Do you want to ${action}
-        ${this._manifest.name}&nbsp;${this._manifest.version}${variantLabel
-          ? html`&nbsp;<em>(${variantLabel})</em>`
-          : ""}?
-        ${this._installErase
-          ? html`<br /><br />All data on the device will be erased.`
-          : ""}
+        ${this._manifest.name}&nbsp;${this._manifest.version}${
+          variantLabel ? html`&nbsp;<em>(${variantLabel})</em>` : ""
+        }?
+        ${
+          this._installErase
+            ? html`<br /><br />All data on the device will be erased.`
+            : ""
+        }
         <ew-text-button
           slot="actions"
           @click=${() => {
@@ -1761,14 +1836,16 @@ export class EwtInstallDialog extends LitElement {
         ? `${chipFamily}${this._flashSize ? `, ${this._flashSize}` : ""}`
         : null;
       content = html`
-        ${deviceInfo
-          ? html`<div
-              class="device-info"
-              style="margin-bottom: 16px; font-size: 14px; color: var(--md-sys-color-on-surface-variant, #666);"
-            >
-              Device: ${deviceInfo}
-            </div>`
-          : ""}
+        ${
+          deviceInfo
+            ? html`<div
+                class="device-info"
+                style="margin-bottom: 16px; font-size: 14px; color: var(--md-sys-color-on-surface-variant, #666);"
+              >
+                Device: ${deviceInfo}
+              </div>`
+            : ""
+        }
         <div class="partition-list">
           <table class="partition-table">
             <thead>
@@ -1791,14 +1868,16 @@ export class EwtInstallDialog extends LitElement {
                     <td>0x${partition.offset.toString(16)}</td>
                     <td>${this._formatSize(partition.size)}</td>
                     <td>
-                      ${partition.type === 0x01 && partition.subtype === 0x82
-                        ? html`
-                            <ew-text-button
-                              @click=${() => this._openFilesystem(partition)}
-                              >Open FS</ew-text-button
-                            >
-                          `
-                        : ""}
+                      ${
+                        partition.type === 0x01 && partition.subtype === 0x82
+                          ? html`
+                              <ew-text-button
+                                @click=${() => this._openFilesystem(partition)}
+                                >Open FS</ew-text-button
+                              >
+                            `
+                          : ""
+                      }
                     </td>
                   </tr>
                 `,
@@ -2286,11 +2365,7 @@ export class EwtInstallDialog extends LitElement {
    */
   private async _switchToFirmwareMode(
     actionAfterReconnect:
-      | "console"
-      | "visit"
-      | "homeassistant"
-      | "wifi"
-      | null = null,
+      "console" | "visit" | "homeassistant" | "wifi" | null = null,
   ): Promise<boolean> {
     const inBootloaderMode = this.esploader.chipFamily !== null;
 
