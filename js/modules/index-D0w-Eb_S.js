@@ -104,18 +104,18 @@ import{y as e,z as t,k as o,_ as l,t as r,b as i,h as a}from"./styles-D4zXLz1s.j
         </div>
         <div slot="actions">
           ${this.doTryAgain?a`
-                <ew-text-button @click=${this._handleClose}
-                  >Cancel</ew-text-button
-                >
-                <ew-text-button
-                  @click=${async()=>{await this._handleClose(),this.doTryAgain()}}
-                  >Try Again</ew-text-button
-                >
-              `:a`
-                <ew-text-button @click=${this._handleClose}
-                  >Close</ew-text-button
-                >
-              `}
+                  <ew-text-button @click=${this._handleClose}
+                    >Cancel</ew-text-button
+                  >
+                  <ew-text-button
+                    @click=${async()=>{await this._handleClose(),this.doTryAgain()}}
+                    >Try Again</ew-text-button
+                  >
+                `:a`
+                  <ew-text-button @click=${this._handleClose}
+                    >Close</ew-text-button
+                  >
+                `}
         </div>
       </ew-dialog>
     `}_preventDefault(e){e.preventDefault()}async _handleClose(){this.remove()}};s.styles=[t,o`

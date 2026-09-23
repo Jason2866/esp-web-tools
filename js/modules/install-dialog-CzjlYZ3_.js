@@ -407,17 +407,17 @@ import{e,i as t,_ as i,n as r,m as o,a as s,b as a,r as l,c as n,d,f as c,g as h
             </div>
             <div class="usage-text">
               ${this._isFlashing?u`<span class="flash-status">
-                    ⚡
-                    ${"reading"===this._flashOperation?"Reading from":"Writing to"}
-                    flash: ${this._flashProgress}%
-                  </span>`:u`<span
-                      >Used: ${this._formatSize(this._usage.usedBytes)} /
-                      ${this._formatSize(this._usage.capacityBytes)}
-                      (${e}%)</span
-                    >
-                    ${this._diskVersion?u`<span class="disk-version"
-                          >${this._diskVersion}</span
-                        >`:""}`}
+                      ⚡
+                      ${"reading"===this._flashOperation?"Reading from":"Writing to"}
+                      flash: ${this._flashProgress}%
+                    </span>`:u`<span
+                        >Used: ${this._formatSize(this._usage.usedBytes)} /
+                        ${this._formatSize(this._usage.capacityBytes)}
+                        (${e}%)</span
+                      >
+                      ${this._diskVersion?u`<span class="disk-version"
+                              >${this._diskVersion}</span
+                            >`:""}`}
             </div>
           </div>
         </div>
@@ -476,49 +476,51 @@ import{e,i as t,_ as i,n as r,m as o,a as s,b as a,r as l,c as n,d,f as c,g as h
             </thead>
             <tbody>
               ${0===this._files.length?u`
-                    <tr>
-                      <td colspan="4" class="empty-state">
-                        No files in this directory
-                      </td>
-                    </tr>
-                  `:this._files.map(e=>u`
                       <tr>
-                        <td>
-                          <div
-                            class="file-name ${"dir"===e.type?"clickable":""}"
-                            @click=${"dir"===e.type?()=>this._navigateTo(e.path):null}
-                          >
-                            <span class="file-icon"
-                              >${"dir"===e.type?"📁":"📄"}</span
-                            >
-                            <span
-                              >${e.path.split("/").filter(Boolean).pop()||"/"}</span
-                            >
-                          </div>
-                        </td>
-                        <td>${"dir"===e.type?"Directory":"File"}</td>
-                        <td>
-                          ${"file"===e.type?this._formatSize(e.size):"-"}
-                        </td>
-                        <td>
-                          <div class="file-actions">
-                            ${"file"===e.type?u`
-                                  <ew-text-button
-                                    @click=${()=>this._downloadFile(e.path)}
-                                    ?disabled=${this._busy}
-                                    >Download</ew-text-button
-                                  >
-                                `:""}
-                            <ew-text-button
-                              class="danger"
-                              @click=${()=>this._deleteFile(e.path,e.type)}
-                              ?disabled=${this._busy}
-                              >Delete</ew-text-button
-                            >
-                          </div>
+                        <td colspan="4" class="empty-state">
+                          No files in this directory
                         </td>
                       </tr>
-                    `)}
+                    `:this._files.map(e=>u`
+                        <tr>
+                          <td>
+                            <div
+                              class="file-name ${"dir"===e.type?"clickable":""}"
+                              @click=${"dir"===e.type?()=>this._navigateTo(e.path):null}
+                            >
+                              <span class="file-icon"
+                                >${"dir"===e.type?"📁":"📄"}</span
+                              >
+                              <span
+                                >${e.path.split("/").filter(Boolean).pop()||"/"}</span
+                              >
+                            </div>
+                          </td>
+                          <td>
+                            ${"dir"===e.type?"Directory":"File"}
+                          </td>
+                          <td>
+                            ${"file"===e.type?this._formatSize(e.size):"-"}
+                          </td>
+                          <td>
+                            <div class="file-actions">
+                              ${"file"===e.type?u`
+                                      <ew-text-button
+                                        @click=${()=>this._downloadFile(e.path)}
+                                        ?disabled=${this._busy}
+                                        >Download</ew-text-button
+                                      >
+                                    `:""}
+                              <ew-text-button
+                                class="danger"
+                                @click=${()=>this._deleteFile(e.path,e.type)}
+                                ?disabled=${this._busy}
+                                >Delete</ew-text-button
+                              >
+                            </div>
+                          </td>
+                        </tr>
+                      `)}
             </tbody>
           </table>
         </div>
@@ -926,13 +928,16 @@ import{e,i as t,_ as i,n as r,m as o,a as s,b as a,r as l,c as n,d,f as c,g as h
         @closed=${this._handleClose}
       >
         ${e?u`
-              <div slot="headline">${e}</div>
-              ${i?u`
-                    <ew-icon-button slot="headline" @click=${this._closeDialog}>
-                      ${vi}
-                    </ew-icon-button>
-                  `:""}
-            `:""}
+                <div slot="headline">${e}</div>
+                ${i?u`
+                        <ew-icon-button
+                          slot="headline"
+                          @click=${this._closeDialog}
+                        >
+                          ${vi}
+                        </ew-icon-button>
+                      `:""}
+              `:""}
         <div slot="content">${t}</div>
       </ew-dialog>
     `}_renderProgress(e,t){return u`
@@ -965,70 +970,72 @@ import{e,i as t,_ as i,n as r,m as o,a as s,b as a,r as l,c as n,d,f as c,g as h
           </div>
         </ew-list-item>
         ${this._isSameVersion?"":u`
-              <ew-list-item
-                type="button"
-                ?disabled=${this._busy}
-                @click=${()=>{this._isSameFirmware?this._startInstall(!1):this._manifest.new_install_prompt_erase?this._state="ASK_ERASE":this._startInstall(!0)}}
-              >
-                ${yi}
-                <div slot="headline">
-                  ${this._isSameFirmware?`Update ${this._manifest.name}`:`Install ${this._manifest.name}`}
-                </div>
-                ${(()=>{const e=this._detectedBuild?this._buildVariantLabel(this._detectedBuild):void 0;return e?u`<div slot="supporting-text">Variant: ${e}</div>`:""})()}
-              </ew-list-item>
-            `}
+                <ew-list-item
+                  type="button"
+                  ?disabled=${this._busy}
+                  @click=${()=>{this._isSameFirmware?this._startInstall(!1):this._manifest.new_install_prompt_erase?this._state="ASK_ERASE":this._startInstall(!0)}}
+                >
+                  ${yi}
+                  <div slot="headline">
+                    ${this._isSameFirmware?`Update ${this._manifest.name}`:`Install ${this._manifest.name}`}
+                  </div>
+                  ${(()=>{const e=this._detectedBuild?this._buildVariantLabel(this._detectedBuild):void 0;return e?u`<div slot="supporting-text">
+                          Variant: ${e}
+                        </div>`:""})()}
+                </ew-list-item>
+              `}
         ${this._client&&void 0!==this._client.nextUrl?u`
-              <ew-list-item
-                type="button"
-                ?disabled=${this._busy}
-                @click=${async()=>{this._busy=!0;await this._switchToFirmwareMode("visit")||(this._client&&this._client.nextUrl&&window.open(this._client.nextUrl,"_blank","noopener,noreferrer"),this._busy=!1)}}
-              >
-                ${wi}
-                <div slot="headline">Visit Device</div>
-              </ew-list-item>
-            `:""}
+                <ew-list-item
+                  type="button"
+                  ?disabled=${this._busy}
+                  @click=${async()=>{this._busy=!0;await this._switchToFirmwareMode("visit")||(this._client&&this._client.nextUrl&&window.open(this._client.nextUrl,"_blank","noopener,noreferrer"),this._busy=!1)}}
+                >
+                  ${wi}
+                  <div slot="headline">Visit Device</div>
+                </ew-list-item>
+              `:""}
         ${this._client&&this._manifest.home_assistant_domain&&this._client.state===Fi.PROVISIONED?u`
-              <ew-list-item
-                type="button"
-                ?disabled=${this._busy}
-                @click=${async()=>{this._busy=!0;await this._switchToFirmwareMode("homeassistant")||(this._manifest.home_assistant_domain&&window.open(`https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`,"_blank","noopener,noreferrer"),this._busy=!1)}}
-              >
-                ${ki}
-                <div slot="headline">Add to Home Assistant</div>
-              </ew-list-item>
-            `:""}
+                <ew-list-item
+                  type="button"
+                  ?disabled=${this._busy}
+                  @click=${async()=>{this._busy=!0;await this._switchToFirmwareMode("homeassistant")||(this._manifest.home_assistant_domain&&window.open(`https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`,"_blank","noopener,noreferrer"),this._busy=!1)}}
+                >
+                  ${ki}
+                  <div slot="headline">Add to Home Assistant</div>
+                </ew-list-item>
+              `:""}
         ${this._client?u`
-              <ew-list-item
-                type="button"
-                ?disabled=${this._busy}
-                @click=${async()=>{this._busy=!0;if(await this._switchToFirmwareMode("wifi"))return;if(this.logger.log("Device is running firmware for Wi-Fi setup"),this._client){try{await this._closeClientWithoutEvents(this._client),this.logger.log("Improv client closed")}catch(e){this.logger.log("Failed to close Improv client:",e)}this._client=void 0,await ne(500)}const e=await this._isWebUsbWithExternalSerial();if(this.esploader.isWebUSB&&this.esploader.isWebUSB()&&!e){this.logger.log("WebUSB CDC: Resetting device for Wi-Fi setup...");try{await this._releaseReaderWriter(),await this.esploader.hardReset(!1),this.logger.log("Device reset completed"),await this._releaseReaderWriter(),this.logger.log("Streams recreated after reset"),await ne(500)}catch(e){this.logger.log(`Reset error: ${e.message}`)}}else e?this.logger.log("WebUSB external serial: Preparing port for Wi-Fi setup..."):this.logger.log("WebSerial: Preparing port for Wi-Fi setup..."),await this._releaseReaderWriter(),await ne(500);this.logger.log("Port ready for new Improv client"),this.logger.log("Flushing serial buffer before Improv init..."),await this._releaseReaderWriter(),await ne(100);const t=new zi(this._port,this.logger);t.addEventListener("state-changed",()=>{this.requestUpdate()}),t.addEventListener("error-changed",()=>this.requestUpdate());try{this._info=await t.initialize(1e4),this._client=t,t.addEventListener("disconnect",this._handleDisconnect),this.logger.log("Improv client ready for Wi-Fi provisioning")}catch(e){try{await this._closeClientWithoutEvents(t)}catch(e){this.logger.log("Failed to close Improv client after init error:",e)}try{await this._releaseReaderWriter(),this.logger.log("Streams recreated after Improv failure")}catch(e){this.logger.log(`Failed to recreate streams: ${e.message}`)}return this.logger.log(`Improv initialization failed: ${e.message}`),this._error=`Improv initialization failed: ${e.message}`,this._state="ERROR",void(this._busy=!1)}this._state="PROVISION",this._provisionForce=!0,this._busy=!1}}
-              >
-                ${_i}
-                <div slot="headline">
-                  ${this._client.state===Fi.READY?"Connect to Wi-Fi":"Change Wi-Fi"}
-                </div>
-              </ew-list-item>
-            `:""}
+                <ew-list-item
+                  type="button"
+                  ?disabled=${this._busy}
+                  @click=${async()=>{this._busy=!0;if(await this._switchToFirmwareMode("wifi"))return;if(this.logger.log("Device is running firmware for Wi-Fi setup"),this._client){try{await this._closeClientWithoutEvents(this._client),this.logger.log("Improv client closed")}catch(e){this.logger.log("Failed to close Improv client:",e)}this._client=void 0,await ne(500)}const e=await this._isWebUsbWithExternalSerial();if(this.esploader.isWebUSB&&this.esploader.isWebUSB()&&!e){this.logger.log("WebUSB CDC: Resetting device for Wi-Fi setup...");try{await this._releaseReaderWriter(),await this.esploader.hardReset(!1),this.logger.log("Device reset completed"),await this._releaseReaderWriter(),this.logger.log("Streams recreated after reset"),await ne(500)}catch(e){this.logger.log(`Reset error: ${e.message}`)}}else e?this.logger.log("WebUSB external serial: Preparing port for Wi-Fi setup..."):this.logger.log("WebSerial: Preparing port for Wi-Fi setup..."),await this._releaseReaderWriter(),await ne(500);this.logger.log("Port ready for new Improv client"),this.logger.log("Flushing serial buffer before Improv init..."),await this._releaseReaderWriter(),await ne(100);const t=new zi(this._port,this.logger);t.addEventListener("state-changed",()=>{this.requestUpdate()}),t.addEventListener("error-changed",()=>this.requestUpdate());try{this._info=await t.initialize(1e4),this._client=t,t.addEventListener("disconnect",this._handleDisconnect),this.logger.log("Improv client ready for Wi-Fi provisioning")}catch(e){try{await this._closeClientWithoutEvents(t)}catch(e){this.logger.log("Failed to close Improv client after init error:",e)}try{await this._releaseReaderWriter(),this.logger.log("Streams recreated after Improv failure")}catch(e){this.logger.log(`Failed to recreate streams: ${e.message}`)}return this.logger.log(`Improv initialization failed: ${e.message}`),this._error=`Improv initialization failed: ${e.message}`,this._state="ERROR",void(this._busy=!1)}this._state="PROVISION",this._provisionForce=!0,this._busy=!1}}
+                >
+                  ${_i}
+                  <div slot="headline">
+                    ${this._client.state===Fi.READY?"Connect to Wi-Fi":"Change Wi-Fi"}
+                  </div>
+                </ew-list-item>
+              `:""}
         ${this._isUsbJtagOrOtgDevice?u`
-              <ew-list-item
-                type="button"
-                ?disabled=${this._busy}
-                @click=${async()=>{if(this._busy=!0,this._client)try{await this._closeClientWithoutEvents(this._client)}catch(e){this.logger.log("Failed to close Improv client:",e)}await this._switchToFirmwareMode("console")||(this.logger.log("Opening console for USB-JTAG/OTG device (in firmware mode)"),this._state="LOGS",this._busy=!1)}}
-              >
-                ${xi}
-                <div slot="headline">Open Console</div>
-              </ew-list-item>
-            `:""}
+                <ew-list-item
+                  type="button"
+                  ?disabled=${this._busy}
+                  @click=${async()=>{if(this._busy=!0,this._client)try{await this._closeClientWithoutEvents(this._client)}catch(e){this.logger.log("Failed to close Improv client:",e)}await this._switchToFirmwareMode("console")||(this.logger.log("Opening console for USB-JTAG/OTG device (in firmware mode)"),this._state="LOGS",this._busy=!1)}}
+                >
+                  ${xi}
+                  <div slot="headline">Open Console</div>
+                </ew-list-item>
+              `:""}
         ${this._isUsbJtagOrOtgDevice?"":u`
-              <ew-list-item
-                type="button"
-                ?disabled=${this._busy}
-                @click=${async()=>{const e=this._client;e&&await this._closeClientWithoutEvents(e),await this._switchToFirmwareMode("console"),this._state="LOGS"}}
-              >
-                ${xi}
-                <div slot="headline">Logs &amp; Console</div>
-              </ew-list-item>
-            `}
+                <ew-list-item
+                  type="button"
+                  ?disabled=${this._busy}
+                  @click=${async()=>{const e=this._client;e&&await this._closeClientWithoutEvents(e),await this._switchToFirmwareMode("console"),this._state="LOGS"}}
+                >
+                  ${xi}
+                  <div slot="headline">Logs &amp; Console</div>
+                </ew-list-item>
+              `}
         <ew-list-item
           type="button"
           ?disabled=${this._busy}
@@ -1038,35 +1045,35 @@ import{e,i as t,_ as i,n as r,m as o,a as s,b as a,r as l,c as n,d,f as c,g as h
           <div slot="headline">Manage Filesystem</div>
         </ew-list-item>
         ${this._isSameFirmware&&this._manifest.funding_url?u`
-              <ew-list-item
-                type="link"
-                href=${this._manifest.funding_url}
-                target="_blank"
-              >
-                ${$i}
-                <div slot="headline">Fund Development</div>
-              </ew-list-item>
-            `:""}
+                <ew-list-item
+                  type="link"
+                  href=${this._manifest.funding_url}
+                  target="_blank"
+                >
+                  ${$i}
+                  <div slot="headline">Fund Development</div>
+                </ew-list-item>
+              `:""}
         ${this._isSameVersion?u`
-              <ew-list-item
-                type="button"
-                class="danger"
-                ?disabled=${this._busy}
-                @click=${()=>this._startInstall(!0)}
-              >
-                ${Si}
-                <div slot="headline">Erase User Data</div>
-              </ew-list-item>
-            `:""}
+                <ew-list-item
+                  type="button"
+                  class="danger"
+                  ?disabled=${this._busy}
+                  @click=${()=>this._startInstall(!0)}
+                >
+                  ${Si}
+                  <div slot="headline">Erase User Data</div>
+                </ew-list-item>
+              `:""}
       </ew-list>
     `;return[e,t,!0,!0]}_renderDashboardNoImprov(){const e=this.esploader.chipFamily?Pi(this.esploader):null,t=e?`(${e}${this._flashSize?`, ${this._flashSize}`:""})`:null,i=u`
       <ew-list>
         ${t?u`
-              <ew-list-item>
-                <div slot="headline">${e}</div>
-                <div slot="supporting-text">${t}</div>
-              </ew-list-item>
-            `:""}
+                <ew-list-item>
+                  <div slot="headline">${e}</div>
+                  <div slot="supporting-text">${t}</div>
+                </ew-list-item>
+              `:""}
         <ew-list-item
           type="button"
           ?disabled=${this._busy}
@@ -1078,25 +1085,25 @@ import{e,i as t,_ as i,n as r,m as o,a as s,b as a,r as l,c as n,d,f as c,g as h
         </ew-list-item>
 
         ${this._isUsbJtagOrOtgDevice?"":u`
-              <ew-list-item
-                type="button"
-                ?disabled=${this._busy}
-                @click=${async()=>{this._busy=!0;const e=this._client;e&&await this._closeClientWithoutEvents(e);await this._switchToFirmwareMode("console")||(this._state="LOGS",this._busy=!1)}}
-              >
-                ${xi}
-                <div slot="headline">Logs &amp; Console</div>
-              </ew-list-item>
-            `}
+                <ew-list-item
+                  type="button"
+                  ?disabled=${this._busy}
+                  @click=${async()=>{this._busy=!0;const e=this._client;e&&await this._closeClientWithoutEvents(e);await this._switchToFirmwareMode("console")||(this._state="LOGS",this._busy=!1)}}
+                >
+                  ${xi}
+                  <div slot="headline">Logs &amp; Console</div>
+                </ew-list-item>
+              `}
         ${this._isUsbJtagOrOtgDevice?u`
-              <ew-list-item
-                type="button"
-                ?disabled=${this._busy}
-                @click=${async()=>{if(this._busy=!0,this._client)try{await this._closeClientWithoutEvents(this._client)}catch(e){this.logger.log("Failed to close Improv client:",e)}await this._switchToFirmwareMode("console")||(this.logger.log("Opening console for USB-JTAG/OTG device (in firmware mode)"),this._state="LOGS",this._busy=!1)}}
-              >
-                ${xi}
-                <div slot="headline">Open Console</div>
-              </ew-list-item>
-            `:""}
+                <ew-list-item
+                  type="button"
+                  ?disabled=${this._busy}
+                  @click=${async()=>{if(this._busy=!0,this._client)try{await this._closeClientWithoutEvents(this._client)}catch(e){this.logger.log("Failed to close Improv client:",e)}await this._switchToFirmwareMode("console")||(this.logger.log("Opening console for USB-JTAG/OTG device (in firmware mode)"),this._state="LOGS",this._busy=!1)}}
+                >
+                  ${xi}
+                  <div slot="headline">Open Console</div>
+                </ew-list-item>
+              `:""}
 
         <ew-list-item
           type="button"
@@ -1114,29 +1121,29 @@ import{e,i as t,_ as i,n as r,m as o,a as s,b as a,r as l,c as n,d,f as c,g as h
         </div>
         ${t?u`<p class="error">${t}</p>`:""}
         ${null!==this._ssids?u`
-              <ew-filled-select
-                menu-positioning="fixed"
-                label="Network"
-                @change=${e=>{const t=e.target.value;this._selectedSsid="-1"===t?null:this._ssids[parseInt(t)].name}}
-                @closed=${e=>e.stopPropagation()}
-              >
-                ${this._ssids.map((e,t)=>u`
-                    <ew-select-option
-                      .selected=${this._selectedSsid===e.name}
-                      .value=${String(t)}
-                    >
-                      ${e.name}
-                    </ew-select-option>
-                  `)}
-                <ew-divider></ew-divider>
-                <ew-select-option
-                  .selected=${null===this._selectedSsid}
-                  value="-1"
+                <ew-filled-select
+                  menu-positioning="fixed"
+                  label="Network"
+                  @change=${e=>{const t=e.target.value;this._selectedSsid="-1"===t?null:this._ssids[parseInt(t)].name}}
+                  @closed=${e=>e.stopPropagation()}
                 >
-                  Join other…
-                </ew-select-option>
-              </ew-filled-select>
-            `:""}
+                  ${this._ssids.map((e,t)=>u`
+                      <ew-select-option
+                        .selected=${this._selectedSsid===e.name}
+                        .value=${String(t)}
+                      >
+                        ${e.name}
+                      </ew-select-option>
+                    `)}
+                  <ew-divider></ew-divider>
+                  <ew-select-option
+                    .selected=${null===this._selectedSsid}
+                    value="-1"
+                  >
+                    Join other…
+                  </ew-select-option>
+                </ew-filled-select>
+              `:""}
         ${null===this._selectedSsid?u`
                 <ew-filled-text-field
                   label="Network Name"
@@ -1162,45 +1169,47 @@ import{e,i as t,_ as i,n as r,m as o,a as s,b as a,r as l,c as n,d,f as c,g as h
           label="Device connected to the network!"
         ></ewt-page-message>
         ${r?u`
-              <div class="dashboard-buttons">
-                ${void 0===this._client.nextUrl?"":u`
-                      <div>
-                        <a
-                          href=${this._client.nextUrl}
-                          class="has-button"
-                          target="_blank"
-                          @click=${async e=>{e.preventDefault();const t=this._client.nextUrl,i=window.open("about:blank","_blank");await this._switchToFirmwareMode("visit")?null==i||i.close():(this.logger.log("Following Link (in firmware mode)"),i?i.location.href=t:window.open(t,"_blank","noopener,noreferrer"),this._state="DASHBOARD")}}
-                        >
-                          <ew-text-button>Visit Device</ew-text-button>
-                        </a>
-                      </div>
-                    `}
-                ${this._manifest.home_assistant_domain?u`
-                      <div>
-                        <a
-                          href=${`https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`}
-                          class="has-button"
-                          target="_blank"
-                          @click=${async e=>{e.preventDefault();const t=`https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`,i=window.open("about:blank","_blank");await this._switchToFirmwareMode("homeassistant")?null==i||i.close():(this.logger.log("Following Link (in firmware mode)"),i?i.location.href=t:window.open(t,"_blank","noopener,noreferrer"),this._state="DASHBOARD")}}
-                        >
-                          <ew-text-button>Add to Home Assistant</ew-text-button>
-                        </a>
-                      </div>
-                    `:""}
-                <div>
-                  <ew-text-button
-                    @click=${async()=>{if(this._client)try{await this._closeClientWithoutEvents(this._client),this.logger.log("Improv client closed after provisioning")}catch(e){this.logger.log("Failed to close Improv client:",e)}await this._releaseReaderWriter(),this.logger.log("Returning to dashboard (device stays in firmware mode)"),this._state="DASHBOARD"}}
-                    >Skip</ew-text-button
-                  >
+                <div class="dashboard-buttons">
+                  ${void 0===this._client.nextUrl?"":u`
+                          <div>
+                            <a
+                              href=${this._client.nextUrl}
+                              class="has-button"
+                              target="_blank"
+                              @click=${async e=>{e.preventDefault();const t=this._client.nextUrl,i=window.open("about:blank","_blank");await this._switchToFirmwareMode("visit")?null==i||i.close():(this.logger.log("Following Link (in firmware mode)"),i?i.location.href=t:window.open(t,"_blank","noopener,noreferrer"),this._state="DASHBOARD")}}
+                            >
+                              <ew-text-button>Visit Device</ew-text-button>
+                            </a>
+                          </div>
+                        `}
+                  ${this._manifest.home_assistant_domain?u`
+                          <div>
+                            <a
+                              href=${`https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`}
+                              class="has-button"
+                              target="_blank"
+                              @click=${async e=>{e.preventDefault();const t=`https://my.home-assistant.io/redirect/config_flow_start/?domain=${this._manifest.home_assistant_domain}`,i=window.open("about:blank","_blank");await this._switchToFirmwareMode("homeassistant")?null==i||i.close():(this.logger.log("Following Link (in firmware mode)"),i?i.location.href=t:window.open(t,"_blank","noopener,noreferrer"),this._state="DASHBOARD")}}
+                            >
+                              <ew-text-button
+                                >Add to Home Assistant</ew-text-button
+                              >
+                            </a>
+                          </div>
+                        `:""}
+                  <div>
+                    <ew-text-button
+                      @click=${async()=>{if(this._client)try{await this._closeClientWithoutEvents(this._client),this.logger.log("Improv client closed after provisioning")}catch(e){this.logger.log("Failed to close Improv client:",e)}await this._releaseReaderWriter(),this.logger.log("Returning to dashboard (device stays in firmware mode)"),this._state="DASHBOARD"}}
+                      >Skip</ew-text-button
+                    >
+                  </div>
                 </div>
-              </div>
-            `:u`
-              <ew-text-button
-                slot="actions"
-                @click=${async()=>{if(this._client)try{await this._closeClientWithoutEvents(this._client),this.logger.log("Improv client closed after provisioning")}catch(e){this.logger.log("Failed to close Improv client:",e)}await this._releaseReaderWriter(),this.logger.log("Returning to dashboard (device stays in firmware mode)"),this._state="DASHBOARD"}}
-                >Continue</ew-text-button
-              >
-            `}
+              `:u`
+                <ew-text-button
+                  slot="actions"
+                  @click=${async()=>{if(this._client)try{await this._closeClientWithoutEvents(this._client),this.logger.log("Improv client closed after provisioning")}catch(e){this.logger.log("Failed to close Improv client:",e)}await this._releaseReaderWriter(),this.logger.log("Returning to dashboard (device stays in firmware mode)"),this._state="DASHBOARD"}}
+                  >Continue</ew-text-button
+                >
+              `}
       `}return[t,e,i]}_renderAskErase(){return["Erase device",u`
       <div>
         Do you want to erase the device before installing
@@ -1261,7 +1270,7 @@ import{e,i as t,_ as i,n as r,m as o,a as s,b as a,r as l,c as n,d,f as c,g as h
         >
       `}else{s="Installing";const e=(null===(o=this._installState)||void 0===o?void 0:o.flashSize)?`Preparing installation (${this._installState.flashSize})`:"Preparing installation";a=this._renderProgress(e),l=!0}else{s="Confirm Installation";const o=n?"update to":"install",l=this._flashSize?u` (${(null===(e=this._info)||void 0===e?void 0:e.chipFamily)||""}${(null===(t=this._info)||void 0===t?void 0:t.chipFamily)?`, ${this._flashSize}`:this._flashSize})`:"",d=null!==(r=null===(i=this._installState)||void 0===i?void 0:i.build)&&void 0!==r?r:this._detectedBuild,c=d?this._buildVariantLabel(d):void 0;a=u`
         ${n?u`Your device is running
-              ${this._info.firmware}&nbsp;${this._info.version}${l}.<br /><br />`:l?u`Device detected: ${l}<br /><br />`:""}
+                ${this._info.firmware}&nbsp;${this._info.version}${l}.<br /><br />`:l?u`Device detected: ${l}<br /><br />`:""}
         Do you want to ${o}
         ${this._manifest.name}&nbsp;${this._manifest.version}${c?u`&nbsp;<em>(${c})</em>`:""}?
         ${this._installErase?u`<br /><br />All data on the device will be erased.`:""}
@@ -1296,11 +1305,11 @@ import{e,i as t,_ as i,n as r,m as o,a as s,b as a,r as l,c as n,d,f as c,g as h
       >
     `,!1]}_renderPartitions(){let e;if(this._busy)e=this._renderProgress("Reading partition table...");else if(this._partitions&&0!==this._partitions.length){const t=this.esploader.chipFamily?Pi(this.esploader):null,i=t?`${t}${this._flashSize?`, ${this._flashSize}`:""}`:null;e=u`
         ${i?u`<div
-              class="device-info"
-              style="margin-bottom: 16px; font-size: 14px; color: var(--md-sys-color-on-surface-variant, #666);"
-            >
-              Device: ${i}
-            </div>`:""}
+                class="device-info"
+                style="margin-bottom: 16px; font-size: 14px; color: var(--md-sys-color-on-surface-variant, #666);"
+              >
+                Device: ${i}
+              </div>`:""}
         <div class="partition-list">
           <table class="partition-table">
             <thead>
@@ -1323,11 +1332,11 @@ import{e,i as t,_ as i,n as r,m as o,a as s,b as a,r as l,c as n,d,f as c,g as h
                     <td>${this._formatSize(e.size)}</td>
                     <td>
                       ${1===e.type&&130===e.subtype?u`
-                            <ew-text-button
-                              @click=${()=>this._openFilesystem(e)}
-                              >Open FS</ew-text-button
-                            >
-                          `:""}
+                              <ew-text-button
+                                @click=${()=>this._openFilesystem(e)}
+                                >Open FS</ew-text-button
+                              >
+                            `:""}
                     </td>
                   </tr>
                 `)}
