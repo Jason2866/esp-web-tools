@@ -74,6 +74,13 @@ Example manifest:
       ]
     },
     {
+      "chipFamily": "ESP32-S31",
+      "improv": true,
+      "parts": [
+        { "path": "../firmware/tasmota32/tasmota32s31.factory.bin", "offset": 0 }
+      ]
+    },
+    {
       "chipFamily": "ESP8266",
       "improv": true,
       "parts": [{ "path": "../firmware/tasmota/tasmota.bin", "offset": 0 }]
